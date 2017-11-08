@@ -1,0 +1,40 @@
+{
+	"name"            : "@detox/transport",
+	"description"     : "High-level utilities that combine under simple interfaces complexity of the transport layer used in Detox project",
+	"keywords"        : [
+		"detox",
+		"transport"
+	],
+	"version"         : "",
+	"homepage"        : "https://github.com/Detox/detox-transport",
+	"author"          : {
+		"name"  : "Nazar Mokrynskyi",
+		"email" : "nazar@mokrynskyi.com",
+		"url"   : "https://cleverstyle.org"
+	},
+	"repository"      : {
+		"type" : "git",
+		"url"  : "git://github.com/Detox/detox-transport.git"
+	},
+	"licenses"        : [
+		{
+			"type" : "MIT",
+			"url"  : "https://github.com/Detox/detox-transport/blob/master/license.txt"
+		}
+	],
+	"bugs"            : "https://github.com/Detox/detox-transport/issues",
+	"docs"            : "https://github.com/Detox/detox-transport",
+	"main"            : "src/index.js",
+	"files"           : [
+		"src"
+	],
+	"scripts"         : {
+		"test" : "tape tests/**/*.js"
+	},
+	"dependencies"    : {},
+	"devDependencies" : {
+		"google-closure-compiler-js" : "^20170910.0.1",
+		"gulp"                       : "^3.9.1",
+		"tape"                       : "^4.8.0"
+	}
+}
