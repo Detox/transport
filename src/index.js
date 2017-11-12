@@ -6,7 +6,18 @@
  * @license   MIT License, see license.txt
  */
 (function(){
-  function Transport(webtorrentDht, ronion){
+  function Transport(webtorrentDht, ronion, jssha){
+    /**
+     * @param {!Uint8Array} data
+     *
+     * @return {string}
+     */
+    function sha3_256(data){
+      var shaObj;
+      shaObj = new jsSHA('SHA3-256', 'ARRAYBUFFER');
+      shaObj.update(array);
+      return shaObj.getHash('HEX');
+    }
     /**
      * @constructor
      *
@@ -23,6 +34,7 @@
       this._dht = new DHT({
         nodeId: node_id,
         bootstrap_nodes: bootstrap_nodes,
+        hash: sha3_256,
         simple_peer_opts: {
           config: {
             iceServers: ice_servers
@@ -63,10 +75,10 @@
     };
   }
   if (typeof define === 'function' && define['amd']) {
-    define(['webtorrent-dht', 'ronion'], Transport);
+    define(['webtorrent-dht', 'ronion', 'jssha/src/sha3'], Transport);
   } else if (typeof exports === 'object') {
-    module.exports = Transport(require('webtorrent-dht'), require('ronion'));
+    module.exports = Transport(require('webtorrent-dht'), require('ronion'), require('jssha/src/sha3'));
   } else {
-    this['detox_transport'] = Transport(this['webtorrent_dht'], this['ronion']);
+    this['detox_transport'] = Transport(this['webtorrent_dht'], this['ronion'], this['jsSHA']);
   }
 }).call(this);

@@ -32,6 +32,7 @@
 		"test" : "tape tests/**/*.js"
 	},
 	"dependencies"    : {
+		"jssha"          : "^2.3.1",
 		"ronion"         : "^0.1.0",
 		"webtorrent-dht" : "^0.5.0"
 	},

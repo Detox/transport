@@ -4,7 +4,16 @@
  * @copyright Copyright (c) 2017, Nazar Mokrynskyi
  * @license   MIT License, see license.txt
  */
-function Transport (webtorrent-dht, ronion)
+function Transport (webtorrent-dht, ronion, jssha)
+	/**
+	 * @param {!Uint8Array} data
+	 *
+	 * @return {string}
+	 */
+	function sha3_256 (data)
+		shaObj = new jsSHA('SHA3-256', 'ARRAYBUFFER');
+		shaObj.update(array)
+		shaObj.getHash('HEX')
 	/**
 	 * @constructor
 	 *
@@ -20,7 +29,7 @@ function Transport (webtorrent-dht, ronion)
 		@_dht	= new DHT(
 			nodeId				: node_id
 			bootstrap_nodes		: bootstrap_nodes
-			#hash				: TODO
+			hash				: sha3_256
 			simple_peer_opts	:
 				config	:
 					iceServers	: ice_servers
@@ -53,10 +62,10 @@ function Transport (webtorrent-dht, ronion)
 
 if typeof define == 'function' && define['amd']
 	# AMD
-	define(['webtorrent-dht', 'ronion'], Transport)
+	define(['webtorrent-dht', 'ronion', 'jssha/src/sha3'], Transport)
 else if typeof exports == 'object'
 	# CommonJS
-	module.exports = Transport(require('webtorrent-dht'), require('ronion'))
+	module.exports = Transport(require('webtorrent-dht'), require('ronion'), require('jssha/src/sha3'))
 else
 	# Browser globals
-	@'detox_transport' = Transport(@'webtorrent_dht', @'ronion')
+	@'detox_transport' = Transport(@'webtorrent_dht', @'ronion', @'jsSHA')
