@@ -20,16 +20,18 @@ function Transport (webtorrent-dht, ronion, jssha)
 	 * @param {!Uint8Array}	node_id
 	 * @param {!string[]}	bootstrap_nodes
 	 * @param {!Object[]}	ice_servers
+	 * @param {number}		bucket_size
 	 *
 	 * @return {DHT}
 	 */
-	!function DHT (node_id, bootstrap_nodes, ice_servers)
+	!function DHT (node_id, bootstrap_nodes, ice_servers, bucket_size = 2)
 		if !(@ instanceof DHT)
-			return new DHT(node_id, bootstrap_nodes, ice_servers)
+			return new DHT(node_id, bootstrap_nodes, ice_servers, bucket_size)
 		@_dht	= new DHT(
-			nodeId				: node_id
 			bootstrap			: bootstrap_nodes
 			hash				: sha3_256
+			k					: bucket_size
+			nodeId				: node_id
 			simple_peer_opts	:
 				config	:
 					iceServers	: ice_servers
