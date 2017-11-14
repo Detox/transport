@@ -33,7 +33,7 @@
       }
       this._dht = new DHT({
         nodeId: node_id,
-        bootstrap_nodes: bootstrap_nodes,
+        bootstrap: bootstrap_nodes,
         hash: sha3_256,
         simple_peer_opts: {
           config: {
