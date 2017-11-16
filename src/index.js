@@ -7,16 +7,15 @@
  */
 (function(){
   function Transport(webtorrentDht, ronion, jssha){
-    var webrtcSocket, simplePeer, x$;
+    var webrtcSocket, simplePeer, x$, y$;
     webrtcSocket = webtorrentDht({
       bootstrap: []
     })._rpc.socket.socket;
     simplePeer = webrtcSocket._simple_peer_constructor;
     /**
-     * We'll reuse single WebRTC connection for both DHT and anonymous routing
+     * @constructor
      *
-     * Also we'll authenticate remove peers by requiring them to sign SDP by their DHT key as well as will send all of the data in chunks of fixed size after
-     * fixed intervals
+     * @param {!Array} options
      */
     function webrtcSocketDetox(options){
       if (!(this instanceof webrtcSocketDetox)) {
@@ -27,6 +26,9 @@
     webrtcSocketDetox.prototype = Object.create(webrtcSocket.prototype);
     x$ = webrtcSocketDetox.prototype;
     /**
+     * We'll reuse single WebRTC connection for both DHT and anonymous routing,
+     * so we don't want to immediately disconnect from the node as soon as it is not used by DHT
+     *
      * @param {string} id
      */
     x$.del_id_mapping = function(id){
@@ -40,6 +42,46 @@
     Object.defineProperty(webrtcSocketDetox.prototype, 'constructor', {
       enumerable: false,
       value: webrtcSocketDetox
+    });
+    /**
+     * We'll authenticate remove peers by requiring them to sign SDP by their DHT key as well as will send all of the data in chunks of fixed size after
+     * fixed time intervals
+     *
+     * @constructor
+     *
+     * @param {!Array} options
+     */
+    function simplePeerDetox(options){
+      if (!(this instanceof simplePeerDetox)) {
+        return new simplePeerDetox(options);
+      }
+      simplePeer.call(this, options);
+    }
+    simplePeerDetox.prototype = Object.create(simplePeer.prototype);
+    y$ = simplePeerDetox.prototype;
+    /**
+     * Data sending method that will be used by DHT
+     *
+     * @param {Buffer} data
+     */
+    y$.send = function(data){
+      this.real_send(data, true);
+    };
+    y$.send_routing(function(data){
+      this.real_send(data, false);
+    });
+    /**
+     * Actual data sending method moved here
+     *
+     * @param {Uint8Array}	data
+     * @param {boolean}		for_dht	Whether data sent are for DHT or not
+     */
+    y$.real_send = function(data, for_dht){
+      simplePeer.prototype.send.call(this, data);
+    };
+    Object.defineProperty(simplePeerDetox.prototype, 'constructor', {
+      enumerable: false,
+      value: simplePeerDetox
     });
     /**
      * @param {!Uint8Array} data
@@ -73,6 +115,7 @@
         k: bucket_size,
         nodeId: node_id,
         socket: webrtcSocketDetox({
+          simple_peer_constructor: simplePeerDetox,
           simple_peer_opts: {
             config: {
               iceServers: ice_servers
