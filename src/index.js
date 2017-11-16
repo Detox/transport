@@ -7,6 +7,40 @@
  */
 (function(){
   function Transport(webtorrentDht, ronion, jssha){
+    var webrtcSocket, simplePeer, x$;
+    webrtcSocket = webtorrentDht({
+      bootstrap: []
+    })._rpc.socket.socket;
+    simplePeer = webrtcSocket._simple_peer_constructor;
+    /**
+     * We'll reuse single WebRTC connection for both DHT and anonymous routing
+     *
+     * Also we'll authenticate remove peers by requiring them to sign SDP by their DHT key as well as will send all of the data in chunks of fixed size after
+     * fixed intervals
+     */
+    function webrtcSocketDetox(options){
+      if (!(this instanceof webrtcSocketDetox)) {
+        return new webrtcSocketDetox(options);
+      }
+      webrtcSocket.call(this, options);
+    }
+    webrtcSocketDetox.prototype = Object.create(webrtcSocket.prototype);
+    x$ = webrtcSocketDetox.prototype;
+    /**
+     * @param {string} id
+     */
+    x$.del_id_mapping = function(id){
+      var peer_connection;
+      peer_connection = this.get_id_mapping(id);
+      if (peer_connection.connected && !peer_connection.destroyed && peer_connection._used_by_detox) {
+        return;
+      }
+      webrtcSocket.prototype.del_id_mapping(id);
+    };
+    Object.defineProperty(webrtcSocketDetox.prototype, 'constructor', {
+      enumerable: false,
+      value: webrtcSocketDetox
+    });
     /**
      * @param {!Uint8Array} data
      *
@@ -38,11 +72,13 @@
         hash: sha3_256,
         k: bucket_size,
         nodeId: node_id,
-        simple_peer_opts: {
-          config: {
-            iceServers: ice_servers
+        socket: webrtcSocketDetox({
+          simple_peer_opts: {
+            config: {
+              iceServers: ice_servers
+            }
           }
-        }
+        })
       });
     }
     DHT.prototype = {

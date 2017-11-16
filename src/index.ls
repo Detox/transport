@@ -5,6 +5,35 @@
  * @license   MIT License, see license.txt
  */
 function Transport (webtorrent-dht, ronion, jssha)
+	webrtc-socket	= webtorrent-dht({bootstrap: []})._rpc.socket.socket
+	# TODO: Dirty hack in order to not include simple-peer second time on frontend
+	simple-peer		= webrtc-socket._simple_peer_constructor
+	# TODO: wrap data sending and receiving methods for separating DHT data and anonymous routing data
+	/**
+	 * We'll reuse single WebRTC connection for both DHT and anonymous routing
+	 *
+	 * Also we'll authenticate remove peers by requiring them to sign SDP by their DHT key as well as will send all of the data in chunks of fixed size after
+	 * fixed intervals
+	 */
+	!function webrtc-socket-detox (options)
+		if !(@ instanceof webrtc-socket-detox)
+			return new webrtc-socket-detox(options)
+		webrtc-socket.call(@, options)
+
+	webrtc-socket-detox:: = Object.create(webrtc-socket::)
+	webrtc-socket-detox::
+		/**
+		 * @param {string} id
+		 */
+		..del_id_mapping = (id) !->
+			peer_connection	= @get_id_mapping(id)
+			# TODO: assign _used_by_detox property
+			if peer_connection.connected && !peer_connection.destroyed && peer_connection._used_by_detox
+				# Do not actually disconnect from the node that is actively used by Detox
+				return
+			webrtc-socket::del_id_mapping(id)
+
+	Object.defineProperty(webrtc-socket-detox::, 'constructor', {enumerable: false, value: webrtc-socket-detox})
 	/**
 	 * @param {!Uint8Array} data
 	 *
@@ -32,9 +61,11 @@ function Transport (webtorrent-dht, ronion, jssha)
 			hash				: sha3_256
 			k					: bucket_size
 			nodeId				: node_id
-			simple_peer_opts	:
-				config	:
-					iceServers	: ice_servers
+			socket				: webrtc-socket-detox(
+				simple_peer_opts	:
+					config	:
+						iceServers	: ice_servers
+			)
 		)
 	DHT::	=
 		/**
