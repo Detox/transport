@@ -7,42 +7,11 @@
  */
 (function(){
   function Transport(webtorrentDht, ronion, jssha, asyncEventer){
-    var webrtcSocket, simplePeer, x$, y$, z$;
+    var webrtcSocket, simplePeer, x$, y$;
     webrtcSocket = webtorrentDht({
       bootstrap: []
     })._rpc.socket.socket;
     simplePeer = webrtcSocket._simple_peer_constructor;
-    /**
-     * @constructor
-     *
-     * @param {!Array} options
-     */
-    function webrtcSocketDetox(options){
-      if (!(this instanceof webrtcSocketDetox)) {
-        return new webrtcSocketDetox(options);
-      }
-      webrtcSocket.call(this, options);
-    }
-    webrtcSocketDetox.prototype = Object.create(webrtcSocket.prototype);
-    x$ = webrtcSocketDetox.prototype;
-    /**
-     * We'll reuse single WebRTC connection for both DHT and anonymous routing,
-     * so we don't want to immediately disconnect from the node as soon as it is not used by DHT
-     *
-     * @param {string} id
-     */
-    x$.del_id_mapping = function(id){
-      var peer_connection;
-      peer_connection = this.get_id_mapping(id);
-      if (peer_connection.connected && !peer_connection.destroyed && peer_connection._used_by_detox) {
-        return;
-      }
-      webrtcSocket.prototype.del_id_mapping(id);
-    };
-    Object.defineProperty(webrtcSocketDetox.prototype, 'constructor', {
-      enumerable: false,
-      value: webrtcSocketDetox
-    });
     /**
      * We'll authenticate remove peers by requiring them to sign SDP by their DHT key
      * TODO: ^ is not implemented yet
@@ -58,11 +27,11 @@
       simplePeer.call(this, options);
     }
     simplePeerDetox.prototype = Object.create(simplePeer.prototype);
-    y$ = simplePeerDetox.prototype;
+    x$ = simplePeerDetox.prototype;
     /**
      * Dirty hack to get `data` event and handle it the way we want
      */
-    y$.emit = function(event, data){
+    x$.emit = function(event, data){
       if (event === 'data') {
         if (data[0] === 1) {
           simplePeer.prototype.emit.call(this, 'data', data.subarray(1));
@@ -78,7 +47,7 @@
      *
      * @param {Buffer} data
      */
-    y$.send = function(data){
+    x$.send = function(data){
       this.real_send(data, true);
     };
     /**
@@ -86,7 +55,7 @@
      *
      * @param {Uint8Array} data
      */
-    y$.send_routing_data = function(data){
+    x$.send_routing_data = function(data){
       this.real_send(data, false);
     };
     /**
@@ -95,7 +64,7 @@
      * @param {Uint8Array}	data
      * @param {boolean}		for_dht	Whether data sent are for DHT or not
      */
-    y$.real_send = function(data, for_dht){
+    x$.real_send = function(data, for_dht){
       var x$, data_with_header;
       x$ = data_with_header = new Uint8Array(data.length + 1);
       x$.set([for_dht ? 1 : 0]);
@@ -134,7 +103,7 @@
         return new DHT(node_id, bootstrap_nodes, ice_servers, bucket_size);
       }
       asyncEventer.call(this);
-      socket = webrtcSocketDetox({
+      socket = webrtcSocket({
         simple_peer_constructor: simplePeerDetox,
         simple_peer_opts: {
           config: {
@@ -158,26 +127,26 @@
       });
     }
     DHT.prototype = Object.create(asyncEventer.prototype);
-    z$ = DHT.prototype;
+    y$ = DHT.prototype;
     /**
      * Start WebSocket server listening on specified ip:port, so that current node will be capable of acting as bootstrap node for other users
      *
      * @param {number}	port
      * @param {string}	ip
      */
-    z$['start_bootstrap_node'] = function(port, ip){
+    y$['start_bootstrap_node'] = function(port, ip){
       this._dht.listen(port, ip);
     };
     /**
      * @return {!string[]}
      */
-    z$['get_bootstrap_nodes'] = function(){
+    y$['get_bootstrap_nodes'] = function(){
       return this._dht.toJSON().nodes;
     };
     /**
      * @param {Function} callback
      */
-    z$['destroy'] = function(callback){
+    y$['destroy'] = function(callback){
       this._dht.destroy(callback);
       delete this._dht;
     };

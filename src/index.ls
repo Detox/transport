@@ -9,33 +9,6 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 	# TODO: Dirty hack in order to not include simple-peer second time on frontend
 	simple-peer		= webrtc-socket._simple_peer_constructor
 	/**
-	 * @constructor
-	 *
-	 * @param {!Array} options
-	 */
-	!function webrtc-socket-detox (options)
-		if !(@ instanceof webrtc-socket-detox)
-			return new webrtc-socket-detox(options)
-		webrtc-socket.call(@, options)
-
-	webrtc-socket-detox:: = Object.create(webrtc-socket::)
-	webrtc-socket-detox::
-		/**
-		 * We'll reuse single WebRTC connection for both DHT and anonymous routing,
-		 * so we don't want to immediately disconnect from the node as soon as it is not used by DHT
-		 *
-		 * @param {string} id
-		 */
-		..del_id_mapping = (id) !->
-			peer_connection	= @get_id_mapping(id)
-			# TODO: assign `_used_by_detox` property
-			if peer_connection.connected && !peer_connection.destroyed && peer_connection._used_by_detox
-				# Do not actually disconnect from the node that is actively used by Detox
-				return
-			webrtc-socket::del_id_mapping(id)
-
-	Object.defineProperty(webrtc-socket-detox::, 'constructor', {enumerable: false, value: webrtc-socket-detox})
-	/**
 	 * We'll authenticate remove peers by requiring them to sign SDP by their DHT key
 	 * TODO: ^ is not implemented yet
 	 *
@@ -111,7 +84,7 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 		if !(@ instanceof DHT)
 			return new DHT(node_id, bootstrap_nodes, ice_servers, bucket_size)
 		async-eventer.call(@)
-		socket	= webrtc-socket-detox(
+		socket	= webrtc-socket(
 			simple_peer_constructor	: simple-peer-detox
 			simple_peer_opts		:
 				config	:
