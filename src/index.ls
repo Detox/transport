@@ -4,6 +4,32 @@
  * @copyright Copyright (c) 2017, Nazar Mokrynskyi
  * @license   MIT License, see license.txt
  */
+const COMMAND_DHT	= 0
+const COMMAND_DATA	= 1
+const COMMAND_TAG	= 2
+const COMMAND_UNTAG	= 3
+
+/**
+ * @param {!Uint8Array} array
+ *
+ * @return {string}
+ */
+function array2hex (array)
+	string = ''
+	for byte in array
+		string += byte.toString(16).padStart(2, 0)
+	string
+/**
+ * @param {string} string
+ *
+ * @return {!Uint8Array}
+ */
+function hex2array (string)
+	array	= new Uint8Array(string.length / 2)
+	for i from 0 til array.length
+		array[i] = parseInt(string.substring(i * 2, i * 2 + 2), 16)
+	array
+
 function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 	webrtc-socket	= webtorrent-dht({bootstrap: []})._rpc.socket.socket
 	# TODO: Dirty hack in order to not include simple-peer second time on frontend
@@ -28,10 +54,11 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 		 */
 		..emit = (event, data) !->
 			if event == 'data'
-				if data[0] == 1 # DHT data
+				command	= data[0]
+				if command == COMMAND_DHT
 					simple-peer::emit.call(@, 'data', data.subarray(1))
-				else # Routing data
-					simple-peer::emit.call(@, 'routing_data', data.subarray(1))
+				else
+					simple-peer::emit.call(@, 'routing_data', command, data.subarray(1))
 			else
 				simple-peer::emit.apply(@, &)
 		/**
@@ -40,23 +67,24 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 		 * @param {Buffer} data
 		 */
 		..send = (data) !->
-			@real_send(data, true)
+			@real_send(data, COMMAND_DHT)
 		/**
 		 * Data sending method that will be used by anonymous routing
 		 *
-		 * @param {Uint8Array} data
+		 * @param {Uint8Array}	data
+		 * @param {number}		command 1..255 - routing data command being sent
 		 */
-		..send_routing_data = (data) !->
-			@real_send(data, false)
+		..send_routing_data = (data, command) !->
+			@real_send(data, command)
 		/**
 		 * Actual data sending method moved here
 		 *
 		 * @param {Uint8Array}	data
-		 * @param {boolean}		for_dht	Whether data sent are for DHT or not
+		 * @param {number}		command
 		 */
-		..real_send = (data, for_dht) !->
+		..real_send = (data, command) !->
 			data_with_header	= new Uint8Array(data.length + 1)
-				..set([if for_dht then 1 else 0])
+				..set([command])
 				..set(data, 1)
 			simple-peer::send.call(@, data_with_header)
 
@@ -84,25 +112,37 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 		if !(@ instanceof DHT)
 			return new DHT(node_id, bootstrap_nodes, ice_servers, bucket_size)
 		async-eventer.call(@)
-		socket	= webrtc-socket(
+		@_socket	= webrtc-socket(
 			simple_peer_constructor	: simple-peer-detox
 			simple_peer_opts		:
 				config	:
 					iceServers	: ice_servers
 		)
-		socket
-			..on('node_connected', (id) !~>
+		@_socket
+			..on('node_connected', (string_id) !~>
+				id	= hex2array(string_id)
+				peer_connection.on('routing_data', (command, data) !~>
+					switch command
+						case COMMAND_TAG
+							@_socket.add_tag(string_id, 'detox-responder')
+							@fire('node_tagged', id)
+						case COMMAND_UNTAG
+							@_socket.del_tag(string_id, 'detox-responder')
+							@fire('node_untagged', id)
+						case COMMAND_DATA
+							@fire('data', id, data)
+				)
 				@fire('node_connected', id)
 			)
-			..on('node_disconnected', (id) !~>
-				@fire('node_disconnected', id)
+			..on('node_disconnected', (string_id) !~>
+				@fire('node_disconnected', hex2array(string_id))
 			)
 		@_dht	= new DHT(
 			bootstrap	: bootstrap_nodes
 			hash		: sha3_256
 			k			: bucket_size
 			nodeId		: node_id
-			socket		: socket
+			socket		: @_socket
 		)
 
 	DHT:: = Object.create(async-eventer::)
@@ -120,6 +160,46 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 		 */
 		..'get_bootstrap_nodes' = ->
 			@_dht.toJSON().nodes
+		/**
+		 * Start lookup for specified node ID (listen for `node_connected` in order to know when interested node was connected)
+		 *
+		 * @param {Uint8Array} id
+		 */
+		..'lookup' = (id) !->
+			@_dht.lookup(array2hex(id))
+		/**
+		 * Tag connection to specified node ID as used, so that it is not disconnected when not used by DHT itself
+		 *
+		 * @param {Uint8Array} id
+		 */
+		..'add_used_tag' = (id) !->
+			string_id	= array2hex(id)
+			peer_connection	= @_socket.get_id_mapping(string_id)
+			if peer_connection
+				peer_connection.send_routing_data(new Uint8Array(0), COMMAND_TAG)
+				@_socket.add_tag(string_id, 'detox-initiator')
+		/**
+		 * Remove tag from connection, so that it can be disconnected if not needed by DHT anymore
+		 *
+		 * @param {Uint8Array} id
+		 */
+		..'del_used_tag' = (id) !->
+			string_id	= array2hex(id)
+			peer_connection	= @_socket.get_id_mapping(string_id)
+			if peer_connection
+				peer_connection.send_routing_data(new Uint8Array(0), COMMAND_UNTAG)
+				@_socket.del_tag(string_id, 'detox-initiator')
+		/**
+		 * Send data to specified node ID
+		 *
+		 * @param {Uint8Array} id
+		 * @param {Uint8Array} data
+		 */
+		..'send_data' = (id, data) !->
+			string_id		= array2hex(id)
+			peer_connection	= @_socket.get_id_mapping(string_id)
+			if peer_connection
+				peer_connection.send_routing_data(data, COMMAND_DATA)
 		#TODO: more methods needed
 		/**
 		 * @param {Function} callback
