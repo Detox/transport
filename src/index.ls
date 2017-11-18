@@ -29,6 +29,39 @@ function hex2array (string)
 	for i from 0 til array.length
 		array[i] = parseInt(string.substring(i * 2, i * 2 + 2), 16)
 	array
+/**
+ * @param {string} string
+ *
+ * @return {!Uint8Array}
+ */
+function string2array (string)
+	array = new Uint8Array(string.length)
+	for i from 0 til string.length
+		array[i] = string.charCodeAt(i)
+	array
+
+/**
+ * @interface
+ *
+ * Public and private key are implicitly assumed to correspond to current node's ones
+ *
+ * @param {!Uint8Array} data
+ *
+ * @return {!Uint8Array} Signature
+ */
+function sign (data)
+	void
+/**
+ * @interface
+ *
+ * @param {!Uint8Array} data
+ * @param {!Uint8Array} signature
+ * @param {!Uint8Array} public_key	Ed25519 public key
+ *
+ * @return {boolean}
+ */
+function verify (data, signature, public_key)
+	void
 
 function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 	webrtc-socket	= webtorrent-dht({bootstrap: []})._rpc.socket.socket
@@ -36,7 +69,6 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 	simple-peer		= webrtc-socket._simple_peer_constructor
 	/**
 	 * We'll authenticate remove peers by requiring them to sign SDP by their DHT key
-	 * TODO: ^ is not implemented yet
 	 *
 	 * @constructor
 	 *
@@ -45,6 +77,7 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 	!function simple-peer-detox (options)
 		if !(@ instanceof simple-peer-detox)
 			return new simple-peer-detox(options)
+		@_sign	= options.sign
 		simple-peer.call(@, options)
 
 	simple-peer-detox:: = Object.create(simple-peer::)
@@ -55,8 +88,8 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 		..emit = (event, data) !->
 			switch event
 				case 'signal'
-					# TODO: SDP signature
-					simple-peer::emit.apply(@, &)
+					data.signature	= @_sign(string2array(data.sdp))
+					simple-peer::emit.apply(@, data)
 				case 'data'
 					command	= data[0]
 					if command == COMMAND_DHT
@@ -69,7 +102,12 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 		 * @param {!Object} signal
 		 */
 		..signal = (signal) !->
-			# TODO: SDP signature check
+			if !signal.signature
+				# Drop connection if signature not specified
+				@destroy()
+			@_signature_received	= signal.signature
+			# Already Uint8Array, no need to convert SDP to array
+			@_sdp_received			= signal.sdp
 			simple-peer::emit.call(@, signal)
 		/**
 		 * Data sending method that will be used by DHT
@@ -112,25 +150,33 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 	 * @constructor
 	 *
 	 * @param {!Uint8Array}	public_key		Ed25519 public key
-	 * @param {!string[]}	bootstrap_nodes
+	 * @param {string[]}	bootstrap_nodes
 	 * @param {!Object[]}	ice_servers
+	 * @param {!sign}		sign
+	 * @param {!verify}		verify
 	 * @param {number}		bucket_size
 	 *
 	 * @return {DHT}
 	 */
-	!function DHT (public_key, bootstrap_nodes, ice_servers, bucket_size = 2)
+	!function DHT (public_key, bootstrap_nodes, ice_servers, sign, verify, bucket_size = 2)
 		if !(@ instanceof DHT)
-			return new DHT(public_key, bootstrap_nodes, ice_servers, bucket_size)
+			return new DHT(public_key, bootstrap_nodes, ice_servers, sign, verify, bucket_size)
 		async-eventer.call(@)
 		@_socket	= webrtc-socket(
 			simple_peer_constructor	: simple-peer-detox
 			simple_peer_opts		:
 				config	:
 					iceServers	: ice_servers
+				sign	: sign
 		)
 		@_socket
 			..on('node_connected', (string_id) !~>
-				id	= hex2array(string_id)
+				id				= hex2array(string_id)
+				peer_connection	= @_socket.get_id_mapping(string_id)
+				# Already Uint8Array, no need to convert SDP to array
+				if !verify(peer_connection._sdp_received, peer_connection._signature_received, id)
+					# Drop connection if node failed to sign SDP with its public message
+					peer_connection.destroy()
 				peer_connection.on('routing_data', (command, data) !~>
 					switch command
 						case COMMAND_TAG

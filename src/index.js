@@ -39,6 +39,40 @@
     }
     return array;
   }
+  /**
+   * @param {string} string
+   *
+   * @return {!Uint8Array}
+   */
+  function string2array(string){
+    var array, i$, to$, i;
+    array = new Uint8Array(string.length);
+    for (i$ = 0, to$ = string.length; i$ < to$; ++i$) {
+      i = i$;
+      array[i] = string.charCodeAt(i);
+    }
+    return array;
+  }
+  /**
+   * @interface
+   *
+   * Public and private key are implicitly assumed to correspond to current node's ones
+   *
+   * @param {!Uint8Array} data
+   *
+   * @return {!Uint8Array} Signature
+   */
+  function sign(data){}
+  /**
+   * @interface
+   *
+   * @param {!Uint8Array} data
+   * @param {!Uint8Array} signature
+   * @param {!Uint8Array} public_key	Ed25519 public key
+   *
+   * @return {boolean}
+   */
+  function verify(data, signature, public_key){}
   function Transport(webtorrentDht, ronion, jssha, asyncEventer){
     var webrtcSocket, simplePeer, x$, y$;
     webrtcSocket = webtorrentDht({
@@ -47,7 +81,6 @@
     simplePeer = webrtcSocket._simple_peer_constructor;
     /**
      * We'll authenticate remove peers by requiring them to sign SDP by their DHT key
-     * TODO: ^ is not implemented yet
      *
      * @constructor
      *
@@ -57,6 +90,7 @@
       if (!(this instanceof simplePeerDetox)) {
         return new simplePeerDetox(options);
       }
+      this._sign = options.sign;
       simplePeer.call(this, options);
     }
     simplePeerDetox.prototype = Object.create(simplePeer.prototype);
@@ -68,7 +102,8 @@
       var command;
       switch (event) {
       case 'signal':
-        simplePeer.prototype.emit.apply(this, arguments);
+        data.signature = this._sign(string2array(data.sdp));
+        simplePeer.prototype.emit.apply(this, data);
         break;
       case 'data':
         command = data[0];
@@ -86,6 +121,11 @@
      * @param {!Object} signal
      */
     x$.signal = function(signal){
+      if (!signal.signature) {
+        this.destroy();
+      }
+      this._signature_received = signal.signature;
+      this._sdp_received = signal.sdp;
       simplePeer.prototype.emit.call(this, signal);
     };
     /**
@@ -137,17 +177,19 @@
      * @constructor
      *
      * @param {!Uint8Array}	public_key		Ed25519 public key
-     * @param {!string[]}	bootstrap_nodes
+     * @param {string[]}	bootstrap_nodes
      * @param {!Object[]}	ice_servers
+     * @param {!sign}		sign
+     * @param {!verify}		verify
      * @param {number}		bucket_size
      *
      * @return {DHT}
      */
-    function DHT(public_key, bootstrap_nodes, ice_servers, bucket_size){
+    function DHT(public_key, bootstrap_nodes, ice_servers, sign, verify, bucket_size){
       var x$, this$ = this;
       bucket_size == null && (bucket_size = 2);
       if (!(this instanceof DHT)) {
-        return new DHT(public_key, bootstrap_nodes, ice_servers, bucket_size);
+        return new DHT(public_key, bootstrap_nodes, ice_servers, sign, verify, bucket_size);
       }
       asyncEventer.call(this);
       this._socket = webrtcSocket({
@@ -155,13 +197,18 @@
         simple_peer_opts: {
           config: {
             iceServers: ice_servers
-          }
+          },
+          sign: sign
         }
       });
       x$ = this._socket;
       x$.on('node_connected', function(string_id){
-        var id;
+        var id, peer_connection;
         id = hex2array(string_id);
+        peer_connection = this$._socket.get_id_mapping(string_id);
+        if (!verify(peer_connection._sdp_received, peer_connection._signature_received, id)) {
+          peer_connection.destroy();
+        }
         peer_connection.on('routing_data', function(command, data){
           switch (command) {
           case COMMAND_TAG:
