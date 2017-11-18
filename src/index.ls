@@ -53,14 +53,24 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 		 * Dirty hack to get `data` event and handle it the way we want
 		 */
 		..emit = (event, data) !->
-			if event == 'data'
-				command	= data[0]
-				if command == COMMAND_DHT
-					simple-peer::emit.call(@, 'data', data.subarray(1))
+			switch event
+				case 'signal'
+					# TODO: SDP signature
+					simple-peer::emit.apply(@, &)
+				case 'data'
+					command	= data[0]
+					if command == COMMAND_DHT
+						simple-peer::emit.call(@, 'data', data.subarray(1))
+					else
+						simple-peer::emit.call(@, 'routing_data', command, data.subarray(1))
 				else
-					simple-peer::emit.call(@, 'routing_data', command, data.subarray(1))
-			else
-				simple-peer::emit.apply(@, &)
+					simple-peer::emit.apply(@, &)
+		/**
+		 * @param {!Object} signal
+		 */
+		..signal = (signal) !->
+			# TODO: SDP signature check
+			simple-peer::emit.call(@, signal)
 		/**
 		 * Data sending method that will be used by DHT
 		 *
@@ -101,16 +111,16 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 	/**
 	 * @constructor
 	 *
-	 * @param {!Uint8Array}	node_id
+	 * @param {!Uint8Array}	public_key		Ed25519 public key
 	 * @param {!string[]}	bootstrap_nodes
 	 * @param {!Object[]}	ice_servers
 	 * @param {number}		bucket_size
 	 *
 	 * @return {DHT}
 	 */
-	!function DHT (node_id, bootstrap_nodes, ice_servers, bucket_size = 2)
+	!function DHT (public_key, bootstrap_nodes, ice_servers, bucket_size = 2)
 		if !(@ instanceof DHT)
-			return new DHT(node_id, bootstrap_nodes, ice_servers, bucket_size)
+			return new DHT(public_key, bootstrap_nodes, ice_servers, bucket_size)
 		async-eventer.call(@)
 		@_socket	= webrtc-socket(
 			simple_peer_constructor	: simple-peer-detox
@@ -141,7 +151,7 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 			bootstrap	: bootstrap_nodes
 			hash		: sha3_256
 			k			: bucket_size
-			nodeId		: node_id
+			nodeId		: public_key
 			socket		: @_socket
 		)
 

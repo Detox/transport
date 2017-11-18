@@ -66,16 +66,27 @@
      */
     x$.emit = function(event, data){
       var command;
-      if (event === 'data') {
+      switch (event) {
+      case 'signal':
+        simplePeer.prototype.emit.apply(this, arguments);
+        break;
+      case 'data':
         command = data[0];
         if (command === COMMAND_DHT) {
           simplePeer.prototype.emit.call(this, 'data', data.subarray(1));
         } else {
           simplePeer.prototype.emit.call(this, 'routing_data', command, data.subarray(1));
         }
-      } else {
+        break;
+      default:
         simplePeer.prototype.emit.apply(this, arguments);
       }
+    };
+    /**
+     * @param {!Object} signal
+     */
+    x$.signal = function(signal){
+      simplePeer.prototype.emit.call(this, signal);
     };
     /**
      * Data sending method that will be used by DHT
@@ -125,18 +136,18 @@
     /**
      * @constructor
      *
-     * @param {!Uint8Array}	node_id
+     * @param {!Uint8Array}	public_key		Ed25519 public key
      * @param {!string[]}	bootstrap_nodes
      * @param {!Object[]}	ice_servers
      * @param {number}		bucket_size
      *
      * @return {DHT}
      */
-    function DHT(node_id, bootstrap_nodes, ice_servers, bucket_size){
+    function DHT(public_key, bootstrap_nodes, ice_servers, bucket_size){
       var x$, this$ = this;
       bucket_size == null && (bucket_size = 2);
       if (!(this instanceof DHT)) {
-        return new DHT(node_id, bootstrap_nodes, ice_servers, bucket_size);
+        return new DHT(public_key, bootstrap_nodes, ice_servers, bucket_size);
       }
       asyncEventer.call(this);
       this._socket = webrtcSocket({
@@ -174,7 +185,7 @@
         bootstrap: bootstrap_nodes,
         hash: sha3_256,
         k: bucket_size,
-        nodeId: node_id,
+        nodeId: public_key,
         socket: this._socket
       });
     }
