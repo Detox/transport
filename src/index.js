@@ -59,20 +59,22 @@
    * Public and private key are implicitly assumed to correspond to current node's ones
    *
    * @param {!Uint8Array} data
+   * @param {!Uint8Array} public_key
+   * @param {!Uint8Array} private_key
    *
    * @return {!Uint8Array} Signature
    */
-  function sign(data){}
+  function sign(data, public_key, private_key){}
   /**
    * @interface
    *
-   * @param {!Uint8Array} data
    * @param {!Uint8Array} signature
+   * @param {!Uint8Array} data
    * @param {!Uint8Array} public_key	Ed25519 public key
    *
    * @return {boolean}
    */
-  function verify(data, signature, public_key){}
+  function verify(signature, data, public_key){}
   function Transport(webtorrentDht, ronion, jssha, asyncEventer){
     var webrtcSocket, simplePeer, x$, y$;
     webrtcSocket = webtorrentDht({
@@ -176,7 +178,10 @@
     /**
      * @constructor
      *
-     * @param {!Uint8Array}	public_key		Ed25519 public key
+     * TODO: constant bandwidth utilization using extensions to transfer info
+     *
+     * @param {!Uint8Array}	public_key		Ed25519 public key, temporary one, just for DHT operation
+     * @param {!Uint8Array}	private_key		Corresponding Ed25519 private key
      * @param {string[]}	bootstrap_nodes
      * @param {!Object[]}	ice_servers
      * @param {!sign}		sign
@@ -185,20 +190,23 @@
      *
      * @return {DHT}
      */
-    function DHT(public_key, bootstrap_nodes, ice_servers, sign, verify, bucket_size){
+    function DHT(public_key, private_key, bootstrap_nodes, ice_servers, sign, verify, bucket_size){
       var x$, this$ = this;
       bucket_size == null && (bucket_size = 2);
       if (!(this instanceof DHT)) {
-        return new DHT(public_key, bootstrap_nodes, ice_servers, sign, verify, bucket_size);
+        return new DHT(public_key, private_key, bootstrap_nodes, ice_servers, sign, verify, bucket_size);
       }
       asyncEventer.call(this);
+      this._sign = sign;
       this._socket = webrtcSocket({
         simple_peer_constructor: simplePeerDetox,
         simple_peer_opts: {
           config: {
             iceServers: ice_servers
           },
-          sign: sign
+          sign: function(data){
+            return sign(data, public_key, private_key);
+          }
         }
       });
       x$ = this._socket;
@@ -206,7 +214,7 @@
         var id, peer_connection;
         id = hex2array(string_id);
         peer_connection = this$._socket.get_id_mapping(string_id);
-        if (!verify(peer_connection._sdp_received, peer_connection._signature_received, id)) {
+        if (!verify(peer_connection._signature_received, peer_connection._sdp_received, id)) {
           peer_connection.destroy();
         }
         peer_connection.on('routing_data', function(command, data){
@@ -233,7 +241,8 @@
         hash: sha3_256,
         k: bucket_size,
         nodeId: public_key,
-        socket: this._socket
+        socket: this._socket,
+        verify: verify
       });
     }
     DHT.prototype = Object.create(asyncEventer.prototype);
@@ -301,6 +310,22 @@
       peer_connection = this._socket.get_id_mapping(string_id);
       if (peer_connection) {
         peer_connection.send_routing_data(data, COMMAND_DATA);
+      }
+    };
+    /**
+     * @param {!Uint8Array}		public_key			Ed25519 public key (real one, different from supplied in DHT constructor)
+     * @param {!Uint8Array}		private_key			Corresponding Ed25519 private key
+     * @param {!Uint8Array[]}	introduction_points	Array of public keys of introduction points
+     */
+    y$['generate_introduction_message'] = function(public_key, private_key, introduction_points){
+      var time, public_key_length, value, i$, len$, index, introduction_point;
+      time = +new Date;
+      public_key_length = public_key.length;
+      value = new Uint8Array(introduction_points.length * public_key_length);
+      for (i$ = 0, len$ = introduction_points.length; i$ < len$; ++i$) {
+        index = i$;
+        introduction_point = introduction_points[i$];
+        value.set(introduction_point, index * public_key_length);
       }
     };
     /**

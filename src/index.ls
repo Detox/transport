@@ -46,21 +46,23 @@ function string2array (string)
  * Public and private key are implicitly assumed to correspond to current node's ones
  *
  * @param {!Uint8Array} data
+ * @param {!Uint8Array} public_key
+ * @param {!Uint8Array} private_key
  *
  * @return {!Uint8Array} Signature
  */
-function sign (data)
+function sign (data, public_key, private_key)
 	void
 /**
  * @interface
  *
- * @param {!Uint8Array} data
  * @param {!Uint8Array} signature
+ * @param {!Uint8Array} data
  * @param {!Uint8Array} public_key	Ed25519 public key
  *
  * @return {boolean}
  */
-function verify (data, signature, public_key)
+function verify (signature, data, public_key)
 	void
 
 function Transport (webtorrent-dht, ronion, jssha, async-eventer)
@@ -149,7 +151,10 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 	/**
 	 * @constructor
 	 *
-	 * @param {!Uint8Array}	public_key		Ed25519 public key
+	 * TODO: constant bandwidth utilization using extensions to transfer info
+	 *
+	 * @param {!Uint8Array}	public_key		Ed25519 public key, temporary one, just for DHT operation
+	 * @param {!Uint8Array}	private_key		Corresponding Ed25519 private key
 	 * @param {string[]}	bootstrap_nodes
 	 * @param {!Object[]}	ice_servers
 	 * @param {!sign}		sign
@@ -158,23 +163,25 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 	 *
 	 * @return {DHT}
 	 */
-	!function DHT (public_key, bootstrap_nodes, ice_servers, sign, verify, bucket_size = 2)
+	!function DHT (public_key, private_key, bootstrap_nodes, ice_servers, sign, verify, bucket_size = 2)
 		if !(@ instanceof DHT)
-			return new DHT(public_key, bootstrap_nodes, ice_servers, sign, verify, bucket_size)
+			return new DHT(public_key, private_key, bootstrap_nodes, ice_servers, sign, verify, bucket_size)
 		async-eventer.call(@)
+		@_sign		= sign
 		@_socket	= webrtc-socket(
 			simple_peer_constructor	: simple-peer-detox
 			simple_peer_opts		:
 				config	:
 					iceServers	: ice_servers
-				sign	: sign
+				sign	: (data) ->
+					sign(data, public_key, private_key)
 		)
 		@_socket
 			..on('node_connected', (string_id) !~>
 				id				= hex2array(string_id)
 				peer_connection	= @_socket.get_id_mapping(string_id)
 				# Already Uint8Array, no need to convert SDP to array
-				if !verify(peer_connection._sdp_received, peer_connection._signature_received, id)
+				if !verify(peer_connection._signature_received, peer_connection._sdp_received, id)
 					# Drop connection if node failed to sign SDP with its public message
 					peer_connection.destroy()
 				peer_connection.on('routing_data', (command, data) !~>
@@ -199,6 +206,7 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 			k			: bucket_size
 			nodeId		: public_key
 			socket		: @_socket
+			verify		: verify
 		)
 
 	DHT:: = Object.create(async-eventer::)
@@ -256,12 +264,30 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 			peer_connection	= @_socket.get_id_mapping(string_id)
 			if peer_connection
 				peer_connection.send_routing_data(data, COMMAND_DATA)
-		#TODO: more methods needed
+		/**
+		 * @param {!Uint8Array}		public_key			Ed25519 public key (real one, different from supplied in DHT constructor)
+		 * @param {!Uint8Array}		private_key			Corresponding Ed25519 private key
+		 * @param {!Uint8Array[]}	introduction_points	Array of public keys of introduction points
+		 */
+		..'generate_introduction_message' = (public_key, private_key, introduction_points) !->
+			time				= +(new Date)
+			public_key_length	= public_key.length
+			value				= new Uint8Array(introduction_points.length * public_key_length)
+			for introduction_point, index in introduction_points
+				value.set(introduction_point, index * public_key_length)
+			# TODO: generate message without sending it to the DHT
+#			@_dht.put(
+#				k		: public_key
+#				seq		: time
+#				cas		: time - 1
+#				v		: value
+#				sign	: (data) ~>
+#					@_sign(data, public_key, private_key)
+#			)
 		/**
 		 * @param {Function} callback
 		 */
 		..'destroy' = (callback) !->
-			# TODO: destroying should disconnect from any peers
 			@_dht.destroy(callback)
 			delete @_dht
 	Object.defineProperty(DHT::, 'constructor', {enumerable: false, value: DHT})

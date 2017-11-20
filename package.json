@@ -3,7 +3,9 @@
 	"description"     : "High-level utilities that combine under simple interfaces complexity of the transport layer used in Detox project",
 	"keywords"        : [
 		"detox",
-		"transport"
+		"transport",
+		"dht",
+		"routing"
 	],
 	"version"         : "",
 	"homepage"        : "https://github.com/Detox/detox-transport",
