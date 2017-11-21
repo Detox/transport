@@ -75,12 +75,11 @@
    * @return {boolean}
    */
   function verify(signature, data, public_key){}
-  function Transport(webtorrentDht, ronion, jssha, asyncEventer){
-    var webrtcSocket, simplePeer, x$, y$;
-    webrtcSocket = webtorrentDht({
-      bootstrap: []
-    })._rpc.socket.socket;
-    simplePeer = webrtcSocket._simple_peer_constructor;
+  function Transport(detoxDht, ronion, jssha, asyncEventer){
+    var simplePeer, webrtcSocket, webtorrentDht, x$, y$;
+    simplePeer = detoxDht.simplePeer;
+    webrtcSocket = detoxDht.webrtcSocket;
+    webtorrentDht = detoxDht.webtorrentDht;
     /**
      * We'll authenticate remove peers by requiring them to sign SDP by their DHT key
      *
@@ -236,7 +235,7 @@
       x$.on('node_disconnected', function(string_id){
         this$.fire('node_disconnected', hex2array(string_id));
       });
-      this._dht = new DHT({
+      this._dht = new webtorrentDht({
         bootstrap: bootstrap_nodes,
         hash: sha3_256,
         k: bucket_size,
@@ -344,10 +343,10 @@
     };
   }
   if (typeof define === 'function' && define['amd']) {
-    define(['webtorrent-dht', 'ronion', 'jssha/src/sha3', 'async-eventer'], Transport);
+    define(['@detox/dht', 'ronion', 'jssha/src/sha3', 'async-eventer'], Transport);
   } else if (typeof exports === 'object') {
-    module.exports = Transport(require('webtorrent-dht'), require('ronion'), require('jssha/src/sha3'), require('async-eventer'));
+    module.exports = Transport(require('@detox/dht'), require('ronion'), require('jssha/src/sha3'), require('async-eventer'));
   } else {
-    this['detox_transport'] = Transport(this['webtorrent_dht'], this['ronion'], this['jsSHA'], this['async_eventer']);
+    this['detox_transport'] = Transport(this['detox_dht'], this['ronion'], this['jsSHA'], this['async_eventer']);
   }
 }).call(this);

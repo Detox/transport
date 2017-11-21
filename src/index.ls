@@ -65,10 +65,10 @@ function sign (data, public_key, private_key)
 function verify (signature, data, public_key)
 	void
 
-function Transport (webtorrent-dht, ronion, jssha, async-eventer)
-	webrtc-socket	= webtorrent-dht({bootstrap: []})._rpc.socket.socket
-	# TODO: Dirty hack in order to not include simple-peer second time on frontend
-	simple-peer		= webrtc-socket._simple_peer_constructor
+function Transport (detox-dht, ronion, jssha, async-eventer)
+	simple-peer		= detox-dht.simple-peer
+	webrtc-socket	= detox-dht.webrtc-socket
+	webtorrent-dht	= detox-dht.webtorrent-dht
 	/**
 	 * We'll authenticate remove peers by requiring them to sign SDP by their DHT key
 	 *
@@ -200,7 +200,7 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 			..on('node_disconnected', (string_id) !~>
 				@fire('node_disconnected', hex2array(string_id))
 			)
-		@_dht	= new DHT(
+		@_dht	= new webtorrent-dht(
 			bootstrap	: bootstrap_nodes
 			hash		: sha3_256
 			k			: bucket_size
@@ -297,10 +297,10 @@ function Transport (webtorrent-dht, ronion, jssha, async-eventer)
 
 if typeof define == 'function' && define['amd']
 	# AMD
-	define(['webtorrent-dht', 'ronion', 'jssha/src/sha3', 'async-eventer'], Transport)
+	define(['@detox/dht', 'ronion', 'jssha/src/sha3', 'async-eventer'], Transport)
 else if typeof exports == 'object'
 	# CommonJS
-	module.exports = Transport(require('webtorrent-dht'), require('ronion'), require('jssha/src/sha3'), require('async-eventer'))
+	module.exports = Transport(require('@detox/dht'), require('ronion'), require('jssha/src/sha3'), require('async-eventer'))
 else
 	# Browser globals
-	@'detox_transport' = Transport(@'webtorrent_dht', @'ronion', @'jsSHA', @'async_eventer')
+	@'detox_transport' = Transport(@'detox_dht', @'ronion', @'jsSHA', @'async_eventer')
