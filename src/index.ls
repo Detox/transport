@@ -69,6 +69,7 @@ function Transport (detox-dht, ronion, jssha, async-eventer)
 	simple-peer		= detox-dht.simple-peer
 	webrtc-socket	= detox-dht.webrtc-socket
 	webtorrent-dht	= detox-dht.webtorrent-dht
+	Buffer			= detox-dht.Buffer
 	/**
 	 * We'll authenticate remove peers by requiring them to sign SDP by their DHT key
 	 *
@@ -148,6 +149,16 @@ function Transport (detox-dht, ronion, jssha, async-eventer)
 		shaObj = new jsSHA('SHA3-256', 'ARRAYBUFFER');
 		shaObj.update(array)
 		shaObj.getHash('HEX')
+	/**
+	 * @param {!Object} message
+	 *
+	 * @return {!Buffer}
+	 */
+	function encode_signature_data (message)
+		ref =
+			seq	: message.seq
+			v	: message.v
+		bencode.encode(ref).slice(1, -1)
 	/**
 	 * @constructor
 	 *
@@ -265,9 +276,13 @@ function Transport (detox-dht, ronion, jssha, async-eventer)
 			if peer_connection
 				peer_connection.send_routing_data(data, COMMAND_DATA)
 		/**
+		 * Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity)
+		 *
 		 * @param {!Uint8Array}		public_key			Ed25519 public key (real one, different from supplied in DHT constructor)
 		 * @param {!Uint8Array}		private_key			Corresponding Ed25519 private key
 		 * @param {!Uint8Array[]}	introduction_points	Array of public keys of introduction points
+		 *
+		 * @return {!Object}
 		 */
 		..'generate_introduction_message' = (public_key, private_key, introduction_points) !->
 			time				= +(new Date)
@@ -275,15 +290,32 @@ function Transport (detox-dht, ronion, jssha, async-eventer)
 			value				= new Uint8Array(introduction_points.length * public_key_length)
 			for introduction_point, index in introduction_points
 				value.set(introduction_point, index * public_key_length)
-			# TODO: generate message without sending it to the DHT
-#			@_dht.put(
-#				k		: public_key
-#				seq		: time
-#				cas		: time - 1
-#				v		: value
-#				sign	: (data) ~>
-#					@_sign(data, public_key, private_key)
-#			)
+			signature_data	= encode_signature_data(
+				seq	: time
+				v	: value
+			)
+			signature		= @_sign(signature_data, public_key, private_key)
+			# This message has signature, so it can be now sent from any node in DHT
+			{
+				k	: public_key
+				seq	: time
+				sig	: signature
+				v	: value
+			}
+		/**
+		 * Publish message with introduction nodes (typically happens on different node than `generate_introduction_message()`)
+		 *
+		 * @param {!Object} message
+		 */
+		..'publish_introduction_message' = (message) !->
+			if !message.k || !message.seq || !message.sig || !message.v
+				return
+			@_dht.put(
+				k	: Buffer.from(message.public_key)
+				seq	: message.time
+				sig	: Buffer.from(message.signature)
+				v	: Buffer.from(message.value)
+			)
 		/**
 		 * @param {Function} callback
 		 */

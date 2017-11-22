@@ -76,10 +76,11 @@
    */
   function verify(signature, data, public_key){}
   function Transport(detoxDht, ronion, jssha, asyncEventer){
-    var simplePeer, webrtcSocket, webtorrentDht, x$, y$;
+    var simplePeer, webrtcSocket, webtorrentDht, Buffer, x$, y$;
     simplePeer = detoxDht.simplePeer;
     webrtcSocket = detoxDht.webrtcSocket;
     webtorrentDht = detoxDht.webtorrentDht;
+    Buffer = detoxDht.Buffer;
     /**
      * We'll authenticate remove peers by requiring them to sign SDP by their DHT key
      *
@@ -173,6 +174,19 @@
       shaObj = new jsSHA('SHA3-256', 'ARRAYBUFFER');
       shaObj.update(array);
       return shaObj.getHash('HEX');
+    }
+    /**
+     * @param {!Object} message
+     *
+     * @return {!Buffer}
+     */
+    function encode_signature_data(message){
+      var ref;
+      ref = {
+        seq: message.seq,
+        v: message.v
+      };
+      return bencode.encode(ref).slice(1, -1);
     }
     /**
      * @constructor
@@ -312,12 +326,16 @@
       }
     };
     /**
+     * Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity)
+     *
      * @param {!Uint8Array}		public_key			Ed25519 public key (real one, different from supplied in DHT constructor)
      * @param {!Uint8Array}		private_key			Corresponding Ed25519 private key
      * @param {!Uint8Array[]}	introduction_points	Array of public keys of introduction points
+     *
+     * @return {!Object}
      */
     y$['generate_introduction_message'] = function(public_key, private_key, introduction_points){
-      var time, public_key_length, value, i$, len$, index, introduction_point;
+      var time, public_key_length, value, i$, len$, index, introduction_point, signature_data, signature;
       time = +new Date;
       public_key_length = public_key.length;
       value = new Uint8Array(introduction_points.length * public_key_length);
@@ -326,6 +344,33 @@
         introduction_point = introduction_points[i$];
         value.set(introduction_point, index * public_key_length);
       }
+      signature_data = encode_signature_data({
+        seq: time,
+        v: value
+      });
+      signature = this._sign(signature_data, public_key, private_key);
+      ({
+        k: public_key,
+        seq: time,
+        sig: signature,
+        v: value
+      });
+    };
+    /**
+     * Publish message with introduction nodes (typically happens on different node than `generate_introduction_message()`)
+     *
+     * @param {!Object} message
+     */
+    y$['publish_introduction_message'] = function(message){
+      if (!message.k || !message.seq || !message.sig || !message.v) {
+        return;
+      }
+      this._dht.put({
+        k: Buffer.from(message.public_key),
+        seq: message.time,
+        sig: Buffer.from(message.signature),
+        v: Buffer.from(message.value)
+      });
     };
     /**
      * @param {Function} callback
