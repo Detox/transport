@@ -294,7 +294,7 @@ function Transport (detox-dht, ronion, jssha, async-eventer)
 		 *
 		 * @return {!Object}
 		 */
-		..'generate_introduction_message' = (public_key, private_key, introduction_points) !->
+		..'generate_introduction_message' = (public_key, private_key, introduction_points) ->
 			time	= +(new Date)
 			value	= new Uint8Array(introduction_points.length * PUBLIC_KEY_LENGTH)
 			for introduction_point, index in introduction_points

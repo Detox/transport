@@ -355,12 +355,12 @@
         v: value
       });
       signature = this._sign(signature_data, public_key, private_key);
-      ({
+      return {
         k: public_key,
         seq: time,
         sig: signature,
         v: value
-      });
+      };
     };
     /**
      * Publish message with introduction nodes (typically happens on different node than `generate_introduction_message()`)
