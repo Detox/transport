@@ -132,7 +132,7 @@ function Transport (detox-dht, ronion, jssha, async-eventer)
 		/**
 		 * Data sending method that will be used by anonymous routing
 		 *
-		 * @param {Uint8Array}	data
+		 * @param {!Uint8Array}	data
 		 * @param {number}		command 1..255 - routing data command being sent
 		 */
 		..send_routing_data = (data, command) !->
@@ -140,7 +140,7 @@ function Transport (detox-dht, ronion, jssha, async-eventer)
 		/**
 		 * Actual data sending method moved here
 		 *
-		 * @param {Uint8Array}	data
+		 * @param {!Uint8Array}	data
 		 * @param {number}		command
 		 */
 		..real_send = (data, command) !->
@@ -248,14 +248,14 @@ function Transport (detox-dht, ronion, jssha, async-eventer)
 		/**
 		 * Start lookup for specified node ID (listen for `node_connected` in order to know when interested node was connected)
 		 *
-		 * @param {Uint8Array} id
+		 * @param {!Uint8Array} id
 		 */
 		..'lookup' = (id) !->
 			@_dht.lookup(array2hex(id))
 		/**
 		 * Tag connection to specified node ID as used, so that it is not disconnected when not used by DHT itself
 		 *
-		 * @param {Uint8Array} id
+		 * @param {!Uint8Array} id
 		 */
 		..'add_used_tag' = (id) !->
 			string_id	= array2hex(id)
@@ -266,7 +266,7 @@ function Transport (detox-dht, ronion, jssha, async-eventer)
 		/**
 		 * Remove tag from connection, so that it can be disconnected if not needed by DHT anymore
 		 *
-		 * @param {Uint8Array} id
+		 * @param {!Uint8Array} id
 		 */
 		..'del_used_tag' = (id) !->
 			string_id	= array2hex(id)
@@ -277,8 +277,8 @@ function Transport (detox-dht, ronion, jssha, async-eventer)
 		/**
 		 * Send data to specified node ID
 		 *
-		 * @param {Uint8Array} id
-		 * @param {Uint8Array} data
+		 * @param {!Uint8Array} id
+		 * @param {!Uint8Array} data
 		 */
 		..'send_data' = (id, data) !->
 			string_id		= array2hex(id)
