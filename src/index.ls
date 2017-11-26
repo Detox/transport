@@ -85,12 +85,15 @@ function Transport (detox-dht, ronion, jssha, async-eventer)
 	 *
 	 * @constructor
 	 *
-	 * @param {!Array} options
+	 * @param {!Object} options
 	 */
 	!function simple-peer-detox (options)
 		if !(@ instanceof simple-peer-detox)
 			return new simple-peer-detox(options)
-		@_sign	= options.sign
+		@_sign					= options.sign
+		@_packet_size			= options.packet_size
+		@_packets_per_second	= options.packets_per_second
+		# TODO: constant bandwidth utilization using @_packet_size and @_packets_per_second
 		simple-peer.call(@, options)
 
 	simple-peer-detox:: = Object.create(simple-peer::)
@@ -118,9 +121,29 @@ function Transport (detox-dht, ronion, jssha, async-eventer)
 			if !signal.signature
 				# Drop connection if signature not specified
 				@destroy()
+				return
 			@_signature_received	= signal.signature
 			# Already Uint8Array, no need to convert SDP to array
 			@_sdp_received			= signal.sdp
+			if !signal.extensions
+				@destroy()
+				return
+			found_psr	= false
+			for extension in extensions
+				if extension.startsWith('psr:')
+					array						= extension.split(':')
+					received_packet_size		= parseInt(array[1])
+					received_packets_per_second	= parseInt(array[2])
+					if received_packet_size < 1 || received_packets_per_second < 1
+						@destroy()
+						return
+					@_packet_size			= Math.min(@_packet_size, received_packet_size)
+					@_packets_per_second	= Math.min(@_packets_per_second, received_packets_per_second)
+					found_psr				= true
+					break
+			if !found_psr
+				@destroy()
+				return
 			simple-peer::emit.call(@, signal)
 		/**
 		 * Data sending method that will be used by DHT
@@ -172,29 +195,33 @@ function Transport (detox-dht, ronion, jssha, async-eventer)
 	/**
 	 * @constructor
 	 *
-	 * TODO: constant bandwidth utilization using extensions to transfer info
-	 *
-	 * @param {!Uint8Array}	public_key		Ed25519 public key, temporary one, just for DHT operation
-	 * @param {!Uint8Array}	private_key		Corresponding Ed25519 private key
+	 * @param {!Uint8Array}	public_key			Ed25519 public key, temporary one, just for DHT operation
+	 * @param {!Uint8Array}	private_key			Corresponding Ed25519 private key
 	 * @param {string[]}	bootstrap_nodes
 	 * @param {!Object[]}	ice_servers
 	 * @param {!sign}		sign
 	 * @param {!verify}		verify
+	 * @param {number}		packet_size
+	 * @param {number}		packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
 	 * @param {number}		bucket_size
 	 *
 	 * @return {DHT}
 	 */
-	!function DHT (public_key, private_key, bootstrap_nodes, ice_servers, sign, verify, bucket_size = 2)
+	!function DHT (public_key, private_key, bootstrap_nodes, ice_servers, sign, verify, packet_size, packets_per_second, bucket_size = 2)
 		if !(@ instanceof DHT)
-			return new DHT(public_key, private_key, bootstrap_nodes, ice_servers, sign, verify, bucket_size)
+			return new DHT(public_key, private_key, bootstrap_nodes, ice_servers, sign, verify, packet_size, packets_per_second, bucket_size)
 		async-eventer.call(@)
+		if packets_per_second < 1
+			packets_per_second	= 1
 		@_sign		= sign
 		@_socket	= webrtc-socket(
 			simple_peer_constructor	: simple-peer-detox
 			simple_peer_opts		:
-				config	:
+				config				:
 					iceServers	: ice_servers
-				sign	: (data) ->
+				packet_size			: packet_size
+				packets_per_second	: packets_per_second
+				sign				: (data) ->
 					sign(data, public_key, private_key)
 		)
 		@_socket
@@ -223,6 +250,9 @@ function Transport (detox-dht, ronion, jssha, async-eventer)
 			)
 		@_dht	= new webtorrent-dht(
 			bootstrap	: bootstrap_nodes
+			extensions	: [
+				"psr:#packet_size:#packets_per_second" # Packet size and rate
+			]
 			hash		: sha3_256
 			k			: bucket_size
 			nodeId		: public_key

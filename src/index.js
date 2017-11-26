@@ -93,13 +93,15 @@
      *
      * @constructor
      *
-     * @param {!Array} options
+     * @param {!Object} options
      */
     function simplePeerDetox(options){
       if (!(this instanceof simplePeerDetox)) {
         return new simplePeerDetox(options);
       }
       this._sign = options.sign;
+      this._packet_size = options.packet_size;
+      this._packets_per_second = options.packets_per_second;
       simplePeer.call(this, options);
     }
     simplePeerDetox.prototype = Object.create(simplePeer.prototype);
@@ -130,11 +132,38 @@
      * @param {!Object} signal
      */
     x$.signal = function(signal){
+      var found_psr, i$, ref$, len$, extension, array, received_packet_size, received_packets_per_second;
       if (!signal.signature) {
         this.destroy();
+        return;
       }
       this._signature_received = signal.signature;
       this._sdp_received = signal.sdp;
+      if (!signal.extensions) {
+        this.destroy();
+        return;
+      }
+      found_psr = false;
+      for (i$ = 0, len$ = (ref$ = extensions).length; i$ < len$; ++i$) {
+        extension = ref$[i$];
+        if (extension.startsWith('psr:')) {
+          array = extension.split(':');
+          received_packet_size = parseInt(array[1]);
+          received_packets_per_second = parseInt(array[2]);
+          if (received_packet_size < 1 || received_packets_per_second < 1) {
+            this.destroy();
+            return;
+          }
+          this._packet_size = Math.min(this._packet_size, received_packet_size);
+          this._packets_per_second = Math.min(this._packets_per_second, received_packets_per_second);
+          found_psr = true;
+          break;
+        }
+      }
+      if (!found_psr) {
+        this.destroy();
+        return;
+      }
       simplePeer.prototype.emit.call(this, signal);
     };
     /**
@@ -198,25 +227,28 @@
     /**
      * @constructor
      *
-     * TODO: constant bandwidth utilization using extensions to transfer info
-     *
-     * @param {!Uint8Array}	public_key		Ed25519 public key, temporary one, just for DHT operation
-     * @param {!Uint8Array}	private_key		Corresponding Ed25519 private key
+     * @param {!Uint8Array}	public_key			Ed25519 public key, temporary one, just for DHT operation
+     * @param {!Uint8Array}	private_key			Corresponding Ed25519 private key
      * @param {string[]}	bootstrap_nodes
      * @param {!Object[]}	ice_servers
      * @param {!sign}		sign
      * @param {!verify}		verify
+     * @param {number}		packet_size
+     * @param {number}		packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
      * @param {number}		bucket_size
      *
      * @return {DHT}
      */
-    function DHT(public_key, private_key, bootstrap_nodes, ice_servers, sign, verify, bucket_size){
+    function DHT(public_key, private_key, bootstrap_nodes, ice_servers, sign, verify, packet_size, packets_per_second, bucket_size){
       var x$, this$ = this;
       bucket_size == null && (bucket_size = 2);
       if (!(this instanceof DHT)) {
-        return new DHT(public_key, private_key, bootstrap_nodes, ice_servers, sign, verify, bucket_size);
+        return new DHT(public_key, private_key, bootstrap_nodes, ice_servers, sign, verify, packet_size, packets_per_second, bucket_size);
       }
       asyncEventer.call(this);
+      if (packets_per_second < 1) {
+        packets_per_second = 1;
+      }
       this._sign = sign;
       this._socket = webrtcSocket({
         simple_peer_constructor: simplePeerDetox,
@@ -224,6 +256,8 @@
           config: {
             iceServers: ice_servers
           },
+          packet_size: packet_size,
+          packets_per_second: packets_per_second,
           sign: function(data){
             return sign(data, public_key, private_key);
           }
@@ -258,6 +292,7 @@
       });
       this._dht = new webtorrentDht({
         bootstrap: bootstrap_nodes,
+        extensions: ["psr:" + packet_size + ":" + packets_per_second],
         hash: sha3_256,
         k: bucket_size,
         nodeId: public_key,
