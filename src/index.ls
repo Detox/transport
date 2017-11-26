@@ -9,6 +9,9 @@ const COMMAND_DATA	= 1
 const COMMAND_TAG	= 2
 const COMMAND_UNTAG	= 3
 
+# Length of Ed25519 public key in bytes
+const PUBLIC_KEY_LENGTH	= 32
+
 /**
  * @param {!Uint8Array} array
  *
@@ -63,6 +66,13 @@ function sign (data, public_key, private_key)
  * @return {boolean}
  */
 function verify (signature, data, public_key)
+	void
+/**
+ * @interface
+ *
+ * @param {!Uint8Array[]} introduction_points
+ */
+function found_introduction_points (introduction_points)
 	void
 
 function Transport (detox-dht, ronion, jssha, async-eventer)
@@ -285,11 +295,10 @@ function Transport (detox-dht, ronion, jssha, async-eventer)
 		 * @return {!Object}
 		 */
 		..'generate_introduction_message' = (public_key, private_key, introduction_points) !->
-			time				= +(new Date)
-			public_key_length	= public_key.length
-			value				= new Uint8Array(introduction_points.length * public_key_length)
+			time	= +(new Date)
+			value	= new Uint8Array(introduction_points.length * PUBLIC_KEY_LENGTH)
 			for introduction_point, index in introduction_points
-				value.set(introduction_point, index * public_key_length)
+				value.set(introduction_point, index * PUBLIC_KEY_LENGTH)
 			signature_data	= encode_signature_data(
 				seq	: time
 				v	: value
@@ -315,6 +324,23 @@ function Transport (detox-dht, ronion, jssha, async-eventer)
 				seq	: message.time
 				sig	: Buffer.from(message.signature)
 				v	: Buffer.from(message.value)
+			)
+		/**
+		 * Find nodes in DHT that are acting as introduction points for specified public key
+		 *
+		 * @param {!Uint8Array}					public_key
+		 * @param {!found_introduction_points}	callback
+		 */
+		..'find_introduction_points' = (public_key, callback) !->
+			hash	= sha3_256(public_key)
+			@_dht.get(hash, (result) !->
+				introduction_points_bulk	= Uint8Array.from(result.v)
+				introduction_points			= []
+				if introduction_points_bulk.length % PUBLIC_KEY_LENGTH == 0
+					return
+				for i from 0 til introduction_points_bulk.length / PUBLIC_KEY_LENGTH
+					introduction_points.push(introduction_points_bulk.subarray(i * PUBLIC_KEY_LENGTH, (i + 1) * PUBLIC_KEY_LENGTH))
+				callback(introduction_points)
 			)
 		/**
 		 * @param {Function} callback

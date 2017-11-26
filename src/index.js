@@ -6,11 +6,12 @@
  * @license   MIT License, see license.txt
  */
 (function(){
-  var COMMAND_DHT, COMMAND_DATA, COMMAND_TAG, COMMAND_UNTAG;
+  var COMMAND_DHT, COMMAND_DATA, COMMAND_TAG, COMMAND_UNTAG, PUBLIC_KEY_LENGTH;
   COMMAND_DHT = 0;
   COMMAND_DATA = 1;
   COMMAND_TAG = 2;
   COMMAND_UNTAG = 3;
+  PUBLIC_KEY_LENGTH = 32;
   /**
    * @param {!Uint8Array} array
    *
@@ -75,6 +76,12 @@
    * @return {boolean}
    */
   function verify(signature, data, public_key){}
+  /**
+   * @interface
+   *
+   * @param {!Uint8Array[]} introduction_points
+   */
+  function found_introduction_points(introduction_points){}
   function Transport(detoxDht, ronion, jssha, asyncEventer){
     var simplePeer, webrtcSocket, webtorrentDht, Buffer, x$, y$;
     simplePeer = detoxDht.simplePeer;
@@ -335,14 +342,13 @@
      * @return {!Object}
      */
     y$['generate_introduction_message'] = function(public_key, private_key, introduction_points){
-      var time, public_key_length, value, i$, len$, index, introduction_point, signature_data, signature;
+      var time, value, i$, len$, index, introduction_point, signature_data, signature;
       time = +new Date;
-      public_key_length = public_key.length;
-      value = new Uint8Array(introduction_points.length * public_key_length);
+      value = new Uint8Array(introduction_points.length * PUBLIC_KEY_LENGTH);
       for (i$ = 0, len$ = introduction_points.length; i$ < len$; ++i$) {
         index = i$;
         introduction_point = introduction_points[i$];
-        value.set(introduction_point, index * public_key_length);
+        value.set(introduction_point, index * PUBLIC_KEY_LENGTH);
       }
       signature_data = encode_signature_data({
         seq: time,
@@ -370,6 +376,29 @@
         seq: message.time,
         sig: Buffer.from(message.signature),
         v: Buffer.from(message.value)
+      });
+    };
+    /**
+     * Find nodes in DHT that are acting as introduction points for specified public key
+     *
+     * @param {!Uint8Array}					public_key
+     * @param {!found_introduction_points}	callback
+     */
+    y$['find_introduction_points'] = function(public_key, callback){
+      var hash;
+      hash = sha3_256(public_key);
+      this._dht.get(hash, function(result){
+        var introduction_points_bulk, introduction_points, i$, to$, i;
+        introduction_points_bulk = Uint8Array.from(result.v);
+        introduction_points = [];
+        if (introduction_points_bulk.length % PUBLIC_KEY_LENGTH === 0) {
+          return;
+        }
+        for (i$ = 0, to$ = introduction_points_bulk.length / PUBLIC_KEY_LENGTH; i$ < to$; ++i$) {
+          i = i$;
+          introduction_points.push(introduction_points_bulk.subarray(i * PUBLIC_KEY_LENGTH, (i + 1) * PUBLIC_KEY_LENGTH));
+        }
+        callback(introduction_points);
       });
     };
     /**
