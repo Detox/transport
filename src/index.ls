@@ -118,16 +118,13 @@ function Transport (detox-dht, ronion, jssha, async-eventer)
 		 * @param {!Object} signal
 		 */
 		..signal = (signal) !->
-			if !signal.signature
-				# Drop connection if signature not specified
+			if !signal.signature || !!signal.extensions
+				# Drop connection if signature or extensions not specified
 				@destroy()
 				return
 			@_signature_received	= signal.signature
 			# Already Uint8Array, no need to convert SDP to array
 			@_sdp_received			= signal.sdp
-			if !signal.extensions
-				@destroy()
-				return
 			found_psr	= false
 			for extension in extensions
 				if extension.startsWith('psr:')

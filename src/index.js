@@ -133,16 +133,12 @@
      */
     x$.signal = function(signal){
       var found_psr, i$, ref$, len$, extension, array, received_packet_size, received_packets_per_second;
-      if (!signal.signature) {
+      if (!signal.signature || !!signal.extensions) {
         this.destroy();
         return;
       }
       this._signature_received = signal.signature;
       this._sdp_received = signal.sdp;
-      if (!signal.extensions) {
-        this.destroy();
-        return;
-      }
       found_psr = false;
       for (i$ = 0, len$ = (ref$ = extensions).length; i$ < len$; ++i$) {
         extension = ref$[i$];
