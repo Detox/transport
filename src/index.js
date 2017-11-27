@@ -6,12 +6,13 @@
  * @license   MIT License, see license.txt
  */
 (function(){
-  var COMMAND_DHT, COMMAND_DATA, COMMAND_TAG, COMMAND_UNTAG, PUBLIC_KEY_LENGTH;
+  var COMMAND_DHT, COMMAND_DATA, COMMAND_TAG, COMMAND_UNTAG, PUBLIC_KEY_LENGTH, MAX_DATA_LENGTH;
   COMMAND_DHT = 0;
   COMMAND_DATA = 1;
   COMMAND_TAG = 2;
   COMMAND_UNTAG = 3;
   PUBLIC_KEY_LENGTH = 32;
+  MAX_DATA_LENGTH = Math.pow(2, 24) - 1;
   /**
    * @param {!Uint8Array} array
    *
@@ -82,12 +83,12 @@
    * @param {!Uint8Array[]} introduction_points
    */
   function found_introduction_points(introduction_points){}
-  function Transport(detoxDht, ronion, jssha, asyncEventer){
+  function Transport(detoxDht, ronion, jssha, fixedSizeMultiplexer, asyncEventer){
     var simplePeer, webrtcSocket, webtorrentDht, Buffer, x$, y$;
-    simplePeer = detoxDht.simplePeer;
-    webrtcSocket = detoxDht.webrtcSocket;
-    webtorrentDht = detoxDht.webtorrentDht;
-    Buffer = detoxDht.Buffer;
+    simplePeer = detoxDht['simple-peer'];
+    webrtcSocket = detoxDht['webrtc-socket'];
+    webtorrentDht = detoxDht['webtorrent-dht'];
+    Buffer = detoxDht['Buffer'];
     /**
      * We'll authenticate remove peers by requiring them to sign SDP by their DHT key
      *
@@ -96,12 +97,23 @@
      * @param {!Object} options
      */
     function simplePeerDetox(options){
+      var this$ = this;
       if (!(this instanceof simplePeerDetox)) {
         return new simplePeerDetox(options);
       }
       this._sign = options.sign;
       this._packet_size = options.packet_size;
       this._packets_per_second = options.packets_per_second;
+      this._sending = options.initiator;
+      this['once']('connect', function(){
+        this$._send_delay = 1000 / this$._packets_per_second;
+        this$._multiplexer = fixedSizeMultiplexer['Multiplexer'](MAX_DATA_LENGTH, this$._packet_size);
+        this$._demultiplexer = fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_LENGTH, this$._packet_size);
+        this$._last_sent = +new Date;
+        if (this$._sending) {
+          this$._real_send();
+        }
+      });
       simplePeer.call(this, options);
     }
     simplePeerDetox.prototype = Object.create(simplePeer.prototype);
@@ -109,45 +121,58 @@
     /**
      * Dirty hack to get `data` event and handle it the way we want
      */
-    x$.emit = function(event, data){
-      var command;
+    x$['emit'] = function(event, data){
+      var actual_data, command;
       switch (event) {
       case 'signal':
-        data.signature = this._sign(string2array(data.sdp));
-        simplePeer.prototype.emit.apply(this, data);
+        data.signature = this._sign(string2array(data['sdp']));
+        simplePeer.prototype['emit'].call(this, 'signal', data);
         break;
       case 'data':
-        command = data[0];
-        if (command === COMMAND_DHT) {
-          simplePeer.prototype.emit.call(this, 'data', data.subarray(1));
+        if (this._sending) {
+          this['destroy']();
+          return;
         } else {
-          simplePeer.prototype.emit.call(this, 'routing_data', command, data.subarray(1));
+          this._demultiplexer['feed'](data);
+          if (this._demultiplexer['have_more_data']()) {
+            /**
+             * @type {!Uint8Array}
+             */
+            actual_data = this._demultiplexer['get_data']();
+            command = actual_data[0];
+            if (command === COMMAND_DHT) {
+              simplePeer.prototype['emit'].call(this, 'data', actual_data.subarray(1));
+            } else {
+              simplePeer.prototype['emit'].call(this, 'routing_data', command, actual_data.subarray(1));
+            }
+          }
+          this._sending = true;
         }
         break;
       default:
-        simplePeer.prototype.emit.apply(this, arguments);
+        simplePeer.prototype['emit'].apply(this, arguments);
       }
     };
     /**
      * @param {!Object} signal
      */
-    x$.signal = function(signal){
+    x$['signal'] = function(signal){
       var found_psr, i$, ref$, len$, extension, array, received_packet_size, received_packets_per_second;
-      if (!signal.signature || !!signal.extensions) {
-        this.destroy();
+      if (!signal.signature || !!signal['extensions']) {
+        this['destroy']();
         return;
       }
       this._signature_received = signal.signature;
-      this._sdp_received = signal.sdp;
+      this._sdp_received = signal['sdp'];
       found_psr = false;
-      for (i$ = 0, len$ = (ref$ = extensions).length; i$ < len$; ++i$) {
+      for (i$ = 0, len$ = (ref$ = signal['extensions']).length; i$ < len$; ++i$) {
         extension = ref$[i$];
         if (extension.startsWith('psr:')) {
           array = extension.split(':');
           received_packet_size = parseInt(array[1]);
           received_packets_per_second = parseInt(array[2]);
           if (received_packet_size < 1 || received_packets_per_second < 1) {
-            this.destroy();
+            this['destroy']();
             return;
           }
           this._packet_size = Math.min(this._packet_size, received_packet_size);
@@ -157,18 +182,18 @@
         }
       }
       if (!found_psr) {
-        this.destroy();
+        this['destroy']();
         return;
       }
-      simplePeer.prototype.emit.call(this, signal);
+      simplePeer.prototype['emit'].call(this, signal);
     };
     /**
      * Data sending method that will be used by DHT
      *
      * @param {Buffer} data
      */
-    x$.send = function(data){
-      this.real_send(data, COMMAND_DHT);
+    x$['send'] = function(data){
+      this._send_multiplex(data, COMMAND_DHT);
     };
     /**
      * Data sending method that will be used by anonymous routing
@@ -176,8 +201,8 @@
      * @param {!Uint8Array}	data
      * @param {number}		command 1..255 - routing data command being sent
      */
-    x$.send_routing_data = function(data, command){
-      this.real_send(data, command);
+    x$._send_routing_data = function(data, command){
+      this._send_multiplex(data, command);
     };
     /**
      * Actual data sending method moved here
@@ -185,12 +210,27 @@
      * @param {!Uint8Array}	data
      * @param {number}		command
      */
-    x$.real_send = function(data, command){
+    x$._send_multiplex = function(data, command){
       var x$, data_with_header;
       x$ = data_with_header = new Uint8Array(data.length + 1);
       x$.set([command]);
       x$.set(data, 1);
-      simplePeer.prototype.send.call(this, data_with_header);
+      this._multiplexer['feed'](data_with_header);
+    };
+    /**
+     * Send a block of multiplexed data to the other side
+     */
+    x$._real_send = function(){
+      var delay, this$ = this;
+      delay = Math.max(0, this._send_delay - (new Date - this._last_sent));
+      setTimeout(function(){
+        if (this$._destroyed) {
+          return;
+        }
+        simplePeer.prototype['send'].call(this$, this$._multiplexer['get_block']());
+        this$._sending = false;
+        this$._last_sent = +new Date;
+      }, delay);
     };
     Object.defineProperty(simplePeerDetox.prototype, 'constructor', {
       enumerable: false,
@@ -204,8 +244,8 @@
     function sha3_256(data){
       var shaObj;
       shaObj = new jsSHA('SHA3-256', 'ARRAYBUFFER');
-      shaObj.update(array);
-      return shaObj.getHash('HEX');
+      shaObj['update'](array);
+      return shaObj['getHash']('HEX');
     }
     /**
      * @param {!Object} message
@@ -213,12 +253,7 @@
      * @return {!Buffer}
      */
     function encode_signature_data(message){
-      var ref;
-      ref = {
-        seq: message.seq,
-        v: message.v
-      };
-      return bencode.encode(ref).slice(1, -1);
+      return bencode['encode'](message).slice(1, -1);
     }
     /**
      * @constructor
@@ -247,53 +282,53 @@
       }
       this._sign = sign;
       this._socket = webrtcSocket({
-        simple_peer_constructor: simplePeerDetox,
-        simple_peer_opts: {
-          config: {
-            iceServers: ice_servers
+        'simple_peer_constructor': simplePeerDetox,
+        'simple_peer_opts': {
+          'config': {
+            'iceServers': ice_servers
           },
-          packet_size: packet_size,
-          packets_per_second: packets_per_second,
-          sign: function(data){
+          'packet_size': packet_size,
+          'packets_per_second': packets_per_second,
+          'sign': function(data){
             return sign(data, public_key, private_key);
           }
         }
       });
       x$ = this._socket;
-      x$.on('node_connected', function(string_id){
+      x$['on']('node_connected', function(string_id){
         var id, peer_connection;
         id = hex2array(string_id);
-        peer_connection = this$._socket.get_id_mapping(string_id);
+        peer_connection = this$._socket['get_id_mapping'](string_id);
         if (!verify(peer_connection._signature_received, peer_connection._sdp_received, id)) {
-          peer_connection.destroy();
+          peer_connection['destroy']();
         }
-        peer_connection.on('routing_data', function(command, data){
+        peer_connection['on']('routing_data', function(command, data){
           switch (command) {
           case COMMAND_TAG:
-            this$._socket.add_tag(string_id, 'detox-responder');
-            this$.fire('node_tagged', id);
+            this$._socket['add_tag'](string_id, 'detox-responder');
+            this$['fire']('node_tagged', id);
             break;
           case COMMAND_UNTAG:
-            this$._socket.del_tag(string_id, 'detox-responder');
-            this$.fire('node_untagged', id);
+            this$._socket['del_tag'](string_id, 'detox-responder');
+            this$['fire']('node_untagged', id);
             break;
           case COMMAND_DATA:
-            this$.fire('data', id, data);
+            this$['fire']('data', id, data);
           }
         });
-        this$.fire('node_connected', id);
+        this$['fire']('node_connected', id);
       });
-      x$.on('node_disconnected', function(string_id){
-        this$.fire('node_disconnected', hex2array(string_id));
+      x$['on']('node_disconnected', function(string_id){
+        this$['fire']('node_disconnected', hex2array(string_id));
       });
       this._dht = new webtorrentDht({
-        bootstrap: bootstrap_nodes,
-        extensions: ["psr:" + packet_size + ":" + packets_per_second],
-        hash: sha3_256,
-        k: bucket_size,
-        nodeId: public_key,
-        socket: this._socket,
-        verify: verify
+        'bootstrap': bootstrap_nodes,
+        'extensions': ["psr:" + packet_size + ":" + packets_per_second],
+        'hash': sha3_256,
+        'k': bucket_size,
+        'nodeId': public_key,
+        'socket': this._socket,
+        'verify': verify
       });
     }
     DHT.prototype = Object.create(asyncEventer.prototype);
@@ -329,10 +364,10 @@
     y$['add_used_tag'] = function(id){
       var string_id, peer_connection;
       string_id = array2hex(id);
-      peer_connection = this._socket.get_id_mapping(string_id);
+      peer_connection = this._socket['get_id_mapping'](string_id);
       if (peer_connection) {
-        peer_connection.send_routing_data(new Uint8Array(0), COMMAND_TAG);
-        this._socket.add_tag(string_id, 'detox-initiator');
+        peer_connection._send_routing_data(new Uint8Array(0), COMMAND_TAG);
+        this._socket['add_tag'](string_id, 'detox-initiator');
       }
     };
     /**
@@ -343,10 +378,10 @@
     y$['del_used_tag'] = function(id){
       var string_id, peer_connection;
       string_id = array2hex(id);
-      peer_connection = this._socket.get_id_mapping(string_id);
+      peer_connection = this._socket['get_id_mapping'](string_id);
       if (peer_connection) {
-        peer_connection.send_routing_data(new Uint8Array(0), COMMAND_UNTAG);
-        this._socket.del_tag(string_id, 'detox-initiator');
+        peer_connection._send_routing_data(new Uint8Array(0), COMMAND_UNTAG);
+        this._socket['del_tag'](string_id, 'detox-initiator');
       }
     };
     /**
@@ -358,9 +393,9 @@
     y$['send_data'] = function(id, data){
       var string_id, peer_connection;
       string_id = array2hex(id);
-      peer_connection = this._socket.get_id_mapping(string_id);
+      peer_connection = this._socket['get_id_mapping'](string_id);
       if (peer_connection) {
-        peer_connection.send_routing_data(data, COMMAND_DATA);
+        peer_connection._send_routing_data(data, COMMAND_DATA);
       }
     };
     /**
@@ -382,15 +417,15 @@
         value.set(introduction_point, index * PUBLIC_KEY_LENGTH);
       }
       signature_data = encode_signature_data({
-        seq: time,
-        v: value
+        'seq': time,
+        'v': value
       });
       signature = this._sign(signature_data, public_key, private_key);
       return {
-        k: public_key,
-        seq: time,
-        sig: signature,
-        v: value
+        'k': public_key,
+        'seq': time,
+        'sig': signature,
+        'v': value
       };
     };
     /**
@@ -399,14 +434,14 @@
      * @param {!Object} message
      */
     y$['publish_introduction_message'] = function(message){
-      if (!message.k || !message.seq || !message.sig || !message.v) {
+      if (!message['k'] || !message['seq'] || !message['sig'] || !message['v']) {
         return;
       }
-      this._dht.put({
-        k: Buffer.from(message.public_key),
-        seq: message.time,
-        sig: Buffer.from(message.signature),
-        v: Buffer.from(message.value)
+      this._dht['put']({
+        'k': Buffer.from(message['k']),
+        'seq': parseInt(message['seq']),
+        'sig': Buffer.from(message['sig']),
+        'v': Buffer.from(message['v'])
       });
     };
     /**
@@ -418,9 +453,9 @@
     y$['find_introduction_points'] = function(public_key, callback){
       var hash;
       hash = sha3_256(public_key);
-      this._dht.get(hash, function(result){
+      this._dht['get'](hash, function(result){
         var introduction_points_bulk, introduction_points, i$, to$, i;
-        introduction_points_bulk = Uint8Array.from(result.v);
+        introduction_points_bulk = Uint8Array.from(result['v']);
         introduction_points = [];
         if (introduction_points_bulk.length % PUBLIC_KEY_LENGTH === 0) {
           return;
@@ -436,7 +471,7 @@
      * @param {Function} callback
      */
     y$['destroy'] = function(callback){
-      this._dht.destroy(callback);
+      this._dht['destroy'](callback);
       delete this._dht;
     };
     Object.defineProperty(DHT.prototype, 'constructor', {
@@ -448,10 +483,10 @@
     };
   }
   if (typeof define === 'function' && define['amd']) {
-    define(['@detox/dht', 'ronion', 'jssha/src/sha3', 'async-eventer'], Transport);
+    define(['@detox/dht', 'ronion', 'jssha/src/sha3', 'fixed-size-multiplexer', 'async-eventer'], Transport);
   } else if (typeof exports === 'object') {
-    module.exports = Transport(require('@detox/dht'), require('ronion'), require('jssha/src/sha3'), require('async-eventer'));
+    module.exports = Transport(require('@detox/dht'), require('ronion'), require('jssha/src/sha3'), require('fixed-size-multiplexer'), require('async-eventer'));
   } else {
-    this['detox_transport'] = Transport(this['detox_dht'], this['ronion'], this['jsSHA'], this['async_eventer']);
+    this['detox_transport'] = Transport(this['detox_dht'], this['ronion'], this['jsSHA'], this['fixed_size_multiplexer'], this['async_eventer']);
   }
 }).call(this);
