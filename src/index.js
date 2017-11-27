@@ -147,6 +147,7 @@
             }
           }
           this._sending = true;
+          this._real_send();
         }
         break;
       default:

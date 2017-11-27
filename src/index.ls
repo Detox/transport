@@ -134,6 +134,7 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 							else
 								simple-peer::['emit'].call(@, 'routing_data', command, actual_data.subarray(1))
 						@_sending	= true
+						@_real_send()
 				else
 					simple-peer::['emit'].apply(@, &)
 		/**
