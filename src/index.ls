@@ -9,10 +9,12 @@ const COMMAND_DATA	= 1
 const COMMAND_TAG	= 2
 const COMMAND_UNTAG	= 3
 
+const ROUTING_PROTOCOL_VERSION	= 0
 # Length of Ed25519 public key in bytes
-const PUBLIC_KEY_LENGTH	= 32
-# Max data size of 16 MiB, more than enough for most purposes
-const MAX_DATA_LENGTH	= 2**24 - 1
+const PUBLIC_KEY_LENGTH			= 32
+const MAC_LENGTH				= 16
+# Max data size up to 64 KiB, should be enough for DHT, everything bigger should be multiplexed on higher level
+const MAX_DATA_LENGTH			= 2**16 - 1
 
 /**
  * @param {!Uint8Array} array
@@ -120,6 +122,9 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 					if @_sending
 						# Data are sent in alternating order, sending data when receiving is expected violates the protocol
 						@'destroy'()
+						return
+					else if data.length != @_packet_size
+						# Data size must be exactly one packet size
 						return
 					else
 						@_demultiplexer['feed'](data)
@@ -341,6 +346,8 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 		 * @param {!Uint8Array} data
 		 */
 		..'send_data' = (id, data) !->
+			if data.length > MAX_DATA_LENGTH
+				return
 			string_id		= array2hex(id)
 			peer_connection	= @_socket['get_id_mapping'](string_id)
 			if peer_connection
@@ -409,8 +416,27 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 			@_dht['destroy'](callback)
 			delete @_dht
 	Object.defineProperty(DHT::, 'constructor', {enumerable: false, value: DHT})
+	/**
+	 * @constructor
+	 *
+	 * @param {number} packet_size			Same as in DHT
+	 * @param {number} max_pending_segments	How much segments can be in pending state per one address
+	 *
+	 * @return {Router}
+	 */
+	!function Router (packet_size, max_pending_segments = 10)
+		if !(@ instanceof Router)
+			return new Router(packet_size, max_pending_segments)
+		# Should be 2 bytes smaller than `packet_size` for DHT because it will be later sent through DHT's peer connection
+		packet_size	= packet_size - 2
+		@_ronion	= ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)
+		async-eventer.call(@)
+	Router:: = Object.create(async-eventer::)
+#	Router::
+	Object.defineProperty(Router::, 'constructor', {enumerable: false, value: Router})
 	{
-		'DHT'	: DHT
+		'DHT'		: DHT
+		'Router'	: Router
 	}
 
 if typeof define == 'function' && define['amd']

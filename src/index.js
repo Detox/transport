@@ -6,13 +6,15 @@
  * @license   MIT License, see license.txt
  */
 (function(){
-  var COMMAND_DHT, COMMAND_DATA, COMMAND_TAG, COMMAND_UNTAG, PUBLIC_KEY_LENGTH, MAX_DATA_LENGTH;
+  var COMMAND_DHT, COMMAND_DATA, COMMAND_TAG, COMMAND_UNTAG, ROUTING_PROTOCOL_VERSION, PUBLIC_KEY_LENGTH, MAC_LENGTH, MAX_DATA_LENGTH;
   COMMAND_DHT = 0;
   COMMAND_DATA = 1;
   COMMAND_TAG = 2;
   COMMAND_UNTAG = 3;
+  ROUTING_PROTOCOL_VERSION = 0;
   PUBLIC_KEY_LENGTH = 32;
-  MAX_DATA_LENGTH = Math.pow(2, 24) - 1;
+  MAC_LENGTH = 16;
+  MAX_DATA_LENGTH = Math.pow(2, 16) - 1;
   /**
    * @param {!Uint8Array} array
    *
@@ -131,6 +133,8 @@
       case 'data':
         if (this._sending) {
           this['destroy']();
+          return;
+        } else if (data.length !== this._packet_size) {
           return;
         } else {
           this._demultiplexer['feed'](data);
@@ -393,6 +397,9 @@
      */
     y$['send_data'] = function(id, data){
       var string_id, peer_connection;
+      if (data.length > MAX_DATA_LENGTH) {
+        return;
+      }
       string_id = array2hex(id);
       peer_connection = this._socket['get_id_mapping'](string_id);
       if (peer_connection) {
@@ -479,8 +486,31 @@
       enumerable: false,
       value: DHT
     });
+    /**
+     * @constructor
+     *
+     * @param {number} packet_size			Same as in DHT
+     * @param {number} max_pending_segments	How much segments can be in pending state per one address
+     *
+     * @return {Router}
+     */
+    function Router(packet_size, max_pending_segments){
+      max_pending_segments == null && (max_pending_segments = 10);
+      if (!(this instanceof Router)) {
+        return new Router(packet_size, max_pending_segments);
+      }
+      packet_size = packet_size - 2;
+      this._ronion = ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments);
+      asyncEventer.call(this);
+    }
+    Router.prototype = Object.create(asyncEventer.prototype);
+    Object.defineProperty(Router.prototype, 'constructor', {
+      enumerable: false,
+      value: Router
+    });
     return {
-      'DHT': DHT
+      'DHT': DHT,
+      'Router': Router
     };
   }
   if (typeof define === 'function' && define['amd']) {
