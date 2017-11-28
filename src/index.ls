@@ -12,9 +12,10 @@ const COMMAND_UNTAG	= 3
 const ROUTING_PROTOCOL_VERSION	= 0
 # Length of Ed25519 public key in bytes
 const PUBLIC_KEY_LENGTH			= 32
+# ChaChaPoly+BLAKE2b
 const MAC_LENGTH				= 16
-# Max data size up to 64 KiB, should be enough for DHT, everything bigger should be multiplexed on higher level
-const MAX_DATA_LENGTH			= 2**16 - 1
+# Fixed minimal reasonable packet size, will definitely fit Noise handshake message and with non-zero chance DHT queries/responses; 512+ is recommended though
+const MIN_PACKET_SIZE			= 256
 
 /**
  * @param {!Uint8Array} array
@@ -100,8 +101,8 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 		@_sending				= options.initiator
 		@'once'('connect', !~>
 			@_send_delay	= 1000 / @_packets_per_second
-			@_multiplexer	= fixed-size-multiplexer['Multiplexer'](MAX_DATA_LENGTH, @_packet_size)
-			@_demultiplexer	= fixed-size-multiplexer['Demultiplexer'](MAX_DATA_LENGTH, @_packet_size)
+			@_multiplexer	= fixed-size-multiplexer['Multiplexer'](@_packet_size, @_packet_size)
+			@_demultiplexer	= fixed-size-multiplexer['Demultiplexer'](@_packet_size, @_packet_size)
 			@_last_sent		= +(new Date)
 			if @_sending
 				@_real_send()
@@ -230,8 +231,8 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 	/**
 	 * @constructor
 	 *
-	 * @param {!Uint8Array}	public_key			Ed25519 public key, temporary one, just for DHT operation
-	 * @param {!Uint8Array}	private_key			Corresponding Ed25519 private key
+	 * @param {!Uint8Array}	dht_public_key		Ed25519 public key, temporary one, just for DHT operation
+	 * @param {!Uint8Array}	dht_private_key		Corresponding Ed25519 private key
 	 * @param {string[]}	bootstrap_nodes
 	 * @param {!Object[]}	ice_servers
 	 * @param {!sign}		sign
@@ -240,11 +241,15 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 	 * @param {number}		packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
 	 * @param {number}		bucket_size
 	 *
-	 * @return {DHT}
+	 * @return {!DHT}
+	 *
+	 * @throws {Error}
 	 */
-	!function DHT (public_key, private_key, bootstrap_nodes, ice_servers, sign, verify, packet_size, packets_per_second, bucket_size = 2)
+	!function DHT (dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, sign, verify, packet_size, packets_per_second, bucket_size = 2)
 		if !(@ instanceof DHT)
-			return new DHT(public_key, private_key, bootstrap_nodes, ice_servers, sign, verify, packet_size, packets_per_second, bucket_size)
+			return new DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, sign, verify, packet_size, packets_per_second, bucket_size)
+		if packet_size < MIN_PACKET_SIZE
+			throw new Error('Minimal supported packet size is ' + MIN_PACKET_SIZE)
 		async-eventer.call(@)
 		if packets_per_second < 1
 			packets_per_second	= 1
@@ -257,7 +262,7 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 				'packet_size'			: packet_size
 				'packets_per_second'	: packets_per_second
 				'sign'					: (data) ->
-					sign(data, public_key, private_key)
+					sign(data, dht_public_key, dht_private_key)
 		)
 		@_socket
 			..'on'('node_connected', (string_id) !~>
@@ -290,7 +295,7 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 			]
 			'hash'			: sha3_256
 			'k'				: bucket_size
-			'nodeId'		: public_key
+			'nodeId'		: dht_public_key
 			'socket'		: @_socket
 			'verify'		: verify
 		)
@@ -346,7 +351,7 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 		 * @param {!Uint8Array} data
 		 */
 		..'send_data' = (id, data) !->
-			if data.length > MAX_DATA_LENGTH
+			if data.length > @_packet_size
 				return
 			string_id		= array2hex(id)
 			peer_connection	= @_socket['get_id_mapping'](string_id)
@@ -355,13 +360,13 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 		/**
 		 * Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity)
 		 *
-		 * @param {!Uint8Array}		public_key			Ed25519 public key (real one, different from supplied in DHT constructor)
-		 * @param {!Uint8Array}		private_key			Corresponding Ed25519 private key
+		 * @param {!Uint8Array}		real_public_key		Ed25519 public key (real one, different from supplied in DHT constructor)
+		 * @param {!Uint8Array}		real_private_key	Corresponding Ed25519 private key
 		 * @param {!Uint8Array[]}	introduction_points	Array of public keys of introduction points
 		 *
 		 * @return {!Object}
 		 */
-		..'generate_introduction_message' = (public_key, private_key, introduction_points) ->
+		..'generate_introduction_message' = (real_public_key, real_private_key, introduction_points) ->
 			time	= +(new Date)
 			value	= new Uint8Array(introduction_points.length * PUBLIC_KEY_LENGTH)
 			for introduction_point, index in introduction_points
@@ -370,10 +375,10 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 				'seq'	: time
 				'v'		: value
 			)
-			signature		= @_sign(signature_data, public_key, private_key)
+			signature		= @_sign(signature_data, real_public_key, real_private_key)
 			# This message has signature, so it can be now sent from any node in DHT
 			{
-				'k'		: public_key
+				'k'		: real_public_key
 				'seq'	: time
 				'sig'	: signature
 				'v'		: value
@@ -395,11 +400,11 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 		/**
 		 * Find nodes in DHT that are acting as introduction points for specified public key
 		 *
-		 * @param {!Uint8Array}					public_key
+		 * @param {!Uint8Array}					target_public_key
 		 * @param {!found_introduction_points}	callback
 		 */
-		..'find_introduction_points' = (public_key, callback) !->
-			hash	= sha3_256(public_key)
+		..'find_introduction_points' = (target_public_key, callback) !->
+			hash	= sha3_256(target_public_key)
 			@_dht['get'](hash, (result) !->
 				introduction_points_bulk	= Uint8Array.from(result['v'])
 				introduction_points			= []

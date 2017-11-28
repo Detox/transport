@@ -6,7 +6,7 @@
  * @license   MIT License, see license.txt
  */
 (function(){
-  var COMMAND_DHT, COMMAND_DATA, COMMAND_TAG, COMMAND_UNTAG, ROUTING_PROTOCOL_VERSION, PUBLIC_KEY_LENGTH, MAC_LENGTH, MAX_DATA_LENGTH;
+  var COMMAND_DHT, COMMAND_DATA, COMMAND_TAG, COMMAND_UNTAG, ROUTING_PROTOCOL_VERSION, PUBLIC_KEY_LENGTH, MAC_LENGTH, MIN_PACKET_SIZE;
   COMMAND_DHT = 0;
   COMMAND_DATA = 1;
   COMMAND_TAG = 2;
@@ -14,7 +14,7 @@
   ROUTING_PROTOCOL_VERSION = 0;
   PUBLIC_KEY_LENGTH = 32;
   MAC_LENGTH = 16;
-  MAX_DATA_LENGTH = Math.pow(2, 16) - 1;
+  MIN_PACKET_SIZE = 256;
   /**
    * @param {!Uint8Array} array
    *
@@ -109,8 +109,8 @@
       this._sending = options.initiator;
       this['once']('connect', function(){
         this$._send_delay = 1000 / this$._packets_per_second;
-        this$._multiplexer = fixedSizeMultiplexer['Multiplexer'](MAX_DATA_LENGTH, this$._packet_size);
-        this$._demultiplexer = fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_LENGTH, this$._packet_size);
+        this$._multiplexer = fixedSizeMultiplexer['Multiplexer'](this$._packet_size, this$._packet_size);
+        this$._demultiplexer = fixedSizeMultiplexer['Demultiplexer'](this$._packet_size, this$._packet_size);
         this$._last_sent = +new Date;
         if (this$._sending) {
           this$._real_send();
@@ -263,8 +263,8 @@
     /**
      * @constructor
      *
-     * @param {!Uint8Array}	public_key			Ed25519 public key, temporary one, just for DHT operation
-     * @param {!Uint8Array}	private_key			Corresponding Ed25519 private key
+     * @param {!Uint8Array}	dht_public_key		Ed25519 public key, temporary one, just for DHT operation
+     * @param {!Uint8Array}	dht_private_key		Corresponding Ed25519 private key
      * @param {string[]}	bootstrap_nodes
      * @param {!Object[]}	ice_servers
      * @param {!sign}		sign
@@ -273,13 +273,18 @@
      * @param {number}		packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
      * @param {number}		bucket_size
      *
-     * @return {DHT}
+     * @return {!DHT}
+     *
+     * @throws {Error}
      */
-    function DHT(public_key, private_key, bootstrap_nodes, ice_servers, sign, verify, packet_size, packets_per_second, bucket_size){
+    function DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, sign, verify, packet_size, packets_per_second, bucket_size){
       var x$, this$ = this;
       bucket_size == null && (bucket_size = 2);
       if (!(this instanceof DHT)) {
-        return new DHT(public_key, private_key, bootstrap_nodes, ice_servers, sign, verify, packet_size, packets_per_second, bucket_size);
+        return new DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, sign, verify, packet_size, packets_per_second, bucket_size);
+      }
+      if (packet_size < MIN_PACKET_SIZE) {
+        throw new Error('Minimal supported packet size is ' + MIN_PACKET_SIZE);
       }
       asyncEventer.call(this);
       if (packets_per_second < 1) {
@@ -295,7 +300,7 @@
           'packet_size': packet_size,
           'packets_per_second': packets_per_second,
           'sign': function(data){
-            return sign(data, public_key, private_key);
+            return sign(data, dht_public_key, dht_private_key);
           }
         }
       });
@@ -331,7 +336,7 @@
         'extensions': ["psr:" + packet_size + ":" + packets_per_second],
         'hash': sha3_256,
         'k': bucket_size,
-        'nodeId': public_key,
+        'nodeId': dht_public_key,
         'socket': this._socket,
         'verify': verify
       });
@@ -397,7 +402,7 @@
      */
     y$['send_data'] = function(id, data){
       var string_id, peer_connection;
-      if (data.length > MAX_DATA_LENGTH) {
+      if (data.length > this._packet_size) {
         return;
       }
       string_id = array2hex(id);
@@ -409,13 +414,13 @@
     /**
      * Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity)
      *
-     * @param {!Uint8Array}		public_key			Ed25519 public key (real one, different from supplied in DHT constructor)
-     * @param {!Uint8Array}		private_key			Corresponding Ed25519 private key
+     * @param {!Uint8Array}		real_public_key		Ed25519 public key (real one, different from supplied in DHT constructor)
+     * @param {!Uint8Array}		real_private_key	Corresponding Ed25519 private key
      * @param {!Uint8Array[]}	introduction_points	Array of public keys of introduction points
      *
      * @return {!Object}
      */
-    y$['generate_introduction_message'] = function(public_key, private_key, introduction_points){
+    y$['generate_introduction_message'] = function(real_public_key, real_private_key, introduction_points){
       var time, value, i$, len$, index, introduction_point, signature_data, signature;
       time = +new Date;
       value = new Uint8Array(introduction_points.length * PUBLIC_KEY_LENGTH);
@@ -428,9 +433,9 @@
         'seq': time,
         'v': value
       });
-      signature = this._sign(signature_data, public_key, private_key);
+      signature = this._sign(signature_data, real_public_key, real_private_key);
       return {
-        'k': public_key,
+        'k': real_public_key,
         'seq': time,
         'sig': signature,
         'v': value
@@ -455,12 +460,12 @@
     /**
      * Find nodes in DHT that are acting as introduction points for specified public key
      *
-     * @param {!Uint8Array}					public_key
+     * @param {!Uint8Array}					target_public_key
      * @param {!found_introduction_points}	callback
      */
-    y$['find_introduction_points'] = function(public_key, callback){
+    y$['find_introduction_points'] = function(target_public_key, callback){
       var hash;
-      hash = sha3_256(public_key);
+      hash = sha3_256(target_public_key);
       this._dht['get'](hash, function(result){
         var introduction_points_bulk, introduction_points, i$, to$, i;
         introduction_points_bulk = Uint8Array.from(result['v']);
