@@ -86,7 +86,7 @@
    */
   function found_introduction_points(introduction_points){}
   function Transport(detoxDht, ronion, jssha, fixedSizeMultiplexer, asyncEventer){
-    var simplePeer, webrtcSocket, webtorrentDht, Buffer, x$, y$;
+    var simplePeer, webrtcSocket, webtorrentDht, Buffer, x$, y$, z$;
     simplePeer = detoxDht['simple-peer'];
     webrtcSocket = detoxDht['webrtc-socket'];
     webtorrentDht = detoxDht['webtorrent-dht'];
@@ -494,21 +494,57 @@
     /**
      * @constructor
      *
-     * @param {number} packet_size			Same as in DHT
-     * @param {number} max_pending_segments	How much segments can be in pending state per one address
+     * @param {!Object}		Encryptor			Encryptor constructor from detox-dht
+     * @param {!Object}		Rewrapper			Rewrapper constructor from detox-dht
+     * @param {!Uint8Array}	dht_public_key		X25519 public key that corresponds to Ed25519 key used in DHT
+     * @param {!Uint8Array}	dht_private_key		Corresponding X25519 private key
+     * @param {number}		packet_size			Same as in DHT
+     * @param {number}		max_pending_segments	How much segments can be in pending state per one address
      *
-     * @return {Router}
+     * @return {!Router}
+     *
+     * @throws {Error}
      */
-    function Router(packet_size, max_pending_segments){
+    function Router(Encryptor, Rewrapper, dht_public_key, dht_private_key, packet_size, max_pending_segments){
       max_pending_segments == null && (max_pending_segments = 10);
       if (!(this instanceof Router)) {
-        return new Router(packet_size, max_pending_segments);
+        return new Router(Encryptor, Rewrapper, dht_public_key, dht_private_key, packet_size, max_pending_segments);
       }
-      packet_size = packet_size - 2;
-      this._ronion = ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments);
+      if (packet_size < MIN_PACKET_SIZE) {
+        throw new Error('Minimal supported packet size is ' + MIN_PACKET_SIZE);
+      }
       asyncEventer.call(this);
+      packet_size = packet_size - 2;
+      this._Encryptor = Encryptor;
+      this._Rewrapper = Rewrapper;
+      this._dht_public_key = dht_public_key;
+      this._dht_private_key = dht_private_key;
+      this._encryptor_instances = new Map;
+      this._rewrapper_instances = new Map;
+      this._ronion = ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments);
     }
     Router.prototype = Object.create(asyncEventer.prototype);
+    z$ = Router.prototype;
+    /**
+     * Process routing packet coming from node with specified ID
+     *
+     * @param {!Uint8Array} source_id
+     * @param {!Uint8Array} packet
+     */
+    z$.process_packet = function(source_id, packet){
+      this._ronion['process_packet'](source_id, packet);
+    };
+    /**
+     * @param {!Uint8Array[]} nodes IDs of the nodes through which routing path must be constructed, last node in the list is responder
+     *
+     * @return {!Promise} Will resolve with ID of the route or will be rejected if path construction fails
+     */
+    z$.construct_routing_path = function(nodes){
+      var first_node, encryptor_instance;
+      first_node = nodes[0];
+      encryptor_instance = this._Encryptor(true, first_node);
+      return this._ronion['create_request'](first_node, encryptor_instance.get_handshake_message());
+    };
     Object.defineProperty(Router.prototype, 'constructor', {
       enumerable: false,
       value: Router

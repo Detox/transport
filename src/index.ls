@@ -424,20 +424,54 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 	/**
 	 * @constructor
 	 *
-	 * @param {number} packet_size			Same as in DHT
-	 * @param {number} max_pending_segments	How much segments can be in pending state per one address
+	 * @param {!Object}		Encryptor			Encryptor constructor from detox-dht
+	 * @param {!Object}		Rewrapper			Rewrapper constructor from detox-dht
+	 * @param {!Uint8Array}	dht_public_key		X25519 public key that corresponds to Ed25519 key used in DHT
+	 * @param {!Uint8Array}	dht_private_key		Corresponding X25519 private key
+	 * @param {number}		packet_size			Same as in DHT
+	 * @param {number}		max_pending_segments	How much segments can be in pending state per one address
 	 *
-	 * @return {Router}
+	 * @return {!Router}
+	 *
+	 * @throws {Error}
 	 */
-	!function Router (packet_size, max_pending_segments = 10)
+	!function Router (Encryptor, Rewrapper, dht_public_key, dht_private_key, packet_size, max_pending_segments = 10)
 		if !(@ instanceof Router)
-			return new Router(packet_size, max_pending_segments)
-		# Should be 2 bytes smaller than `packet_size` for DHT because it will be later sent through DHT's peer connection
-		packet_size	= packet_size - 2
-		@_ronion	= ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)
+			return new Router(Encryptor, Rewrapper, dht_public_key, dht_private_key, packet_size, max_pending_segments)
+		if packet_size < MIN_PACKET_SIZE
+			throw new Error('Minimal supported packet size is ' + MIN_PACKET_SIZE)
 		async-eventer.call(@)
+		# Should be 2 bytes smaller than `packet_size` for DHT because it will be later sent through DHT's peer connection
+		packet_size				= packet_size - 2
+		@_Encryptor				= Encryptor
+		@_Rewrapper				= Rewrapper
+		@_dht_public_key		= dht_public_key
+		@_dht_private_key		= dht_private_key
+		@_encryptor_instances	= new Map
+		@_rewrapper_instances	= new Map
+		@_ronion				= ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)
+		# TODO: Events handlers needed here
 	Router:: = Object.create(async-eventer::)
-#	Router::
+	Router::
+		/**
+		 * Process routing packet coming from node with specified ID
+		 *
+		 * @param {!Uint8Array} source_id
+		 * @param {!Uint8Array} packet
+		 */
+		..process_packet = (source_id, packet) !->
+			@_ronion['process_packet'](source_id, packet)
+		/**
+		 * @param {!Uint8Array[]} nodes IDs of the nodes through which routing path must be constructed, last node in the list is responder
+		 *
+		 * @return {!Promise} Will resolve with ID of the route or will be rejected if path construction fails
+		 */
+		..construct_routing_path = (nodes) ->
+			first_node			= nodes[0]
+			encryptor_instance	= @_Encryptor(true, first_node)
+			@_ronion['create_request'](first_node, encryptor_instance.get_handshake_message())
+			# TODO: method not finished yet
+		# TODO: more methods are needed here
 	Object.defineProperty(Router::, 'constructor', {enumerable: false, value: Router})
 	{
 		'DHT'		: DHT
