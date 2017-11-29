@@ -6,7 +6,7 @@
  * @license   MIT License, see license.txt
  */
 (function(){
-  var COMMAND_DHT, COMMAND_DATA, COMMAND_TAG, COMMAND_UNTAG, ROUTING_PROTOCOL_VERSION, PUBLIC_KEY_LENGTH, MAC_LENGTH, MIN_PACKET_SIZE;
+  var COMMAND_DHT, COMMAND_DATA, COMMAND_TAG, COMMAND_UNTAG, ROUTING_PROTOCOL_VERSION, PUBLIC_KEY_LENGTH, MAC_LENGTH, MIN_PACKET_SIZE, ROUTING_PATH_SEGMENT_TIMEOUT;
   COMMAND_DHT = 0;
   COMMAND_DATA = 1;
   COMMAND_TAG = 2;
@@ -15,6 +15,7 @@
   PUBLIC_KEY_LENGTH = 32;
   MAC_LENGTH = 16;
   MIN_PACKET_SIZE = 256;
+  ROUTING_PATH_SEGMENT_TIMEOUT = 10;
   /**
    * @param {!Uint8Array} array
    *
@@ -56,6 +57,9 @@
       array[i] = string.charCodeAt(i);
     }
     return array;
+  }
+  function is_string_equal_to_array(string, array){
+    return string === array.toString();
   }
   /**
    * @interface
@@ -535,15 +539,99 @@
       this._ronion['process_packet'](source_id, packet);
     };
     /**
+     * TODO: No rewrapper yet
      * @param {!Uint8Array[]} nodes IDs of the nodes through which routing path must be constructed, last node in the list is responder
      *
      * @return {!Promise} Will resolve with ID of the route or will be rejected if path construction fails
      */
     z$.construct_routing_path = function(nodes){
-      var first_node, encryptor_instance;
-      first_node = nodes[0];
-      encryptor_instance = this._Encryptor(true, first_node);
-      return this._ronion['create_request'](first_node, encryptor_instance.get_handshake_message());
+      nodes = nodes.slice();
+      return new Promise(function(resolve, reject){
+        var first_node, first_node_string, encryptor_instances, fail, segment_establishment_timeout, route_id, route_id_string, this$ = this;
+        first_node = nodes.shift();
+        first_node_string = first_node.toString();
+        encryptor_instances = Object.create(null);
+        fail = function(){
+          var i$, ref$, encryptor_instance;
+          for (i$ in ref$ = encryptor_instances) {
+            encryptor_instance = ref$[i$];
+            encryptor_instance['destroy']();
+            try {
+              this$._ronion['destroy'](first_node, route_id);
+            } catch (e$) {}
+          }
+          this$._encryptor_instances['delete'](route_id_string);
+          throw new Error('Routing path creation failed');
+        };
+        encryptor_instances[first_node_string] = this._Encryptor(true, first_node);
+        this._ronion.on('create_response', (function(){
+          function create_response_handler(arg$){
+            var address, segment_id, command_data, e, current_node, current_node_string, segment_extension_timeout;
+            address = arg$.address, segment_id = arg$.segment_id, command_data = arg$.command_data;
+            if (!is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)) {
+              return;
+            }
+            clearTimeout(segment_establishment_timeout);
+            this._ronion.off('create_response', create_response_handler);
+            try {
+              encryptor_instances[first_node_string]['put_handshake_message'](command_data);
+            } catch (e$) {
+              e = e$;
+              fail();
+            }
+            if (!encryptor_instances[first_node_string]['ready']()) {
+              fail();
+            }
+            this._ronion['confirm_outgoing_segment_established'](first_node, route_id);
+            function extend_request(){
+              var this$ = this;
+              if (!nodes.length) {
+                resolve(route_id);
+              }
+              this._ronion.on('extend_response', (function(){
+                function extend_response_handler(arg$){
+                  var address, segment_id, command_data, e;
+                  address = arg$.address, segment_id = arg$.segment_id, command_data = arg$.command_data;
+                  if (!is_string_equal_to_array(current_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)) {
+                    return;
+                  }
+                  this._ronion.off('extend_response', extend_response_handler);
+                  clearTimeout(segment_extension_timeout);
+                  try {
+                    encryptor_instances[current_node_string]['put_handshake_message'](command_data);
+                  } catch (e$) {
+                    e = e$;
+                    fail();
+                  }
+                  if (!encryptor_instances[current_node_string]['ready']()) {
+                    fail();
+                  }
+                  this._ronion['confirm_extended_path'](first_node, route_id);
+                  extend_request();
+                }
+                return extend_response_handler;
+              }()));
+              current_node = nodes.shift();
+              current_node_string = current_node.toString();
+              encryptor_instances[current_node_string] = this._Encryptor(true, current_node);
+              segment_extension_timeout = setTimeout(function(){
+                this$._ronion.off('extend_response', extend_response_handler);
+                fail();
+              }, ROUTING_PATH_SEGMENT_TIMEOUT);
+              this._ronion['extend_request'](current_node, route_id, encryptor_instances[current_node_string]['get_handshake_message']());
+            }
+            extend_request();
+          }
+          return create_response_handler;
+        }()));
+        segment_establishment_timeout = setTimeout(function(){
+          this$._ronion.off('create_response', create_response_handler);
+          fail();
+        }, ROUTING_PATH_SEGMENT_TIMEOUT);
+        route_id = this._ronion['create_request'](first_node, encryptor_instances[first_node_string]['get_handshake_message']());
+        route_id_string = route_id.toString();
+        this._encryptor_instances.set(route_id.toString(), encryptor_instances);
+      });
     };
     Object.defineProperty(Router.prototype, 'constructor', {
       enumerable: false,

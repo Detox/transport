@@ -9,13 +9,15 @@ const COMMAND_DATA	= 1
 const COMMAND_TAG	= 2
 const COMMAND_UNTAG	= 3
 
-const ROUTING_PROTOCOL_VERSION	= 0
+const ROUTING_PROTOCOL_VERSION		= 0
 # Length of Ed25519 public key in bytes
-const PUBLIC_KEY_LENGTH			= 32
+const PUBLIC_KEY_LENGTH				= 32
 # ChaChaPoly+BLAKE2b
-const MAC_LENGTH				= 16
+const MAC_LENGTH					= 16
 # Fixed minimal reasonable packet size, will definitely fit Noise handshake message and with non-zero chance DHT queries/responses; 512+ is recommended though
-const MIN_PACKET_SIZE			= 256
+const MIN_PACKET_SIZE				= 256
+# Max time in seconds allowed for routing path segment creation after which creation is considered failed
+const ROUTING_PATH_SEGMENT_TIMEOUT	= 10
 
 /**
  * @param {!Uint8Array} array
@@ -47,6 +49,9 @@ function string2array (string)
 	for i from 0 til string.length
 		array[i] = string.charCodeAt(i)
 	array
+
+function is_string_equal_to_array (string, array)
+	string == array.toString()
 
 /**
  * @interface
@@ -462,15 +467,75 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 		..process_packet = (source_id, packet) !->
 			@_ronion['process_packet'](source_id, packet)
 		/**
+		 * TODO: No rewrapper yet
 		 * @param {!Uint8Array[]} nodes IDs of the nodes through which routing path must be constructed, last node in the list is responder
 		 *
 		 * @return {!Promise} Will resolve with ID of the route or will be rejected if path construction fails
 		 */
 		..construct_routing_path = (nodes) ->
-			first_node			= nodes[0]
-			encryptor_instance	= @_Encryptor(true, first_node)
-			@_ronion['create_request'](first_node, encryptor_instance.get_handshake_message())
-			# TODO: method not finished yet
+			nodes	= nodes.slice() # Do not modify source array
+			new Promise (resolve, reject) !->
+				first_node			= nodes.shift()
+				first_node_string	= first_node.toString()
+				encryptor_instances	= Object.create(null)
+				fail				= !~>
+					for , encryptor_instance of encryptor_instances
+						encryptor_instance['destroy']()
+						try # Not all segments might be established yet, but in any case there will be at most as much of them as instances of encryptor
+							@_ronion['destroy'](first_node, route_id)
+					@_encryptor_instances.delete(route_id_string)
+					throw new Error('Routing path creation failed')
+				# Establishing first segment
+				encryptor_instances[first_node_string]	= @_Encryptor(true, first_node)
+				@_ronion.on('create_response', !function create_response_handler ({address, segment_id, command_data})
+					if !is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)
+						return
+					clearTimeout(segment_establishment_timeout)
+					@_ronion.off('create_response', create_response_handler)
+					try
+						encryptor_instances[first_node_string]['put_handshake_message'](command_data)
+					catch
+						fail()
+					if !encryptor_instances[first_node_string]['ready']()
+						fail()
+					@_ronion['confirm_outgoing_segment_established'](first_node, route_id)
+					# Successfully established first segment, extending routing path further
+					var current_node, current_node_string, segment_extension_timeout
+					!function extend_request
+						if !nodes.length
+							resolve(route_id)
+						@_ronion.on('extend_response', !function extend_response_handler ({address, segment_id, command_data})
+							if !is_string_equal_to_array(current_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)
+								return
+							@_ronion.off('extend_response', extend_response_handler)
+							clearTimeout(segment_extension_timeout)
+							try
+								encryptor_instances[current_node_string]['put_handshake_message'](command_data)
+							catch
+								fail()
+							if !encryptor_instances[current_node_string]['ready']()
+								fail()
+							@_ronion['confirm_extended_path'](first_node, route_id)
+							# Successfully extended routing path by one more segment, continue extending routing path further
+							extend_request()
+						)
+						current_node								:= nodes.shift()
+						current_node_string							:= current_node.toString()
+						encryptor_instances[current_node_string]	= @_Encryptor(true, current_node)
+						segment_extension_timeout					:= setTimeout (!~>
+							@_ronion.off('extend_response', extend_response_handler)
+							fail()
+						), ROUTING_PATH_SEGMENT_TIMEOUT
+						@_ronion['extend_request'](current_node, route_id, encryptor_instances[current_node_string]['get_handshake_message']())
+					extend_request()
+				)
+				segment_establishment_timeout	= setTimeout (!~>
+					@_ronion.off('create_response', create_response_handler)
+					fail()
+				), ROUTING_PATH_SEGMENT_TIMEOUT
+				route_id						= @_ronion['create_request'](first_node, encryptor_instances[first_node_string]['get_handshake_message']())
+				route_id_string					= route_id.toString()
+				@_encryptor_instances.set(route_id.toString(), encryptor_instances)
 		# TODO: more methods are needed here
 	Object.defineProperty(Router::, 'constructor', {enumerable: false, value: Router})
 	{
