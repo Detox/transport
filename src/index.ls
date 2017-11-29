@@ -49,10 +49,22 @@ function string2array (string)
 	for i from 0 til string.length
 		array[i] = string.charCodeAt(i)
 	array
-
+/**
+ * @param {string}		string
+ * @param {!Uint8Array}	array
+ *
+ * @return {boolean}
+ */
 function is_string_equal_to_array (string, array)
 	string == array.toString()
-
+/**
+ * @param {!Uint8Array}	address
+ * @param {!Uint8Array}	segment_id
+ *
+ * @return {string}
+ */
+function compute_source_id (address, segment_id)
+	address.toString() + segment_id.toString()
 /**
  * @interface
  *
@@ -461,11 +473,11 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 		/**
 		 * Process routing packet coming from node with specified ID
 		 *
-		 * @param {!Uint8Array} source_id
+		 * @param {!Uint8Array} node_id
 		 * @param {!Uint8Array} packet
 		 */
-		..process_packet = (source_id, packet) !->
-			@_ronion['process_packet'](source_id, packet)
+		..process_packet = (node_id, packet) !->
+			@_ronion['process_packet'](node_id, packet)
 		/**
 		 * TODO: No rewrapper yet
 		 * @param {!Uint8Array[]} nodes IDs of the nodes through which routing path must be constructed, last node in the list is responder
@@ -483,7 +495,7 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 						encryptor_instance['destroy']()
 						try # Not all segments might be established yet, but in any case there will be at most as much of them as instances of encryptor
 							@_ronion['destroy'](first_node, route_id)
-					@_encryptor_instances.delete(route_id_string)
+					@_encryptor_instances.delete(source_id)
 					throw new Error('Routing path creation failed')
 				# Establishing first segment
 				encryptor_instances[first_node_string]	= @_Encryptor(true, first_node)
@@ -535,7 +547,8 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 				), ROUTING_PATH_SEGMENT_TIMEOUT
 				route_id						= @_ronion['create_request'](first_node, encryptor_instances[first_node_string]['get_handshake_message']())
 				route_id_string					= route_id.toString()
-				@_encryptor_instances.set(route_id.toString(), encryptor_instances)
+				source_id						= compute_source_id(first_node, route_id)
+				@_encryptor_instances.set(source_id, encryptor_instances)
 		# TODO: more methods are needed here
 	Object.defineProperty(Router::, 'constructor', {enumerable: false, value: Router})
 	{

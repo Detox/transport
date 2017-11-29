@@ -58,8 +58,23 @@
     }
     return array;
   }
+  /**
+   * @param {string}		string
+   * @param {!Uint8Array}	array
+   *
+   * @return {boolean}
+   */
   function is_string_equal_to_array(string, array){
     return string === array.toString();
+  }
+  /**
+   * @param {!Uint8Array}	address
+   * @param {!Uint8Array}	segment_id
+   *
+   * @return {string}
+   */
+  function compute_source_id(address, segment_id){
+    return address.toString() + segment_id.toString();
   }
   /**
    * @interface
@@ -532,11 +547,11 @@
     /**
      * Process routing packet coming from node with specified ID
      *
-     * @param {!Uint8Array} source_id
+     * @param {!Uint8Array} node_id
      * @param {!Uint8Array} packet
      */
-    z$.process_packet = function(source_id, packet){
-      this._ronion['process_packet'](source_id, packet);
+    z$.process_packet = function(node_id, packet){
+      this._ronion['process_packet'](node_id, packet);
     };
     /**
      * TODO: No rewrapper yet
@@ -547,7 +562,7 @@
     z$.construct_routing_path = function(nodes){
       nodes = nodes.slice();
       return new Promise(function(resolve, reject){
-        var first_node, first_node_string, encryptor_instances, fail, segment_establishment_timeout, route_id, route_id_string, this$ = this;
+        var first_node, first_node_string, encryptor_instances, fail, segment_establishment_timeout, route_id, route_id_string, source_id, this$ = this;
         first_node = nodes.shift();
         first_node_string = first_node.toString();
         encryptor_instances = Object.create(null);
@@ -560,7 +575,7 @@
               this$._ronion['destroy'](first_node, route_id);
             } catch (e$) {}
           }
-          this$._encryptor_instances['delete'](route_id_string);
+          this$._encryptor_instances['delete'](source_id);
           throw new Error('Routing path creation failed');
         };
         encryptor_instances[first_node_string] = this._Encryptor(true, first_node);
@@ -630,7 +645,8 @@
         }, ROUTING_PATH_SEGMENT_TIMEOUT);
         route_id = this._ronion['create_request'](first_node, encryptor_instances[first_node_string]['get_handshake_message']());
         route_id_string = route_id.toString();
-        this._encryptor_instances.set(route_id.toString(), encryptor_instances);
+        source_id = compute_source_id(first_node, route_id);
+        this._encryptor_instances.set(source_id, encryptor_instances);
       });
     };
     Object.defineProperty(Router.prototype, 'constructor', {
