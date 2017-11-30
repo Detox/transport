@@ -487,7 +487,6 @@
     });
     /**
      * @constructor
-     * TODO: Identify routing paths by responder, not by the first node in routing path
      *
      * @param {!Uint8Array}	dht_private_key			X25519 private key that corresponds to Ed25519 key used in DHT
      * @param {number}		packet_size				Same as in DHT

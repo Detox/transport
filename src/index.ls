@@ -413,7 +413,6 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 	Object.defineProperty(DHT::, 'constructor', {enumerable: false, value: DHT})
 	/**
 	 * @constructor
-	 * TODO: Identify routing paths by responder, not by the first node in routing path
 	 *
 	 * @param {!Uint8Array}	dht_private_key			X25519 private key that corresponds to Ed25519 key used in DHT
 	 * @param {number}		packet_size				Same as in DHT
@@ -436,7 +435,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 		@_last_node_in_routing_path	= new Map
 		@_ronion					= ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)
 			.on('create_request', ({address, segment_id, command_data}) !~>
-				source_id			= compute_source_id(address, segment_id)
+				source_id	= compute_source_id(address, segment_id)
 				if @_encryptor_instances.has(source_id)
 					# Something wrong is happening, refuse to handle
 					return
