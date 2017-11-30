@@ -650,7 +650,7 @@
           this$._destroy_routing_path(first_node, route_id);
           throw new Error('Routing path creation failed');
         };
-        encryptor_instances[first_node_string] = detoxCrypto['Encryptor'](true, first_node);
+        encryptor_instances[first_node_string] = detoxCrypto['Encryptor'](true, detoxCrypto['convert_public_key'](first_node));
         this._ronion.on('create_response', (function(){
           function create_response_handler(arg$){
             var address, segment_id, command_data, e, max_packet_data_size, current_node, current_node_string, segment_extension_timeout;
@@ -709,7 +709,7 @@
               }()));
               current_node = nodes.shift();
               current_node_string = current_node.join(',');
-              encryptor_instances[current_node_string] = detoxCrypto['Encryptor'](true, current_node);
+              encryptor_instances[current_node_string] = detoxCrypto['Encryptor'](true, detoxCrypto['convert_public_key'](current_node));
               segment_extension_timeout = setTimeout(function(){
                 this$._ronion.off('extend_response', extend_response_handler);
                 fail();
