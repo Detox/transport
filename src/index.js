@@ -513,6 +513,7 @@
       this._last_node_in_routing_path = new Map;
       this._multiplexer = new Map;
       this._demultiplexer = new Map;
+      this._established_routing_paths = new Map;
       this._ronion = ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments).on('create_request', function(arg$){
         var address, segment_id, command_data, source_id, encryptor_instance, e, rewrapper_instance, address_string, encryptor_instances, rewrapper_instances;
         address = arg$.address, segment_id = arg$.segment_id, command_data = arg$.command_data;
@@ -676,6 +677,7 @@
             function extend_request(){
               var this$ = this;
               if (!nodes.length) {
+                this._established_routing_paths.set(source_id, [first_node, route_id]);
                 resolve(route_id);
               }
               this._ronion.on('extend_response', (function(){
@@ -761,7 +763,14 @@
         this._ronion['data'](node_id, route_id, target_address, data_block);
       }
     };
-    z$['destroy'] = function(){};
+    z$['destroy'] = function(){
+      var this$ = this;
+      this._established_routing_paths.forEach(function(arg$){
+        var address, segment_id;
+        address = arg$[0], segment_id = arg$[1];
+        this$._destroy_routing_path(address, segment_id);
+      });
+    };
     /**
      * @param {!Uint8Array} address
      * @param {!Uint8Array} segment_id
@@ -785,6 +794,7 @@
       this._last_node_in_routing_path['delete'](source_id);
       this._multiplexer['delete'](source_id);
       this._demultiplexer['delete'](source_id);
+      this._established_routing_paths['delete'](source_id);
     };
     Object.defineProperty(Router.prototype, 'constructor', {
       enumerable: false,

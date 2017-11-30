@@ -437,6 +437,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 		@_last_node_in_routing_path	= new Map
 		@_multiplexer				= new Map
 		@_demultiplexer				= new Map
+		@_established_routing_paths	= new Map
 		@_ronion					= ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)
 			.on('create_request', ({address, segment_id, command_data}) !~>
 				source_id	= compute_source_id(address, segment_id)
@@ -577,6 +578,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 					var current_node, current_node_string, segment_extension_timeout
 					!function extend_request
 						if !nodes.length
+							@_established_routing_paths.set(source_id, [first_node, route_id])
 							resolve(route_id)
 						@_ronion.on('extend_response', !function extend_response_handler ({address, segment_id, command_data})
 							if !is_string_equal_to_array(current_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)
@@ -643,7 +645,8 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 				data_block	= multiplexer['get_block']()
 				@_ronion['data'](node_id, route_id, target_address, data_block)
 		..'destroy' = !->
-			# TODO: Destroy all of the routing paths here
+			@_established_routing_paths.forEach ([address, segment_id]) !~>
+				@_destroy_routing_path(address, segment_id)
 		/**
 		 * @param {!Uint8Array} address
 		 * @param {!Uint8Array} segment_id
@@ -662,6 +665,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 			@_last_node_in_routing_path.delete(source_id)
 			@_multiplexer.delete(source_id)
 			@_demultiplexer.delete(source_id)
+			@_established_routing_paths.delete(source_id)
 	Object.defineProperty(Router::, 'constructor', {enumerable: false, value: Router})
 	{
 		'ready'		: detox-crypto['ready']
