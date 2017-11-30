@@ -488,30 +488,50 @@
     /**
      * @constructor
      *
-     * @param {!Uint8Array}	dht_public_key		X25519 public key that corresponds to Ed25519 key used in DHT
-     * @param {!Uint8Array}	dht_private_key		Corresponding X25519 private key
-     * @param {number}		packet_size			Same as in DHT
+     * @param {!Uint8Array}	dht_private_key			X25519 private key that corresponds to Ed25519 key used in DHT
+     * @param {number}		packet_size				Same as in DHT
      * @param {number}		max_pending_segments	How much segments can be in pending state per one address
      *
      * @return {!Router}
      *
      * @throws {Error}
      */
-    function Router(dht_public_key, dht_private_key, packet_size, max_pending_segments){
+    function Router(dht_private_key, packet_size, max_pending_segments){
+      var this$ = this;
       max_pending_segments == null && (max_pending_segments = 10);
       if (!(this instanceof Router)) {
-        return new Router(dht_public_key, dht_private_key, packet_size, max_pending_segments);
+        return new Router(dht_private_key, packet_size, max_pending_segments);
       }
       if (packet_size < MIN_PACKET_SIZE) {
         throw new Error('Minimal supported packet size is ' + MIN_PACKET_SIZE);
       }
       asyncEventer.call(this);
       packet_size = packet_size - 2;
-      this._dht_public_key = dht_public_key;
-      this._dht_private_key = dht_private_key;
       this._encryptor_instances = new Map;
       this._rewrapper_instances = new Map;
-      this._ronion = ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments);
+      this._ronion = ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments).on('create_request', function(arg$){
+        var address, segment_id, command_data, encryptor_instance, e, rewrapper_instance, address_string, source_id, x$, y$;
+        address = arg$.address, segment_id = arg$.segment_id, command_data = arg$.command_data;
+        encryptor_instance = detoxCrypto['Encryptor'](false, dht_private_key);
+        try {
+          encryptor_instance['put_handshake_message'](command_data);
+        } catch (e$) {
+          e = e$;
+          return;
+        }
+        this$._ronion['create_response'](address, segment_id, encryptor_instance['get_handshake_message']());
+        this$._ronion['confirm_incoming_segment_established'](address, segment_id);
+        if (!encryptor_instance['ready']()) {
+          return;
+        }
+        rewrapper_instance = encryptor_instance['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
+        address_string = address.toString();
+        source_id = compute_source_id(address, segment_id);
+        x$ = this$._encryptor_instances[source_id] = Object.create(null);
+        x$[address_string] = encryptor_instance;
+        y$ = this$._rewrapper_instances[source_id] = Object.create(null);
+        y$[address_string] = rewrapper_instance;
+      });
     }
     Router.prototype = Object.create(asyncEventer.prototype);
     z$ = Router.prototype;
@@ -585,6 +605,9 @@
                   }
                   this._ronion.off('extend_response', extend_response_handler);
                   clearTimeout(segment_extension_timeout);
+                  if (!command_data.length) {
+                    fail();
+                  }
                   try {
                     encryptor_instances[current_node_string]['put_handshake_message'](command_data);
                   } catch (e$) {

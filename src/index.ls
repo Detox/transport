@@ -414,29 +414,45 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 	/**
 	 * @constructor
 	 *
-	 * @param {!Uint8Array}	dht_public_key		X25519 public key that corresponds to Ed25519 key used in DHT
-	 * @param {!Uint8Array}	dht_private_key		Corresponding X25519 private key
-	 * @param {number}		packet_size			Same as in DHT
+	 * @param {!Uint8Array}	dht_private_key			X25519 private key that corresponds to Ed25519 key used in DHT
+	 * @param {number}		packet_size				Same as in DHT
 	 * @param {number}		max_pending_segments	How much segments can be in pending state per one address
 	 *
 	 * @return {!Router}
 	 *
 	 * @throws {Error}
 	 */
-	!function Router (dht_public_key, dht_private_key, packet_size, max_pending_segments = 10)
+	!function Router (dht_private_key, packet_size, max_pending_segments = 10)
 		if !(@ instanceof Router)
-			return new Router(dht_public_key, dht_private_key, packet_size, max_pending_segments)
+			return new Router(dht_private_key, packet_size, max_pending_segments)
 		if packet_size < MIN_PACKET_SIZE
 			throw new Error('Minimal supported packet size is ' + MIN_PACKET_SIZE)
 		async-eventer.call(@)
 		# Should be 2 bytes smaller than `packet_size` for DHT because it will be later sent through DHT's peer connection
 		packet_size				= packet_size - 2
-		@_dht_public_key		= dht_public_key
-		@_dht_private_key		= dht_private_key
 		@_encryptor_instances	= new Map
 		@_rewrapper_instances	= new Map
 		@_ronion				= ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)
-		# TODO: Events handlers needed here
+			.on('create_request', ({address, segment_id, command_data}) !~>
+				encryptor_instance	= detox-crypto['Encryptor'](false, dht_private_key)
+				try
+					encryptor_instance['put_handshake_message'](command_data)
+				catch
+					return
+				@_ronion['create_response'](address, segment_id, encryptor_instance['get_handshake_message']())
+				# At this point we simply assume that initiator received our response
+				@_ronion['confirm_incoming_segment_established'](address, segment_id)
+				if !encryptor_instance['ready']()
+					return
+				rewrapper_instance					= encryptor_instance['get_rewrapper_keys']().map(detox-crypto['Rewrapper'])
+				address_string						= address.toString()
+				source_id							= compute_source_id(address, segment_id)
+				@_encryptor_instances[source_id]	= Object.create(null)
+					..[address_string]	= encryptor_instance
+				@_rewrapper_instances[source_id]	= Object.create(null)
+					..[address_string]	= rewrapper_instance
+			)
+		# TODO: More events handlers needed here
 	Router:: = Object.create(async-eventer::)
 	Router::
 		/**
@@ -492,6 +508,9 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 								return
 							@_ronion.off('extend_response', extend_response_handler)
 							clearTimeout(segment_extension_timeout)
+							# If last node in routing path clearly said extension failed - no need to do something else here
+							if !command_data.length
+								fail()
 							try
 								encryptor_instances[current_node_string]['put_handshake_message'](command_data)
 							catch
