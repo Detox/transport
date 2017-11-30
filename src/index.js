@@ -66,7 +66,7 @@
    * @return {boolean}
    */
   function is_string_equal_to_array(string, array){
-    return string === array.toString();
+    return string === array.join(',');
   }
   /**
    * @param {!Uint8Array}	address
@@ -75,7 +75,7 @@
    * @return {string}
    */
   function compute_source_id(address, segment_id){
-    return address.toString() + segment_id.toString();
+    return address.join(',') + segment_id.join(',');
   }
   /**
    * @interface
@@ -533,7 +533,7 @@
           return;
         }
         rewrapper_instance = encryptor_instance['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
-        address_string = address.toString();
+        address_string = address.join(',');
         encryptor_instances = Object.create(null);
         encryptor_instances[address_string] = encryptor_instance;
         rewrapper_instances = Object.create(null);
@@ -550,9 +550,13 @@
           packet: packet
         });
       }).on('data', function(arg$){
-        var address, segment_id, command_data, source_id, demultiplexer, data;
-        address = arg$.address, segment_id = arg$.segment_id, command_data = arg$.command_data;
+        var address, segment_id, target_address, command_data, source_id, last_node_in_routing_path, demultiplexer, data;
+        address = arg$.address, segment_id = arg$.segment_id, target_address = arg$.target_address, command_data = arg$.command_data;
         source_id = compute_source_id(address, segment_id);
+        last_node_in_routing_path = this$._last_node_in_routing_path.get(source_id);
+        if (target_address.join(',') !== last_node_in_routing_path.join(',')) {
+          return;
+        }
         demultiplexer = this$._demultiplexer.get(source_id);
         if (!demultiplexer) {
           return;
@@ -598,7 +602,7 @@
         var last_node_in_routing_path, first_node, first_node_string, encryptor_instances, rewrapper_instances, fail, segment_establishment_timeout, route_id, route_id_string, source_id, this$ = this;
         last_node_in_routing_path = nodes[nodes.length - 1];
         first_node = nodes.shift();
-        first_node_string = first_node.toString();
+        first_node_string = first_node.join(',');
         encryptor_instances = Object.create(null);
         rewrapper_instances = Object.create(null);
         fail = function(){
@@ -662,7 +666,7 @@
                 return extend_response_handler;
               }()));
               current_node = nodes.shift();
-              current_node_string = current_node.toString();
+              current_node_string = current_node.join(',');
               encryptor_instances[current_node_string] = detoxCrypto['Encryptor'](true, current_node);
               segment_extension_timeout = setTimeout(function(){
                 this$._ronion.off('extend_response', extend_response_handler);
@@ -679,7 +683,7 @@
           fail();
         }, ROUTING_PATH_SEGMENT_TIMEOUT);
         route_id = this._ronion['create_request'](first_node, encryptor_instances[first_node_string]['get_handshake_message']());
-        route_id_string = route_id.toString();
+        route_id_string = route_id.join(',');
         source_id = compute_source_id(first_node, route_id);
         this._encryptor_instances.set(source_id, encryptor_instances);
         this._rewrapper_instances.set(source_id, rewrapper_instances);

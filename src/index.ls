@@ -58,7 +58,7 @@ function string2array (string)
  * @return {boolean}
  */
 function is_string_equal_to_array (string, array)
-	string == array.toString()
+	string == array.join(',')
 /**
  * @param {!Uint8Array}	address
  * @param {!Uint8Array}	segment_id
@@ -66,7 +66,7 @@ function is_string_equal_to_array (string, array)
  * @return {string}
  */
 function compute_source_id (address, segment_id)
-	address.toString() + segment_id.toString()
+	address.join(',') + segment_id.join(',')
 /**
  * @interface
  *
@@ -281,7 +281,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 				@'fire'('node_disconnected', hex2array(string_id))
 			)
 		@_dht	= new webtorrent-dht(
-			'bootstrap'		: bootstrap_nodes
+			'bootstrap'		: bootstrap_nodes # TODO: Need to associate bootstrap nodes with their DHT public key and check it on connection
 			'extensions'	: [
 				"psr:#packet_size:#packets_per_second" # Packet size and rate
 			]
@@ -454,7 +454,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 				if !encryptor_instance['ready']()
 					return
 				rewrapper_instance					= encryptor_instance['get_rewrapper_keys']().map(detox-crypto['Rewrapper'])
-				address_string						= address.toString()
+				address_string						= address.join(',')
 				encryptor_instances					= Object.create(null)
 				encryptor_instances[address_string]	= encryptor_instance
 				rewrapper_instances					= Object.create(null)
@@ -467,10 +467,13 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 				node_id	= address
 				@fire('send', ({node_id, packet}))
 			)
-			.on('data', ({address, segment_id, command_data}) !~>
-				# TODO: Need to know where data came from exactly when implemented in Ronion
-				source_id		= compute_source_id(address, segment_id)
-				demultiplexer	= @_demultiplexer.get(source_id)
+			.on('data', ({address, segment_id, target_address, command_data}) !~>
+				source_id					= compute_source_id(address, segment_id)
+				last_node_in_routing_path	= @_last_node_in_routing_path.get(source_id)
+				if target_address.join(',') != last_node_in_routing_path.join(',')
+					# We only accept data back from responder
+					return
+				demultiplexer				= @_demultiplexer.get(source_id)
 				if !demultiplexer
 					return
 				demultiplexer['feed'](command_data)
@@ -511,7 +514,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 			new Promise (resolve, reject) !->
 				last_node_in_routing_path				= nodes[nodes.length - 1]
 				first_node								= nodes.shift()
-				first_node_string						= first_node.toString()
+				first_node_string						= first_node.join(',')
 				encryptor_instances						= Object.create(null)
 				rewrapper_instances						= Object.create(null)
 				fail									= !~>
@@ -560,7 +563,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 							extend_request()
 						)
 						current_node								:= nodes.shift()
-						current_node_string							:= current_node.toString()
+						current_node_string							:= current_node.join(',')
 						encryptor_instances[current_node_string]	= detox-crypto['Encryptor'](true, current_node)
 						segment_extension_timeout					:= setTimeout (!~>
 							@_ronion.off('extend_response', extend_response_handler)
@@ -574,7 +577,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 					fail()
 				), ROUTING_PATH_SEGMENT_TIMEOUT
 				route_id						= @_ronion['create_request'](first_node, encryptor_instances[first_node_string]['get_handshake_message']())
-				route_id_string					= route_id.toString()
+				route_id_string					= route_id.join(',')
 				source_id						= compute_source_id(first_node, route_id)
 				@_encryptor_instances.set(source_id, encryptor_instances)
 				@_rewrapper_instances.set(source_id, rewrapper_instances)

@@ -39,7 +39,7 @@
 		"async-eventer"          : "^1.1.3",
 		"fixed-size-multiplexer" : "^0.1.0",
 		"jssha"                  : "^2.3.1",
-		"ronion"                 : "^0.2.1"
+		"ronion"                 : "^0.3.0"
 	},
 	"devDependencies" : {
 		"google-closure-compiler-js" : "^20170910.0.1",
