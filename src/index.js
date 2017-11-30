@@ -79,32 +79,10 @@
   /**
    * @interface
    *
-   * Public and private key are implicitly assumed to correspond to current node's ones
-   *
-   * @param {!Uint8Array} data
-   * @param {!Uint8Array} public_key
-   * @param {!Uint8Array} private_key
-   *
-   * @return {!Uint8Array} Signature
-   */
-  function sign(data, public_key, private_key){}
-  /**
-   * @interface
-   *
-   * @param {!Uint8Array} signature
-   * @param {!Uint8Array} data
-   * @param {!Uint8Array} public_key	Ed25519 public key
-   *
-   * @return {boolean}
-   */
-  function verify(signature, data, public_key){}
-  /**
-   * @interface
-   *
    * @param {!Uint8Array[]} introduction_points
    */
   function found_introduction_points(introduction_points){}
-  function Transport(detoxDht, ronion, jssha, fixedSizeMultiplexer, asyncEventer){
+  function Transport(detoxCrypto, detoxDht, ronion, jssha, fixedSizeMultiplexer, asyncEventer){
     var simplePeer, webrtcSocket, webtorrentDht, Buffer, x$, y$, z$;
     simplePeer = detoxDht['simple-peer'];
     webrtcSocket = detoxDht['webrtc-socket'];
@@ -286,8 +264,6 @@
      * @param {!Uint8Array}	dht_private_key		Corresponding Ed25519 private key
      * @param {string[]}	bootstrap_nodes
      * @param {!Object[]}	ice_servers
-     * @param {!sign}		sign
-     * @param {!verify}		verify
      * @param {number}		packet_size
      * @param {number}		packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
      * @param {number}		bucket_size
@@ -296,11 +272,11 @@
      *
      * @throws {Error}
      */
-    function DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, sign, verify, packet_size, packets_per_second, bucket_size){
+    function DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packet_size, packets_per_second, bucket_size){
       var x$, this$ = this;
       bucket_size == null && (bucket_size = 2);
       if (!(this instanceof DHT)) {
-        return new DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, sign, verify, packet_size, packets_per_second, bucket_size);
+        return new DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packet_size, packets_per_second, bucket_size);
       }
       if (packet_size < MIN_PACKET_SIZE) {
         throw new Error('Minimal supported packet size is ' + MIN_PACKET_SIZE);
@@ -309,7 +285,6 @@
       if (packets_per_second < 1) {
         packets_per_second = 1;
       }
-      this._sign = sign;
       this._socket = webrtcSocket({
         'simple_peer_constructor': simplePeerDetox,
         'simple_peer_opts': {
@@ -319,7 +294,7 @@
           'packet_size': packet_size,
           'packets_per_second': packets_per_second,
           'sign': function(data){
-            return sign(data, dht_public_key, dht_private_key);
+            return detoxCrypto['sign'](data, dht_public_key, dht_private_key);
           }
         }
       });
@@ -328,7 +303,7 @@
         var id, peer_connection;
         id = hex2array(string_id);
         peer_connection = this$._socket['get_id_mapping'](string_id);
-        if (!verify(peer_connection._signature_received, peer_connection._sdp_received, id)) {
+        if (!detoxCrypto['verify'](peer_connection._signature_received, peer_connection._sdp_received, id)) {
           peer_connection['destroy']();
         }
         peer_connection['on']('routing_data', function(command, data){
@@ -357,7 +332,7 @@
         'k': bucket_size,
         'nodeId': dht_public_key,
         'socket': this._socket,
-        'verify': verify
+        'verify': detoxCrypto['verify']
       });
     }
     DHT.prototype = Object.create(asyncEventer.prototype);
@@ -452,7 +427,7 @@
         'seq': time,
         'v': value
       });
-      signature = this._sign(signature_data, real_public_key, real_private_key);
+      signature = detoxCrypto['sign'](signature_data, real_public_key, real_private_key);
       return {
         'k': real_public_key,
         'seq': time,
@@ -513,8 +488,6 @@
     /**
      * @constructor
      *
-     * @param {!Object}		Encryptor			Encryptor constructor from detox-dht
-     * @param {!Object}		Rewrapper			Rewrapper constructor from detox-dht
      * @param {!Uint8Array}	dht_public_key		X25519 public key that corresponds to Ed25519 key used in DHT
      * @param {!Uint8Array}	dht_private_key		Corresponding X25519 private key
      * @param {number}		packet_size			Same as in DHT
@@ -524,18 +497,16 @@
      *
      * @throws {Error}
      */
-    function Router(Encryptor, Rewrapper, dht_public_key, dht_private_key, packet_size, max_pending_segments){
+    function Router(dht_public_key, dht_private_key, packet_size, max_pending_segments){
       max_pending_segments == null && (max_pending_segments = 10);
       if (!(this instanceof Router)) {
-        return new Router(Encryptor, Rewrapper, dht_public_key, dht_private_key, packet_size, max_pending_segments);
+        return new Router(dht_public_key, dht_private_key, packet_size, max_pending_segments);
       }
       if (packet_size < MIN_PACKET_SIZE) {
         throw new Error('Minimal supported packet size is ' + MIN_PACKET_SIZE);
       }
       asyncEventer.call(this);
       packet_size = packet_size - 2;
-      this._Encryptor = Encryptor;
-      this._Rewrapper = Rewrapper;
       this._dht_public_key = dht_public_key;
       this._dht_private_key = dht_private_key;
       this._encryptor_instances = new Map;
@@ -578,7 +549,7 @@
           this$._encryptor_instances['delete'](source_id);
           throw new Error('Routing path creation failed');
         };
-        encryptor_instances[first_node_string] = this._Encryptor(true, first_node);
+        encryptor_instances[first_node_string] = detoxCrypto['Encryptor'](true, first_node);
         this._ronion.on('create_response', (function(){
           function create_response_handler(arg$){
             var address, segment_id, command_data, e, current_node, current_node_string, segment_extension_timeout;
@@ -628,7 +599,7 @@
               }()));
               current_node = nodes.shift();
               current_node_string = current_node.toString();
-              encryptor_instances[current_node_string] = this._Encryptor(true, current_node);
+              encryptor_instances[current_node_string] = detoxCrypto['Encryptor'](true, current_node);
               segment_extension_timeout = setTimeout(function(){
                 this$._ronion.off('extend_response', extend_response_handler);
                 fail();
@@ -654,15 +625,16 @@
       value: Router
     });
     return {
+      'ready': detoxCrypto['ready'],
       'DHT': DHT,
       'Router': Router
     };
   }
   if (typeof define === 'function' && define['amd']) {
-    define(['@detox/dht', 'ronion', 'jssha/src/sha3', 'fixed-size-multiplexer', 'async-eventer'], Transport);
+    define(['@detox/crypto', '@detox/dht', 'ronion', 'jssha/src/sha3', 'fixed-size-multiplexer', 'async-eventer'], Transport);
   } else if (typeof exports === 'object') {
-    module.exports = Transport(require('@detox/dht'), require('ronion'), require('jssha/src/sha3'), require('fixed-size-multiplexer'), require('async-eventer'));
+    module.exports = Transport(require('@detox/crypto'), require('@detox/dht'), require('ronion'), require('jssha/src/sha3'), require('fixed-size-multiplexer'), require('async-eventer'));
   } else {
-    this['detox_transport'] = Transport(this['detox_dht'], this['ronion'], this['jsSHA'], this['fixed_size_multiplexer'], this['async_eventer']);
+    this['detox_transport'] = Transport(this['detox_crypto'], this['detox_dht'], this['ronion'], this['jsSHA'], this['fixed_size_multiplexer'], this['async_eventer']);
   }
 }).call(this);

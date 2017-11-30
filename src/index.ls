@@ -68,36 +68,12 @@ function compute_source_id (address, segment_id)
 /**
  * @interface
  *
- * Public and private key are implicitly assumed to correspond to current node's ones
- *
- * @param {!Uint8Array} data
- * @param {!Uint8Array} public_key
- * @param {!Uint8Array} private_key
- *
- * @return {!Uint8Array} Signature
- */
-function sign (data, public_key, private_key)
-	void
-/**
- * @interface
- *
- * @param {!Uint8Array} signature
- * @param {!Uint8Array} data
- * @param {!Uint8Array} public_key	Ed25519 public key
- *
- * @return {boolean}
- */
-function verify (signature, data, public_key)
-	void
-/**
- * @interface
- *
  * @param {!Uint8Array[]} introduction_points
  */
 function found_introduction_points (introduction_points)
 	void
 
-function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-eventer)
+function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplexer, async-eventer)
 	simple-peer		= detox-dht['simple-peer']
 	webrtc-socket	= detox-dht['webrtc-socket']
 	webtorrent-dht	= detox-dht['webtorrent-dht']
@@ -252,8 +228,6 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 	 * @param {!Uint8Array}	dht_private_key		Corresponding Ed25519 private key
 	 * @param {string[]}	bootstrap_nodes
 	 * @param {!Object[]}	ice_servers
-	 * @param {!sign}		sign
-	 * @param {!verify}		verify
 	 * @param {number}		packet_size
 	 * @param {number}		packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
 	 * @param {number}		bucket_size
@@ -262,15 +236,14 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 	 *
 	 * @throws {Error}
 	 */
-	!function DHT (dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, sign, verify, packet_size, packets_per_second, bucket_size = 2)
+	!function DHT (dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packet_size, packets_per_second, bucket_size = 2)
 		if !(@ instanceof DHT)
-			return new DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, sign, verify, packet_size, packets_per_second, bucket_size)
+			return new DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packet_size, packets_per_second, bucket_size)
 		if packet_size < MIN_PACKET_SIZE
 			throw new Error('Minimal supported packet size is ' + MIN_PACKET_SIZE)
 		async-eventer.call(@)
 		if packets_per_second < 1
 			packets_per_second	= 1
-		@_sign		= sign
 		@_socket	= webrtc-socket(
 			'simple_peer_constructor'	: simple-peer-detox
 			'simple_peer_opts'		:
@@ -279,14 +252,14 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 				'packet_size'			: packet_size
 				'packets_per_second'	: packets_per_second
 				'sign'					: (data) ->
-					sign(data, dht_public_key, dht_private_key)
+					detox-crypto['sign'](data, dht_public_key, dht_private_key)
 		)
 		@_socket
 			..'on'('node_connected', (string_id) !~>
 				id				= hex2array(string_id)
 				peer_connection	= @_socket['get_id_mapping'](string_id)
 				# Already Uint8Array, no need to convert SDP to array
-				if !verify(peer_connection._signature_received, peer_connection._sdp_received, id)
+				if !detox-crypto['verify'](peer_connection._signature_received, peer_connection._sdp_received, id)
 					# Drop connection if node failed to sign SDP with its public message
 					peer_connection['destroy']()
 				peer_connection['on']('routing_data', (command, data) !~>
@@ -314,7 +287,7 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 			'k'				: bucket_size
 			'nodeId'		: dht_public_key
 			'socket'		: @_socket
-			'verify'		: verify
+			'verify'		: detox-crypto['verify']
 		)
 
 	DHT:: = Object.create(async-eventer::)
@@ -392,7 +365,7 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 				'seq'	: time
 				'v'		: value
 			)
-			signature		= @_sign(signature_data, real_public_key, real_private_key)
+			signature		= detox-crypto['sign'](signature_data, real_public_key, real_private_key)
 			# This message has signature, so it can be now sent from any node in DHT
 			{
 				'k'		: real_public_key
@@ -441,8 +414,6 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 	/**
 	 * @constructor
 	 *
-	 * @param {!Object}		Encryptor			Encryptor constructor from detox-dht
-	 * @param {!Object}		Rewrapper			Rewrapper constructor from detox-dht
 	 * @param {!Uint8Array}	dht_public_key		X25519 public key that corresponds to Ed25519 key used in DHT
 	 * @param {!Uint8Array}	dht_private_key		Corresponding X25519 private key
 	 * @param {number}		packet_size			Same as in DHT
@@ -452,16 +423,14 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 	 *
 	 * @throws {Error}
 	 */
-	!function Router (Encryptor, Rewrapper, dht_public_key, dht_private_key, packet_size, max_pending_segments = 10)
+	!function Router (dht_public_key, dht_private_key, packet_size, max_pending_segments = 10)
 		if !(@ instanceof Router)
-			return new Router(Encryptor, Rewrapper, dht_public_key, dht_private_key, packet_size, max_pending_segments)
+			return new Router(dht_public_key, dht_private_key, packet_size, max_pending_segments)
 		if packet_size < MIN_PACKET_SIZE
 			throw new Error('Minimal supported packet size is ' + MIN_PACKET_SIZE)
 		async-eventer.call(@)
 		# Should be 2 bytes smaller than `packet_size` for DHT because it will be later sent through DHT's peer connection
 		packet_size				= packet_size - 2
-		@_Encryptor				= Encryptor
-		@_Rewrapper				= Rewrapper
 		@_dht_public_key		= dht_public_key
 		@_dht_private_key		= dht_private_key
 		@_encryptor_instances	= new Map
@@ -498,7 +467,7 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 					@_encryptor_instances.delete(source_id)
 					throw new Error('Routing path creation failed')
 				# Establishing first segment
-				encryptor_instances[first_node_string]	= @_Encryptor(true, first_node)
+				encryptor_instances[first_node_string]	= detox-crypto['Encryptor'](true, first_node)
 				@_ronion.on('create_response', !function create_response_handler ({address, segment_id, command_data})
 					if !is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)
 						return
@@ -533,7 +502,7 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 						)
 						current_node								:= nodes.shift()
 						current_node_string							:= current_node.toString()
-						encryptor_instances[current_node_string]	= @_Encryptor(true, current_node)
+						encryptor_instances[current_node_string]	= detox-crypto['Encryptor'](true, current_node)
 						segment_extension_timeout					:= setTimeout (!~>
 							@_ronion.off('extend_response', extend_response_handler)
 							fail()
@@ -552,16 +521,17 @@ function Transport (detox-dht, ronion, jssha, fixed-size-multiplexer, async-even
 		# TODO: more methods are needed here
 	Object.defineProperty(Router::, 'constructor', {enumerable: false, value: Router})
 	{
+		'ready'		: detox-crypto['ready']
 		'DHT'		: DHT
 		'Router'	: Router
 	}
 
 if typeof define == 'function' && define['amd']
 	# AMD
-	define(['@detox/dht', 'ronion', 'jssha/src/sha3', 'fixed-size-multiplexer', 'async-eventer'], Transport)
+	define(['@detox/crypto', '@detox/dht', 'ronion', 'jssha/src/sha3', 'fixed-size-multiplexer', 'async-eventer'], Transport)
 else if typeof exports == 'object'
 	# CommonJS
-	module.exports = Transport(require('@detox/dht'), require('ronion'), require('jssha/src/sha3'), require('fixed-size-multiplexer'), require('async-eventer'))
+	module.exports = Transport(require('@detox/crypto'), require('@detox/dht'), require('ronion'), require('jssha/src/sha3'), require('fixed-size-multiplexer'), require('async-eventer'))
 else
 	# Browser globals
-	@'detox_transport' = Transport(@'detox_dht', @'ronion', @'jsSHA', @'fixed_size_multiplexer', @'async_eventer')
+	@'detox_transport' = Transport(@'detox_crypto', @'detox_dht', @'ronion', @'jsSHA', @'fixed_size_multiplexer', @'async_eventer')
