@@ -18,6 +18,8 @@ const MAC_LENGTH					= 16
 const MIN_PACKET_SIZE				= 256
 # Max time in seconds allowed for routing path segment creation after which creation is considered failed
 const ROUTING_PATH_SEGMENT_TIMEOUT	= 10
+# 16 MiB is a reasonable size limit for text data, bigger data can be multiplexed on higher level if necessary
+const MAX_DATA_SIZE					= 2 ** 24 - 1
 
 /**
  * @param {!Uint8Array} array
@@ -433,6 +435,8 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 		@_encryptor_instances		= new Map
 		@_rewrapper_instances		= new Map
 		@_last_node_in_routing_path	= new Map
+		@_multiplexer				= new Map
+		@_demultiplexer				= new Map
 		@_ronion					= ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)
 			.on('create_request', ({address, segment_id, command_data}) !~>
 				source_id	= compute_source_id(address, segment_id)
@@ -464,11 +468,20 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 				@fire('send', ({node_id, packet}))
 			)
 			.on('data', ({address, segment_id, command_data}) !~>
-				@fire('data', {
-					node_id		: address
-					route_id	: segment_id
-					data		: command_data
-				})
+				# TODO: Need to know where data came from exactly when implemented in Ronion
+				source_id		= compute_source_id(address, segment_id)
+				demultiplexer	= @_demultiplexer.get(source_id)
+				if !demultiplexer
+					return
+				demultiplexer['feed'](command_data)
+				# Data are always more or equal to block size, so no need to do `while` loop
+				if demultiplexer['have_more_data']()
+					data	= demultiplexer['get_data']()
+					@fire('data', {
+						node_id		: address
+						route_id	: segment_id
+						data		: data
+					})
 			)
 			.on('destroy', ({address, segment_id}) !~>
 				@_destroy_routing_path(address, segment_id)
@@ -519,6 +532,9 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 						fail()
 					rewrapper_instances[first_node_string]	= encryptor_instances[first_node_string]['get_rewrapper_keys']().map(detox-crypto['Rewrapper'])
 					@_ronion['confirm_outgoing_segment_established'](first_node, route_id)
+					max_packet_data_size	= encryptor_instances[first_node_string]['get_max_command_data_length']()
+					@_multiplexer.set(source_id, fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, max_packet_data_size))
+					@_demultiplexer.set(source_id, fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, max_packet_data_size))
 					# Successfully established first segment, extending routing path further
 					var current_node, current_node_string, segment_extension_timeout
 					!function extend_request
@@ -577,10 +593,17 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 		 * @param {!Uint8Array} data
 		 */
 		..'send_data' = (node_id, route_id, data) !->
-			# TODO: multiplexing and demultiplexing
+			if data.length > MAX_DATA_SIZE
+				return
 			source_id		= compute_source_id(node_id, route_id)
 			target_address	= @_last_node_in_routing_path.get(source_id)
-			@_ronion['data'](node_id, route_id, target_address, data)
+			multiplexer		= @_multiplexer.get(source_id)
+			if !multiplexer
+				return
+			multiplexer['feed'](data)
+			while multiplexer['have_more_blocks']()
+				data_block	= multiplexer['get_block']()
+				@_ronion['data'](node_id, route_id, target_address, data_block)
 		/**
 		 * @param {!Uint8Array} address
 		 * @param {!Uint8Array} segment_id
@@ -597,6 +620,8 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 			@_encryptor_instances.delete(source_id)
 			@_rewrapper_instances.delete(source_id)
 			@_last_node_in_routing_path.delete(source_id)
+			@_multiplexer.delete(source_id)
+			@_demultiplexer.delete(source_id)
 		# TODO: more methods are needed here
 	Object.defineProperty(Router::, 'constructor', {enumerable: false, value: Router})
 	{

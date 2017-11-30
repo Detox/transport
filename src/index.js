@@ -6,7 +6,7 @@
  * @license   MIT License, see license.txt
  */
 (function(){
-  var COMMAND_DHT, COMMAND_DATA, COMMAND_TAG, COMMAND_UNTAG, ROUTING_PROTOCOL_VERSION, PUBLIC_KEY_LENGTH, MAC_LENGTH, MIN_PACKET_SIZE, ROUTING_PATH_SEGMENT_TIMEOUT;
+  var COMMAND_DHT, COMMAND_DATA, COMMAND_TAG, COMMAND_UNTAG, ROUTING_PROTOCOL_VERSION, PUBLIC_KEY_LENGTH, MAC_LENGTH, MIN_PACKET_SIZE, ROUTING_PATH_SEGMENT_TIMEOUT, MAX_DATA_SIZE;
   COMMAND_DHT = 0;
   COMMAND_DATA = 1;
   COMMAND_TAG = 2;
@@ -16,6 +16,7 @@
   MAC_LENGTH = 16;
   MIN_PACKET_SIZE = 256;
   ROUTING_PATH_SEGMENT_TIMEOUT = 10;
+  MAX_DATA_SIZE = Math.pow(2, 24) - 1;
   /**
    * @param {!Uint8Array} array
    *
@@ -510,6 +511,8 @@
       this._encryptor_instances = new Map;
       this._rewrapper_instances = new Map;
       this._last_node_in_routing_path = new Map;
+      this._multiplexer = new Map;
+      this._demultiplexer = new Map;
       this._ronion = ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments).on('create_request', function(arg$){
         var address, segment_id, command_data, source_id, encryptor_instance, e, rewrapper_instance, address_string, encryptor_instances, rewrapper_instances;
         address = arg$.address, segment_id = arg$.segment_id, command_data = arg$.command_data;
@@ -547,13 +550,22 @@
           packet: packet
         });
       }).on('data', function(arg$){
-        var address, segment_id, command_data;
+        var address, segment_id, command_data, source_id, demultiplexer, data;
         address = arg$.address, segment_id = arg$.segment_id, command_data = arg$.command_data;
-        this$.fire('data', {
-          node_id: address,
-          route_id: segment_id,
-          data: command_data
-        });
+        source_id = compute_source_id(address, segment_id);
+        demultiplexer = this$._demultiplexer.get(source_id);
+        if (!demultiplexer) {
+          return;
+        }
+        demultiplexer['feed'](command_data);
+        if (demultiplexer['have_more_data']()) {
+          data = demultiplexer['get_data']();
+          this$.fire('data', {
+            node_id: address,
+            route_id: segment_id,
+            data: data
+          });
+        }
       }).on('destroy', function(arg$){
         var address, segment_id;
         address = arg$.address, segment_id = arg$.segment_id;
@@ -596,7 +608,7 @@
         encryptor_instances[first_node_string] = detoxCrypto['Encryptor'](true, first_node);
         this._ronion.on('create_response', (function(){
           function create_response_handler(arg$){
-            var address, segment_id, command_data, e, current_node, current_node_string, segment_extension_timeout;
+            var address, segment_id, command_data, e, max_packet_data_size, current_node, current_node_string, segment_extension_timeout;
             address = arg$.address, segment_id = arg$.segment_id, command_data = arg$.command_data;
             if (!is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)) {
               return;
@@ -614,6 +626,9 @@
             }
             rewrapper_instances[first_node_string] = encryptor_instances[first_node_string]['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
             this._ronion['confirm_outgoing_segment_established'](first_node, route_id);
+            max_packet_data_size = encryptor_instances[first_node_string]['get_max_command_data_length']();
+            this._multiplexer.set(source_id, fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, max_packet_data_size));
+            this._demultiplexer.set(source_id, fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, max_packet_data_size));
             function extend_request(){
               var this$ = this;
               if (!nodes.length) {
@@ -686,10 +701,21 @@
      * @param {!Uint8Array} data
      */
     z$['send_data'] = function(node_id, route_id, data){
-      var source_id, target_address;
+      var source_id, target_address, multiplexer, data_block;
+      if (data.length > MAX_DATA_SIZE) {
+        return;
+      }
       source_id = compute_source_id(node_id, route_id);
       target_address = this._last_node_in_routing_path.get(source_id);
-      this._ronion['data'](node_id, route_id, target_address, data);
+      multiplexer = this._multiplexer.get(source_id);
+      if (!multiplexer) {
+        return;
+      }
+      multiplexer['feed'](data);
+      while (multiplexer['have_more_blocks']()) {
+        data_block = multiplexer['get_block']();
+        this._ronion['data'](node_id, route_id, target_address, data_block);
+      }
     };
     /**
      * @param {!Uint8Array} address
@@ -712,6 +738,8 @@
       this._encryptor_instances['delete'](source_id);
       this._rewrapper_instances['delete'](source_id);
       this._last_node_in_routing_path['delete'](source_id);
+      this._multiplexer['delete'](source_id);
+      this._demultiplexer['delete'](source_id);
     };
     Object.defineProperty(Router.prototype, 'constructor', {
       enumerable: false,
