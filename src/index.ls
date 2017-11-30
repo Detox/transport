@@ -68,7 +68,7 @@ function compute_source_id (address, segment_id)
 /**
  * @interface
  *
- * @param {!Uint8Array[]} introduction_points
+ * @param {!Array<Uint8Array>} introduction_points
  */
 function found_introduction_points (introduction_points)
 	void
@@ -224,13 +224,13 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 	/**
 	 * @constructor
 	 *
-	 * @param {!Uint8Array}	dht_public_key		Ed25519 public key, temporary one, just for DHT operation
-	 * @param {!Uint8Array}	dht_private_key		Corresponding Ed25519 private key
-	 * @param {string[]}	bootstrap_nodes
-	 * @param {!Object[]}	ice_servers
-	 * @param {number}		packet_size
-	 * @param {number}		packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
-	 * @param {number}		bucket_size
+	 * @param {!Uint8Array}		dht_public_key		Ed25519 public key, temporary one, just for DHT operation
+	 * @param {!Uint8Array}		dht_private_key		Corresponding Ed25519 private key
+	 * @param {!Array<string>}	bootstrap_nodes
+	 * @param {!Array<Object>}	ice_servers
+	 * @param {number}			packet_size
+	 * @param {number}			packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
+	 * @param {number}			bucket_size
 	 *
 	 * @return {!DHT}
 	 *
@@ -301,7 +301,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 		..'start_bootstrap_node' = (port, ip) !->
 			@_dht.listen(port, ip)
 		/**
-		 * @return {!string[]}
+		 * @return {!Array<string>}
 		 */
 		..'get_bootstrap_nodes' = ->
 			@_dht.toJSON().nodes
@@ -350,9 +350,9 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 		/**
 		 * Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity)
 		 *
-		 * @param {!Uint8Array}		real_public_key		Ed25519 public key (real one, different from supplied in DHT constructor)
-		 * @param {!Uint8Array}		real_private_key	Corresponding Ed25519 private key
-		 * @param {!Uint8Array[]}	introduction_points	Array of public keys of introduction points
+		 * @param {!Uint8Array}			real_public_key		Ed25519 public key (real one, different from supplied in DHT constructor)
+		 * @param {!Uint8Array}			real_private_key	Corresponding Ed25519 private key
+		 * @param {!Array<Uint8Array>}	introduction_points	Array of public keys of introduction points
 		 *
 		 * @return {!Object}
 		 */
@@ -449,7 +449,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 			@_ronion['process_packet'](node_id, packet)
 		/**
 		 * TODO: No rewrapper yet
-		 * @param {!Uint8Array[]} nodes IDs of the nodes through which routing path must be constructed, last node in the list is responder
+		 * @param {!Array<Uint8Array>} nodes IDs of the nodes through which routing path must be constructed, last node in the list is responder
 		 *
 		 * @return {!Promise} Will resolve with ID of the route or will be rejected if path construction fails
 		 */

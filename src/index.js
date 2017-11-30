@@ -79,7 +79,7 @@
   /**
    * @interface
    *
-   * @param {!Uint8Array[]} introduction_points
+   * @param {!Array<Uint8Array>} introduction_points
    */
   function found_introduction_points(introduction_points){}
   function Transport(detoxCrypto, detoxDht, ronion, jssha, fixedSizeMultiplexer, asyncEventer){
@@ -260,13 +260,13 @@
     /**
      * @constructor
      *
-     * @param {!Uint8Array}	dht_public_key		Ed25519 public key, temporary one, just for DHT operation
-     * @param {!Uint8Array}	dht_private_key		Corresponding Ed25519 private key
-     * @param {string[]}	bootstrap_nodes
-     * @param {!Object[]}	ice_servers
-     * @param {number}		packet_size
-     * @param {number}		packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
-     * @param {number}		bucket_size
+     * @param {!Uint8Array}		dht_public_key		Ed25519 public key, temporary one, just for DHT operation
+     * @param {!Uint8Array}		dht_private_key		Corresponding Ed25519 private key
+     * @param {!Array<string>}	bootstrap_nodes
+     * @param {!Array<Object>}	ice_servers
+     * @param {number}			packet_size
+     * @param {number}			packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
+     * @param {number}			bucket_size
      *
      * @return {!DHT}
      *
@@ -347,7 +347,7 @@
       this._dht.listen(port, ip);
     };
     /**
-     * @return {!string[]}
+     * @return {!Array<string>}
      */
     y$['get_bootstrap_nodes'] = function(){
       return this._dht.toJSON().nodes;
@@ -408,9 +408,9 @@
     /**
      * Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity)
      *
-     * @param {!Uint8Array}		real_public_key		Ed25519 public key (real one, different from supplied in DHT constructor)
-     * @param {!Uint8Array}		real_private_key	Corresponding Ed25519 private key
-     * @param {!Uint8Array[]}	introduction_points	Array of public keys of introduction points
+     * @param {!Uint8Array}			real_public_key		Ed25519 public key (real one, different from supplied in DHT constructor)
+     * @param {!Uint8Array}			real_private_key	Corresponding Ed25519 private key
+     * @param {!Array<Uint8Array>}	introduction_points	Array of public keys of introduction points
      *
      * @return {!Object}
      */
@@ -526,7 +526,7 @@
     };
     /**
      * TODO: No rewrapper yet
-     * @param {!Uint8Array[]} nodes IDs of the nodes through which routing path must be constructed, last node in the list is responder
+     * @param {!Array<Uint8Array>} nodes IDs of the nodes through which routing path must be constructed, last node in the list is responder
      *
      * @return {!Promise} Will resolve with ID of the route or will be rejected if path construction fails
      */
