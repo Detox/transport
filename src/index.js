@@ -525,7 +525,6 @@
       this._ronion['process_packet'](node_id, packet);
     };
     /**
-     * TODO: No rewrapper yet
      * @param {!Array<Uint8Array>} nodes IDs of the nodes through which routing path must be constructed, last node in the list is responder
      *
      * @return {!Promise} Will resolve with ID of the route or will be rejected if path construction fails
@@ -533,10 +532,11 @@
     z$.construct_routing_path = function(nodes){
       nodes = nodes.slice();
       return new Promise(function(resolve, reject){
-        var first_node, first_node_string, encryptor_instances, fail, segment_establishment_timeout, route_id, route_id_string, source_id, this$ = this;
+        var first_node, first_node_string, encryptor_instances, rewrapper_instances, fail, segment_establishment_timeout, route_id, route_id_string, source_id, this$ = this;
         first_node = nodes.shift();
         first_node_string = first_node.toString();
         encryptor_instances = Object.create(null);
+        rewrapper_instances = Object.create(null);
         fail = function(){
           var i$, ref$, encryptor_instance;
           for (i$ in ref$ = encryptor_instances) {
@@ -547,6 +547,7 @@
             } catch (e$) {}
           }
           this$._encryptor_instances['delete'](source_id);
+          this$._rewrapper_instances['delete'](source_id);
           throw new Error('Routing path creation failed');
         };
         encryptor_instances[first_node_string] = detoxCrypto['Encryptor'](true, first_node);
@@ -568,6 +569,7 @@
             if (!encryptor_instances[first_node_string]['ready']()) {
               fail();
             }
+            rewrapper_instances[first_node_string] = encryptor_instances[first_node_string]['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
             this._ronion['confirm_outgoing_segment_established'](first_node, route_id);
             function extend_request(){
               var this$ = this;
@@ -592,6 +594,7 @@
                   if (!encryptor_instances[current_node_string]['ready']()) {
                     fail();
                   }
+                  rewrapper_instances[current_node_string] = encryptor_instances[current_node_string]['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
                   this._ronion['confirm_extended_path'](first_node, route_id);
                   extend_request();
                 }
@@ -618,6 +621,7 @@
         route_id_string = route_id.toString();
         source_id = compute_source_id(first_node, route_id);
         this._encryptor_instances.set(source_id, encryptor_instances);
+        this._rewrapper_instances.set(source_id, rewrapper_instances);
       });
     };
     Object.defineProperty(Router.prototype, 'constructor', {

@@ -448,7 +448,6 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 		..process_packet = (node_id, packet) !->
 			@_ronion['process_packet'](node_id, packet)
 		/**
-		 * TODO: No rewrapper yet
 		 * @param {!Array<Uint8Array>} nodes IDs of the nodes through which routing path must be constructed, last node in the list is responder
 		 *
 		 * @return {!Promise} Will resolve with ID of the route or will be rejected if path construction fails
@@ -459,12 +458,14 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 				first_node			= nodes.shift()
 				first_node_string	= first_node.toString()
 				encryptor_instances	= Object.create(null)
+				rewrapper_instances	= Object.create(null)
 				fail				= !~>
 					for , encryptor_instance of encryptor_instances
 						encryptor_instance['destroy']()
 						try # Not all segments might be established yet, but in any case there will be at most as much of them as instances of encryptor
 							@_ronion['destroy'](first_node, route_id)
 					@_encryptor_instances.delete(source_id)
+					@_rewrapper_instances.delete(source_id)
 					throw new Error('Routing path creation failed')
 				# Establishing first segment
 				encryptor_instances[first_node_string]	= detox-crypto['Encryptor'](true, first_node)
@@ -479,6 +480,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 						fail()
 					if !encryptor_instances[first_node_string]['ready']()
 						fail()
+					rewrapper_instances[first_node_string]	= encryptor_instances[first_node_string]['get_rewrapper_keys']().map(detox-crypto['Rewrapper'])
 					@_ronion['confirm_outgoing_segment_established'](first_node, route_id)
 					# Successfully established first segment, extending routing path further
 					var current_node, current_node_string, segment_extension_timeout
@@ -496,6 +498,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 								fail()
 							if !encryptor_instances[current_node_string]['ready']()
 								fail()
+							rewrapper_instances[current_node_string]	= encryptor_instances[current_node_string]['get_rewrapper_keys']().map(detox-crypto['Rewrapper'])
 							@_ronion['confirm_extended_path'](first_node, route_id)
 							# Successfully extended routing path by one more segment, continue extending routing path further
 							extend_request()
@@ -518,6 +521,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 				route_id_string					= route_id.toString()
 				source_id						= compute_source_id(first_node, route_id)
 				@_encryptor_instances.set(source_id, encryptor_instances)
+				@_rewrapper_instances.set(source_id, rewrapper_instances)
 		# TODO: more methods are needed here
 	Object.defineProperty(Router::, 'constructor', {enumerable: false, value: Router})
 	{
