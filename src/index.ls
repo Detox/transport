@@ -281,7 +281,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 				@'fire'('node_disconnected', hex2array(string_id))
 			)
 		@_dht	= new webtorrent-dht(
-			'bootstrap'		: bootstrap_nodes # TODO: Need to associate bootstrap nodes with their DHT public key and check it on connection
+			'bootstrap'		: bootstrap_nodes # TODO: Need to associate bootstrap nodes with their DHT public key and check it on connection (webrtc-socket-detox)
 			'extensions'	: [
 				"psr:#packet_size:#packets_per_second" # Packet size and rate
 			]
