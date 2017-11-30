@@ -413,6 +413,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 	Object.defineProperty(DHT::, 'constructor', {enumerable: false, value: DHT})
 	/**
 	 * @constructor
+	 * TODO: Identify routing paths by responder, not by the first node in routing path
 	 *
 	 * @param {!Uint8Array}	dht_private_key			X25519 private key that corresponds to Ed25519 key used in DHT
 	 * @param {number}		packet_size				Same as in DHT
@@ -429,10 +430,11 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 			throw new Error('Minimal supported packet size is ' + MIN_PACKET_SIZE)
 		async-eventer.call(@)
 		# Should be 2 bytes smaller than `packet_size` for DHT because it will be later sent through DHT's peer connection
-		packet_size				= packet_size - 2
-		@_encryptor_instances	= new Map
-		@_rewrapper_instances	= new Map
-		@_ronion				= ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)
+		packet_size					= packet_size - 2
+		@_encryptor_instances		= new Map
+		@_rewrapper_instances		= new Map
+		@_last_node_in_routing_path	= new Map
+		@_ronion					= ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)
 			.on('create_request', ({address, segment_id, command_data}) !~>
 				source_id			= compute_source_id(address, segment_id)
 				if @_encryptor_instances.has(source_id)
@@ -450,14 +452,24 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 					return
 				rewrapper_instance					= encryptor_instance['get_rewrapper_keys']().map(detox-crypto['Rewrapper'])
 				address_string						= address.toString()
-				@_encryptor_instances[source_id]	= Object.create(null)
-					..[address_string]	= encryptor_instance
-				@_rewrapper_instances[source_id]	= Object.create(null)
-					..[address_string]	= rewrapper_instance
+				encryptor_instances					= Object.create(null)
+				encryptor_instances[address_string]	= encryptor_instance
+				rewrapper_instances					= Object.create(null)
+				rewrapper_instances[address_string]	= rewrapper_instance
+				@_encryptor_instances.set(source_id, encryptor_instances)
+				@_rewrapper_instances.set(source_id, rewrapper_instances)
+				@_last_node_in_routing_path.set(source_id, address)
 			)
 			.on('send', ({address, packet}) !~>
 				node_id	= address
 				@fire('send', ({node_id, packet}))
+			)
+			.on('data', ({address, segment_id, command_data}) !~>
+				@fire('data', {
+					node_id		: address
+					route_id	: segment_id
+					data		: command_data
+				})
 			)
 			.on('destroy', ({address, segment_id}) !~>
 				@_destroy_routing_path(address, segment_id)
@@ -528,6 +540,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 								fail()
 							rewrapper_instances[current_node_string]	= encryptor_instances[current_node_string]['get_rewrapper_keys']().map(detox-crypto['Rewrapper'])
 							@_ronion['confirm_extended_path'](first_node, route_id)
+							@_last_node_in_routing_path.set(source_id, current_node)
 							# Successfully extended routing path by one more segment, continue extending routing path further
 							extend_request()
 						)
@@ -550,12 +563,25 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 				source_id						= compute_source_id(first_node, route_id)
 				@_encryptor_instances.set(source_id, encryptor_instances)
 				@_rewrapper_instances.set(source_id, rewrapper_instances)
+				@_last_node_in_routing_path.set(source_id, first_node)
 		/**
 		 * @param {!Uint8Array} node_id		First node in routing path
 		 * @param {!Uint8Array} route_id	Identifier returned during routing path construction
 		 */
 		..'destroy_routing_path' = (node_id, route_id) !->
 			@_destroy_routing_path(node_id, route_id)
+		/**
+		 * Send data to the responder on specified routing path
+		 *
+		 * @param {!Uint8Array} node_id		First node in routing path
+		 * @param {!Uint8Array} route_id	Identifier returned during routing path construction
+		 * @param {!Uint8Array} data
+		 */
+		..'send_data' = (node_id, route_id, data) !->
+			# TODO: multiplexing and demultiplexing
+			source_id		= compute_source_id(node_id, route_id)
+			target_address	= @_last_node_in_routing_path.get(source_id)
+			@_ronion['data'](node_id, route_id, target_address, data)
 		/**
 		 * @param {!Uint8Array} address
 		 * @param {!Uint8Array} segment_id
@@ -571,6 +597,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 					@_ronion['destroy'](address, segment_id)
 			@_encryptor_instances.delete(source_id)
 			@_rewrapper_instances.delete(source_id)
+			@_last_node_in_routing_path.delete(source_id)
 		# TODO: more methods are needed here
 	Object.defineProperty(Router::, 'constructor', {enumerable: false, value: Router})
 	{

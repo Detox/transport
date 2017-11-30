@@ -487,6 +487,7 @@
     });
     /**
      * @constructor
+     * TODO: Identify routing paths by responder, not by the first node in routing path
      *
      * @param {!Uint8Array}	dht_private_key			X25519 private key that corresponds to Ed25519 key used in DHT
      * @param {number}		packet_size				Same as in DHT
@@ -509,8 +510,9 @@
       packet_size = packet_size - 2;
       this._encryptor_instances = new Map;
       this._rewrapper_instances = new Map;
+      this._last_node_in_routing_path = new Map;
       this._ronion = ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments).on('create_request', function(arg$){
-        var address, segment_id, command_data, source_id, encryptor_instance, e, rewrapper_instance, address_string, x$, y$;
+        var address, segment_id, command_data, source_id, encryptor_instance, e, rewrapper_instance, address_string, encryptor_instances, rewrapper_instances;
         address = arg$.address, segment_id = arg$.segment_id, command_data = arg$.command_data;
         source_id = compute_source_id(address, segment_id);
         if (this$._encryptor_instances.has(source_id)) {
@@ -530,10 +532,13 @@
         }
         rewrapper_instance = encryptor_instance['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
         address_string = address.toString();
-        x$ = this$._encryptor_instances[source_id] = Object.create(null);
-        x$[address_string] = encryptor_instance;
-        y$ = this$._rewrapper_instances[source_id] = Object.create(null);
-        y$[address_string] = rewrapper_instance;
+        encryptor_instances = Object.create(null);
+        encryptor_instances[address_string] = encryptor_instance;
+        rewrapper_instances = Object.create(null);
+        rewrapper_instances[address_string] = rewrapper_instance;
+        this$._encryptor_instances.set(source_id, encryptor_instances);
+        this$._rewrapper_instances.set(source_id, rewrapper_instances);
+        this$._last_node_in_routing_path.set(source_id, address);
       }).on('send', function(arg$){
         var address, packet, node_id;
         address = arg$.address, packet = arg$.packet;
@@ -541,6 +546,14 @@
         this$.fire('send', {
           node_id: node_id,
           packet: packet
+        });
+      }).on('data', function(arg$){
+        var address, segment_id, command_data;
+        address = arg$.address, segment_id = arg$.segment_id, command_data = arg$.command_data;
+        this$.fire('data', {
+          node_id: address,
+          route_id: segment_id,
+          data: command_data
         });
       }).on('destroy', function(arg$){
         var address, segment_id;
@@ -629,6 +642,7 @@
                   }
                   rewrapper_instances[current_node_string] = encryptor_instances[current_node_string]['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
                   this._ronion['confirm_extended_path'](first_node, route_id);
+                  this._last_node_in_routing_path.set(source_id, current_node);
                   extend_request();
                 }
                 return extend_response_handler;
@@ -655,6 +669,7 @@
         source_id = compute_source_id(first_node, route_id);
         this._encryptor_instances.set(source_id, encryptor_instances);
         this._rewrapper_instances.set(source_id, rewrapper_instances);
+        this._last_node_in_routing_path.set(source_id, first_node);
       });
     };
     /**
@@ -663,6 +678,19 @@
      */
     z$['destroy_routing_path'] = function(node_id, route_id){
       this._destroy_routing_path(node_id, route_id);
+    };
+    /**
+     * Send data to the responder on specified routing path
+     *
+     * @param {!Uint8Array} node_id		First node in routing path
+     * @param {!Uint8Array} route_id	Identifier returned during routing path construction
+     * @param {!Uint8Array} data
+     */
+    z$['send_data'] = function(node_id, route_id, data){
+      var source_id, target_address;
+      source_id = compute_source_id(node_id, route_id);
+      target_address = this._last_node_in_routing_path.get(source_id);
+      this._ronion['data'](node_id, route_id, target_address, data);
     };
     /**
      * @param {!Uint8Array} address
@@ -684,6 +712,7 @@
       }
       this._encryptor_instances['delete'](source_id);
       this._rewrapper_instances['delete'](source_id);
+      this._last_node_in_routing_path['delete'](source_id);
     };
     Object.defineProperty(Router.prototype, 'constructor', {
       enumerable: false,
