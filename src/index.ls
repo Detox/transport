@@ -434,6 +434,10 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 		@_rewrapper_instances	= new Map
 		@_ronion				= ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)
 			.on('create_request', ({address, segment_id, command_data}) !~>
+				source_id			= compute_source_id(address, segment_id)
+				if @_encryptor_instances.has(source_id)
+					# Something wrong is happening, refuse to handle
+					return
 				encryptor_instance	= detox-crypto['Encryptor'](false, dht_private_key)
 				try
 					encryptor_instance['put_handshake_message'](command_data)
@@ -446,11 +450,21 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 					return
 				rewrapper_instance					= encryptor_instance['get_rewrapper_keys']().map(detox-crypto['Rewrapper'])
 				address_string						= address.toString()
-				source_id							= compute_source_id(address, segment_id)
 				@_encryptor_instances[source_id]	= Object.create(null)
 					..[address_string]	= encryptor_instance
 				@_rewrapper_instances[source_id]	= Object.create(null)
 					..[address_string]	= rewrapper_instance
+			)
+			.on('send', ({address, packet}) !~>
+				node_id	= address
+				@fire('send', ({node_id, packet}))
+			)
+			.on('destroy', ({address, segment_id}) !~>
+				@_destroy_routing_path(address, segment_id)
+				@fire('destroyed', {
+					node_id		: address
+					route_id	: segment_id
+				})
 			)
 		# TODO: More events handlers needed here
 	Router:: = Object.create(async-eventer::)
@@ -461,14 +475,14 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 		 * @param {!Uint8Array} node_id
 		 * @param {!Uint8Array} packet
 		 */
-		..process_packet = (node_id, packet) !->
+		..'process_packet' = (node_id, packet) !->
 			@_ronion['process_packet'](node_id, packet)
 		/**
 		 * @param {!Array<Uint8Array>} nodes IDs of the nodes through which routing path must be constructed, last node in the list is responder
 		 *
 		 * @return {!Promise} Will resolve with ID of the route or will be rejected if path construction fails
 		 */
-		..construct_routing_path = (nodes) ->
+		..'construct_routing_path' = (nodes) ->
 			nodes	= nodes.slice() # Do not modify source array
 			new Promise (resolve, reject) !->
 				first_node			= nodes.shift()
@@ -476,12 +490,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 				encryptor_instances	= Object.create(null)
 				rewrapper_instances	= Object.create(null)
 				fail				= !~>
-					for , encryptor_instance of encryptor_instances
-						encryptor_instance['destroy']()
-						try # Not all segments might be established yet, but in any case there will be at most as much of them as instances of encryptor
-							@_ronion['destroy'](first_node, route_id)
-					@_encryptor_instances.delete(source_id)
-					@_rewrapper_instances.delete(source_id)
+					@_destroy_routing_path(first_node, route_id)
 					throw new Error('Routing path creation failed')
 				# Establishing first segment
 				encryptor_instances[first_node_string]	= detox-crypto['Encryptor'](true, first_node)
@@ -541,6 +550,27 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 				source_id						= compute_source_id(first_node, route_id)
 				@_encryptor_instances.set(source_id, encryptor_instances)
 				@_rewrapper_instances.set(source_id, rewrapper_instances)
+		/**
+		 * @param {!Uint8Array} node_id		First node in routing path
+		 * @param {!Uint8Array} route_id	Identifier returned during routing path construction
+		 */
+		..'destroy_routing_path' = (node_id, route_id) !->
+			@_destroy_routing_path(node_id, route_id)
+		/**
+		 * @param {!Uint8Array} address
+		 * @param {!Uint8Array} segment_id
+		 */
+		.._destroy_routing_path = (address, segment_id) !->
+			source_id			= compute_source_id(address, segment_id)
+			encryptor_instances	= @_encryptor_instances.has(source_id)
+			if !encryptor_instances
+				return
+			for , encryptor_instance of encryptor_instances
+				encryptor_instance['destroy']()
+				try # Not all segments might be established yet, but in any case there will be at most as much of them as instances of encryptor
+					@_ronion['destroy'](address, segment_id)
+			@_encryptor_instances.delete(source_id)
+			@_rewrapper_instances.delete(source_id)
 		# TODO: more methods are needed here
 	Object.defineProperty(Router::, 'constructor', {enumerable: false, value: Router})
 	{

@@ -510,8 +510,12 @@
       this._encryptor_instances = new Map;
       this._rewrapper_instances = new Map;
       this._ronion = ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments).on('create_request', function(arg$){
-        var address, segment_id, command_data, encryptor_instance, e, rewrapper_instance, address_string, source_id, x$, y$;
+        var address, segment_id, command_data, source_id, encryptor_instance, e, rewrapper_instance, address_string, x$, y$;
         address = arg$.address, segment_id = arg$.segment_id, command_data = arg$.command_data;
+        source_id = compute_source_id(address, segment_id);
+        if (this$._encryptor_instances.has(source_id)) {
+          return;
+        }
         encryptor_instance = detoxCrypto['Encryptor'](false, dht_private_key);
         try {
           encryptor_instance['put_handshake_message'](command_data);
@@ -526,11 +530,26 @@
         }
         rewrapper_instance = encryptor_instance['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
         address_string = address.toString();
-        source_id = compute_source_id(address, segment_id);
         x$ = this$._encryptor_instances[source_id] = Object.create(null);
         x$[address_string] = encryptor_instance;
         y$ = this$._rewrapper_instances[source_id] = Object.create(null);
         y$[address_string] = rewrapper_instance;
+      }).on('send', function(arg$){
+        var address, packet, node_id;
+        address = arg$.address, packet = arg$.packet;
+        node_id = address;
+        this$.fire('send', {
+          node_id: node_id,
+          packet: packet
+        });
+      }).on('destroy', function(arg$){
+        var address, segment_id;
+        address = arg$.address, segment_id = arg$.segment_id;
+        this$._destroy_routing_path(address, segment_id);
+        this$.fire('destroyed', {
+          node_id: address,
+          route_id: segment_id
+        });
       });
     }
     Router.prototype = Object.create(asyncEventer.prototype);
@@ -541,7 +560,7 @@
      * @param {!Uint8Array} node_id
      * @param {!Uint8Array} packet
      */
-    z$.process_packet = function(node_id, packet){
+    z$['process_packet'] = function(node_id, packet){
       this._ronion['process_packet'](node_id, packet);
     };
     /**
@@ -549,7 +568,7 @@
      *
      * @return {!Promise} Will resolve with ID of the route or will be rejected if path construction fails
      */
-    z$.construct_routing_path = function(nodes){
+    z$['construct_routing_path'] = function(nodes){
       nodes = nodes.slice();
       return new Promise(function(resolve, reject){
         var first_node, first_node_string, encryptor_instances, rewrapper_instances, fail, segment_establishment_timeout, route_id, route_id_string, source_id, this$ = this;
@@ -558,16 +577,7 @@
         encryptor_instances = Object.create(null);
         rewrapper_instances = Object.create(null);
         fail = function(){
-          var i$, ref$, encryptor_instance;
-          for (i$ in ref$ = encryptor_instances) {
-            encryptor_instance = ref$[i$];
-            encryptor_instance['destroy']();
-            try {
-              this$._ronion['destroy'](first_node, route_id);
-            } catch (e$) {}
-          }
-          this$._encryptor_instances['delete'](source_id);
-          this$._rewrapper_instances['delete'](source_id);
+          this$._destroy_routing_path(first_node, route_id);
           throw new Error('Routing path creation failed');
         };
         encryptor_instances[first_node_string] = detoxCrypto['Encryptor'](true, first_node);
@@ -646,6 +656,34 @@
         this._encryptor_instances.set(source_id, encryptor_instances);
         this._rewrapper_instances.set(source_id, rewrapper_instances);
       });
+    };
+    /**
+     * @param {!Uint8Array} node_id		First node in routing path
+     * @param {!Uint8Array} route_id	Identifier returned during routing path construction
+     */
+    z$['destroy_routing_path'] = function(node_id, route_id){
+      this._destroy_routing_path(node_id, route_id);
+    };
+    /**
+     * @param {!Uint8Array} address
+     * @param {!Uint8Array} segment_id
+     */
+    z$._destroy_routing_path = function(address, segment_id){
+      var source_id, encryptor_instances, i$, encryptor_instance;
+      source_id = compute_source_id(address, segment_id);
+      encryptor_instances = this._encryptor_instances.has(source_id);
+      if (!encryptor_instances) {
+        return;
+      }
+      for (i$ in encryptor_instances) {
+        encryptor_instance = encryptor_instances[i$];
+        encryptor_instance['destroy']();
+        try {
+          this._ronion['destroy'](address, segment_id);
+        } catch (e$) {}
+      }
+      this._encryptor_instances['delete'](source_id);
+      this._rewrapper_instances['delete'](source_id);
     };
     Object.defineProperty(Router.prototype, 'constructor', {
       enumerable: false,
