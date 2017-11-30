@@ -578,6 +578,46 @@
           node_id: address,
           route_id: segment_id
         });
+      }).on('encrypt', function(data){
+        var address, segment_id, target_address, plaintext, source_id, target_address_string, encryptor_instance, ref$;
+        address = data.address, segment_id = data.segment_id, target_address = data.target_address, plaintext = data.plaintext;
+        source_id = compute_source_id(address, segment_id);
+        target_address_string = target_address.join(',');
+        encryptor_instance = (ref$ = this$._encryptor_instances.get(source_id)) != null ? ref$[target_address_string] : void 8;
+        if (!encryptor_instance) {
+          return;
+        }
+        data.ciphertext = encryptor_instance['encrypt'](plaintext);
+      }).on('decrypt', function(data){
+        var address, segment_id, target_address, ciphertext, source_id, target_address_string, encryptor_instance, ref$;
+        address = data.address, segment_id = data.segment_id, target_address = data.target_address, ciphertext = data.ciphertext;
+        source_id = compute_source_id(address, segment_id);
+        target_address_string = target_address.join(',');
+        encryptor_instance = (ref$ = this$._encryptor_instances.get(source_id)) != null ? ref$[target_address_string] : void 8;
+        if (!encryptor_instance) {
+          return;
+        }
+        data.plaintext = encryptor_instance['decrypt'](plaintext);
+      }).on('wrap', function(data){
+        var address, segment_id, target_address, unwrapped, source_id, target_address_string, rewrapper_instance, ref$, ref1$;
+        address = data.address, segment_id = data.segment_id, target_address = data.target_address, unwrapped = data.unwrapped;
+        source_id = compute_source_id(address, segment_id);
+        target_address_string = target_address.join(',');
+        rewrapper_instance = (ref$ = this$._rewrapper_instances.get(source_id)) != null ? (ref1$ = ref$[target_address_string]) != null ? ref1$[0] : void 8 : void 8;
+        if (!rewrapper_instance) {
+          return;
+        }
+        data.wrapped = rewrapper_instance['wrap'](unwrapped);
+      }).on('unwrap', function(data){
+        var address, segment_id, target_address, wrapped, source_id, target_address_string, rewrapper_instance, ref$, ref1$;
+        address = data.address, segment_id = data.segment_id, target_address = data.target_address, wrapped = data.wrapped;
+        source_id = compute_source_id(address, segment_id);
+        target_address_string = target_address.join(',');
+        rewrapper_instance = (ref$ = this$._rewrapper_instances.get(source_id)) != null ? (ref1$ = ref$[target_address_string]) != null ? ref1$[1] : void 8 : void 8;
+        if (!rewrapper_instance) {
+          return;
+        }
+        data.unwrapped = rewrapper_instance['unwrap'](wrapped);
       });
     }
     Router.prototype = Object.create(asyncEventer.prototype);
@@ -721,6 +761,7 @@
         this._ronion['data'](node_id, route_id, target_address, data_block);
       }
     };
+    z$['destroy'] = function(){};
     /**
      * @param {!Uint8Array} address
      * @param {!Uint8Array} segment_id

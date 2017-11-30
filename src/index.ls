@@ -493,7 +493,42 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 					route_id	: segment_id
 				})
 			)
-		# TODO: More events handlers needed here
+			.on('encrypt', (data) !~>
+				{address, segment_id, target_address, plaintext}	= data
+				source_id											= compute_source_id(address, segment_id)
+				target_address_string								= target_address.join(',')
+				encryptor_instance									= @_encryptor_instances.get(source_id)?[target_address_string]
+				if !encryptor_instance
+					return
+				data.ciphertext	= encryptor_instance['encrypt'](plaintext)
+			)
+			.on('decrypt', (data) !~>
+				{address, segment_id, target_address, ciphertext}	= data
+				source_id											= compute_source_id(address, segment_id)
+				target_address_string								= target_address.join(',')
+				encryptor_instance									= @_encryptor_instances.get(source_id)?[target_address_string]
+				if !encryptor_instance
+					return
+				data.plaintext	= encryptor_instance['decrypt'](plaintext)
+			)
+			.on('wrap', (data) !~>
+				{address, segment_id, target_address, unwrapped}	= data
+				source_id											= compute_source_id(address, segment_id)
+				target_address_string								= target_address.join(',')
+				rewrapper_instance									= @_rewrapper_instances.get(source_id)?[target_address_string]?[0]
+				if !rewrapper_instance
+					return
+				data.wrapped	= rewrapper_instance['wrap'](unwrapped)
+			)
+			.on('unwrap', (data) !~>
+				{address, segment_id, target_address, wrapped}		= data
+				source_id											= compute_source_id(address, segment_id)
+				target_address_string								= target_address.join(',')
+				rewrapper_instance									= @_rewrapper_instances.get(source_id)?[target_address_string]?[1]
+				if !rewrapper_instance
+					return
+				data.unwrapped	= rewrapper_instance['unwrap'](wrapped)
+			)
 	Router:: = Object.create(async-eventer::)
 	Router::
 		/**
@@ -607,6 +642,8 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 			while multiplexer['have_more_blocks']()
 				data_block	= multiplexer['get_block']()
 				@_ronion['data'](node_id, route_id, target_address, data_block)
+		..'destroy' = !->
+			# TODO: Destroy all of the routing paths here
 		/**
 		 * @param {!Uint8Array} address
 		 * @param {!Uint8Array} segment_id
@@ -625,7 +662,6 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 			@_last_node_in_routing_path.delete(source_id)
 			@_multiplexer.delete(source_id)
 			@_demultiplexer.delete(source_id)
-		# TODO: more methods are needed here
 	Object.defineProperty(Router::, 'constructor', {enumerable: false, value: Router})
 	{
 		'ready'		: detox-crypto['ready']
