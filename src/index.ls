@@ -122,7 +122,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 						return
 					else
 						@_demultiplexer['feed'](data)
-						if @_demultiplexer['have_more_data']()
+						while @_demultiplexer['have_more_data']()
 							/**
 							 * @type {!Uint8Array}
 							 */
@@ -496,11 +496,12 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 		..'construct_routing_path' = (nodes) ->
 			nodes	= nodes.slice() # Do not modify source array
 			new Promise (resolve, reject) !->
-				first_node			= nodes.shift()
-				first_node_string	= first_node.toString()
-				encryptor_instances	= Object.create(null)
-				rewrapper_instances	= Object.create(null)
-				fail				= !~>
+				last_node_in_routing_path				= nodes[nodes.length - 1]
+				first_node								= nodes.shift()
+				first_node_string						= first_node.toString()
+				encryptor_instances						= Object.create(null)
+				rewrapper_instances						= Object.create(null)
+				fail									= !~>
 					@_destroy_routing_path(first_node, route_id)
 					throw new Error('Routing path creation failed')
 				# Establishing first segment
@@ -539,7 +540,6 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 								fail()
 							rewrapper_instances[current_node_string]	= encryptor_instances[current_node_string]['get_rewrapper_keys']().map(detox-crypto['Rewrapper'])
 							@_ronion['confirm_extended_path'](first_node, route_id)
-							@_last_node_in_routing_path.set(source_id, current_node)
 							# Successfully extended routing path by one more segment, continue extending routing path further
 							extend_request()
 						)
@@ -562,7 +562,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 				source_id						= compute_source_id(first_node, route_id)
 				@_encryptor_instances.set(source_id, encryptor_instances)
 				@_rewrapper_instances.set(source_id, rewrapper_instances)
-				@_last_node_in_routing_path.set(source_id, first_node)
+				@_last_node_in_routing_path.set(source_id, last_node_in_routing_path)
 		/**
 		 * @param {!Uint8Array} node_id		First node in routing path
 		 * @param {!Uint8Array} route_id	Identifier returned during routing path construction

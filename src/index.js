@@ -135,7 +135,7 @@
           return;
         } else {
           this._demultiplexer['feed'](data);
-          if (this._demultiplexer['have_more_data']()) {
+          while (this._demultiplexer['have_more_data']()) {
             /**
              * @type {!Uint8Array}
              */
@@ -583,7 +583,8 @@
     z$['construct_routing_path'] = function(nodes){
       nodes = nodes.slice();
       return new Promise(function(resolve, reject){
-        var first_node, first_node_string, encryptor_instances, rewrapper_instances, fail, segment_establishment_timeout, route_id, route_id_string, source_id, this$ = this;
+        var last_node_in_routing_path, first_node, first_node_string, encryptor_instances, rewrapper_instances, fail, segment_establishment_timeout, route_id, route_id_string, source_id, this$ = this;
+        last_node_in_routing_path = nodes[nodes.length - 1];
         first_node = nodes.shift();
         first_node_string = first_node.toString();
         encryptor_instances = Object.create(null);
@@ -641,7 +642,6 @@
                   }
                   rewrapper_instances[current_node_string] = encryptor_instances[current_node_string]['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
                   this._ronion['confirm_extended_path'](first_node, route_id);
-                  this._last_node_in_routing_path.set(source_id, current_node);
                   extend_request();
                 }
                 return extend_response_handler;
@@ -668,7 +668,7 @@
         source_id = compute_source_id(first_node, route_id);
         this._encryptor_instances.set(source_id, encryptor_instances);
         this._rewrapper_instances.set(source_id, rewrapper_instances);
-        this._last_node_in_routing_path.set(source_id, first_node);
+        this._last_node_in_routing_path.set(source_id, last_node_in_routing_path);
       });
     };
     /**
