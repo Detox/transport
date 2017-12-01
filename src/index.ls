@@ -496,7 +496,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 				@_last_node_in_routing_path.set(source_id, address)
 			)
 			.'on'('send', (data) !~>
-				@fire('send', {
+				@'fire'('send', {
 					'node_id'	: data['address']
 					'packet'	: data['packet']
 				})
@@ -518,7 +518,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 				# Data are always more or equal to block size, so no need to do `while` loop
 				if demultiplexer['have_more_data']()
 					data	= demultiplexer['get_data']()
-					@fire('data', {
+					@'fire'('data', {
 						'node_id'	: address
 						'route_id'	: segment_id
 						'data'		: data
@@ -528,7 +528,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 				address		= data['address']
 				segment_id	= data['segment_id']
 				@_destroy_routing_path(address, segment_id)
-				@fire('destroyed', {
+				@'fire'('destroyed', {
 					'node_id'	: address
 					'route_id'	: segment_id
 				})

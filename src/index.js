@@ -581,7 +581,7 @@
         this$._rewrapper_instances.set(source_id, rewrapper_instances);
         this$._last_node_in_routing_path.set(source_id, address);
       })['on']('send', function(data){
-        this$.fire('send', {
+        this$['fire']('send', {
           'node_id': data['address'],
           'packet': data['packet']
         });
@@ -603,7 +603,7 @@
         demultiplexer['feed'](command_data);
         if (demultiplexer['have_more_data']()) {
           data = demultiplexer['get_data']();
-          this$.fire('data', {
+          this$['fire']('data', {
             'node_id': address,
             'route_id': segment_id,
             'data': data
@@ -614,7 +614,7 @@
         address = data['address'];
         segment_id = data['segment_id'];
         this$._destroy_routing_path(address, segment_id);
-        this$.fire('destroyed', {
+        this$['fire']('destroyed', {
           'node_id': address,
           'route_id': segment_id
         });
