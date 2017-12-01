@@ -125,7 +125,7 @@
       var actual_data, command;
       switch (event) {
       case 'signal':
-        data.signature = this._sign(string2array(data['sdp']));
+        data['signature'] = this._sign(string2array(data['sdp']));
         simplePeer.prototype['emit'].call(this, 'signal', data);
         break;
       case 'data':
@@ -162,11 +162,11 @@
      */
     x$['signal'] = function(signal){
       var found_psr, i$, ref$, len$, extension, array, received_packet_size, received_packets_per_second;
-      if (!signal.signature || !!signal['extensions']) {
+      if (!signal['signature'] || !signal['extensions']) {
         this['destroy']();
         return;
       }
-      this._signature_received = signal.signature;
+      this._signature_received = signal['signature'];
       this._sdp_received = signal['sdp'];
       found_psr = false;
       for (i$ = 0, len$ = (ref$ = signal['extensions']).length; i$ < len$; ++i$) {

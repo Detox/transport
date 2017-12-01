@@ -112,7 +112,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 		..'emit' = (event, data) !->
 			switch event
 				case 'signal'
-					data.signature	= @_sign(string2array(data['sdp']))
+					data['signature']	= @_sign(string2array(data['sdp']))
 					simple-peer::['emit'].call(@, 'signal', data)
 				case 'data'
 					if @_sending
@@ -143,11 +143,11 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 		 * @param {!Object} signal
 		 */
 		..'signal' = (signal) !->
-			if !signal.signature || !!signal['extensions']
+			if !signal['signature'] || !signal['extensions']
 				# Drop connection if signature or extensions not specified
 				@'destroy'()
 				return
-			@_signature_received	= signal.signature
+			@_signature_received	= signal['signature']
 			# Already Uint8Array, no need to convert SDP to array
 			@_sdp_received			= signal['sdp']
 			found_psr				= false
