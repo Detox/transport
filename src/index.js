@@ -228,7 +228,7 @@
       var delay, this$ = this;
       delay = Math.max(0, this._send_delay - (new Date - this._last_sent));
       setTimeout(function(){
-        if (this$._destroyed) {
+        if (this$.destroyed) {
           return;
         }
         simplePeer.prototype['send'].call(this$, this$._multiplexer['get_block']());

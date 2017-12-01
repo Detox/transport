@@ -200,7 +200,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			# Subtract from necessary delay actual amount of time already passed and make sure it is not negative
 			delay	= Math.max(0, @_send_delay - (new Date - @_last_sent))
 			setTimeout (!~>
-				if @_destroyed
+				if @destroyed
 					return
 				simple-peer::['send'].call(@, @_multiplexer['get_block']())
 				@_sending	= false
