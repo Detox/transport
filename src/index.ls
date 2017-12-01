@@ -246,7 +246,8 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 		async-eventer.call(@)
 		if packets_per_second < 1
 			packets_per_second	= 1
-		@_socket	= webrtc-socket(
+		@_pending_websocket_ids	= new Map
+		@_socket				= webrtc-socket(
 			'simple_peer_constructor'	: simple-peer-detox
 			'simple_peer_opts'		:
 				'config'				:
@@ -256,14 +257,30 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 				'sign'					: (data) ->
 					detox-crypto['sign'](data, dht_public_key, dht_private_key)
 		)
-		@_socket
+			..'on'('websocket_peer_connection_alias', (websocket_host, websocket_port, peer_connection) !~>
+				bootstrap_nodes.forEach (bootstrap_node) ~>
+					if bootstrap_node.host != websocket_host || bootstrap_node.port != websocket_port
+						return
+					@_pending_websocket_ids.set(peer_connection, bootstrap_node.node_id)
+					peer_connection['on']('close', !~>
+						@_pending_websocket_ids.delete(peer_connection)
+					)
+			)
 			..'on'('node_connected', (string_id) !~>
 				id				= hex2array(string_id)
 				peer_connection	= @_socket['get_id_mapping'](string_id)
+				# If connection was started from WebSocket (bootstrap node, insecure ws://), we need to confirm that WebRTC uses the same node ID as WebSocket
+				if @_pending_websocket_ids.has(peer_connection)
+					expected_id	= @_pending_websocket_ids.get(peer_connection)
+					@_pending_websocket_ids.delete(peer_connection)
+					if expected_id != string_id
+						peer_connection['destroy']()
+						return
 				# Already Uint8Array, no need to convert SDP to array
 				if !detox-crypto['verify'](peer_connection._signature_received, peer_connection._sdp_received, id)
 					# Drop connection if node failed to sign SDP with its public message
 					peer_connection['destroy']()
+					return
 				peer_connection['on']('routing_data', (command, data) !~>
 					switch command
 						case COMMAND_TAG
@@ -280,7 +297,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 			..'on'('node_disconnected', (string_id) !~>
 				@'fire'('node_disconnected', hex2array(string_id))
 			)
-		@_dht	= new webtorrent-dht(
+		@_dht					= new webtorrent-dht(
 			'bootstrap'		: bootstrap_nodes # TODO: Need to associate bootstrap nodes with their DHT public key and check it on connection (webrtc-socket-detox)
 			'extensions'	: [
 				"psr:#packet_size:#packets_per_second" # Packet size and rate
@@ -303,10 +320,21 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 		..'start_bootstrap_node' = (port, ip) !->
 			@_dht.listen(port, ip)
 		/**
-		 * @return {!Array<string>}
+		 * Get an array of bootstrap nodes
+		 *
+		 * @return {!Array<Object>} Each element is an object with keys `host`, `port` and `node_id`
 		 */
 		..'get_bootstrap_nodes' = ->
-			@_dht.toJSON().nodes
+			(
+				for , peer_connection of @_dht['_rpc']['socket']['socket']['_peer_connections']
+					if peer_connection['ws_server'] && peer_connection['id']
+						{
+							'node_id'	: peer_connection['id']
+							'host'		: peer_connection['ws_server']['host']
+							'port'		: peer_connection['ws_server']['port']
+						}
+			)
+			.filter(Boolean)
 		/**
 		 * Start lookup for specified node ID (listen for `node_connected` in order to know when interested node was connected)
 		 *
@@ -439,7 +467,10 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 		@_demultiplexer				= new Map
 		@_established_routing_paths	= new Map
 		@_ronion					= ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)
-			.on('create_request', ({address, segment_id, command_data}) !~>
+			.'on'('create_request', (data) !~>
+				address			= data['address']
+				segment_id		= data['segment_id']
+				command_data	= data['command_data']
 				source_id	= compute_source_id(address, segment_id)
 				if @_encryptor_instances.has(source_id)
 					# Something wrong is happening, refuse to handle
@@ -464,11 +495,17 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 				@_rewrapper_instances.set(source_id, rewrapper_instances)
 				@_last_node_in_routing_path.set(source_id, address)
 			)
-			.on('send', ({address, packet}) !~>
-				node_id	= address
-				@fire('send', ({node_id, packet}))
+			.'on'('send', (data) !~>
+				@fire('send', {
+					'node_id'	: data['address']
+					'packet'	: data['packet']
+				})
 			)
-			.on('data', ({address, segment_id, target_address, command_data}) !~>
+			.'on'('data', (data) !~>
+				address						= data['address']
+				segment_id					= data['segment_id']
+				target_address				= data['target_address']
+				command_data				= data['command_data']
 				source_id					= compute_source_id(address, segment_id)
 				last_node_in_routing_path	= @_last_node_in_routing_path.get(source_id)
 				if target_address.join(',') != last_node_in_routing_path.join(',')
@@ -482,53 +519,67 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 				if demultiplexer['have_more_data']()
 					data	= demultiplexer['get_data']()
 					@fire('data', {
-						node_id		: address
-						route_id	: segment_id
-						data		: data
+						'node_id'	: address
+						'route_id'	: segment_id
+						'data'		: data
 					})
 			)
-			.on('destroy', ({address, segment_id}) !~>
+			.'on'('destroy', (data) !~>
+				address		= data['address']
+				segment_id	= data['segment_id']
 				@_destroy_routing_path(address, segment_id)
 				@fire('destroyed', {
-					node_id		: address
-					route_id	: segment_id
+					'node_id'	: address
+					'route_id'	: segment_id
 				})
 			)
-			.on('encrypt', (data) !~>
-				{address, segment_id, target_address, plaintext}	= data
-				source_id											= compute_source_id(address, segment_id)
-				target_address_string								= target_address.join(',')
-				encryptor_instance									= @_encryptor_instances.get(source_id)?[target_address_string]
+			.'on'('encrypt', (data) !~>
+				address					= data['address']
+				segment_id				= data['segment_id']
+				target_address			= data['target_address']
+				plaintext				= data['plaintext']
+				source_id				= compute_source_id(address, segment_id)
+				target_address_string	= target_address.join(',')
+				encryptor_instance		= @_encryptor_instances.get(source_id)?[target_address_string]
 				if !encryptor_instance
 					return
-				data.ciphertext	= encryptor_instance['encrypt'](plaintext)
+				data['ciphertext']	= encryptor_instance['encrypt'](plaintext)
 			)
-			.on('decrypt', (data) !~>
-				{address, segment_id, target_address, ciphertext}	= data
-				source_id											= compute_source_id(address, segment_id)
-				target_address_string								= target_address.join(',')
-				encryptor_instance									= @_encryptor_instances.get(source_id)?[target_address_string]
+			.'on'('decrypt', (data) !~>
+				address					= data['address']
+				segment_id				= data['segment_id']
+				target_address			= data['target_address']
+				ciphertext				= data['ciphertext']
+				source_id				= compute_source_id(address, segment_id)
+				target_address_string	= target_address.join(',')
+				encryptor_instance		= @_encryptor_instances.get(source_id)?[target_address_string]
 				if !encryptor_instance
 					return
-				data.plaintext	= encryptor_instance['decrypt'](plaintext)
+				data['plaintext']	= encryptor_instance['decrypt'](plaintext)
 			)
-			.on('wrap', (data) !~>
-				{address, segment_id, target_address, unwrapped}	= data
-				source_id											= compute_source_id(address, segment_id)
-				target_address_string								= target_address.join(',')
-				rewrapper_instance									= @_rewrapper_instances.get(source_id)?[target_address_string]?[0]
+			.'on'('wrap', (data) !~>
+				address					= data['address']
+				segment_id				= data['segment_id']
+				target_address			= data['target_address']
+				unwrapped				= data['unwrapped']
+				source_id				= compute_source_id(address, segment_id)
+				target_address_string	= target_address.join(',')
+				rewrapper_instance		= @_rewrapper_instances.get(source_id)?[target_address_string]?[0]
 				if !rewrapper_instance
 					return
-				data.wrapped	= rewrapper_instance['wrap'](unwrapped)
+				data['wrapped']	= rewrapper_instance['wrap'](unwrapped)
 			)
-			.on('unwrap', (data) !~>
-				{address, segment_id, target_address, wrapped}		= data
-				source_id											= compute_source_id(address, segment_id)
-				target_address_string								= target_address.join(',')
-				rewrapper_instance									= @_rewrapper_instances.get(source_id)?[target_address_string]?[1]
+			.'on'('unwrap', (data) !~>
+				address					= data['address']
+				segment_id				= data['segment_id']
+				target_address			= data['target_address']
+				wrapped					= data['wrapped']
+				source_id				= compute_source_id(address, segment_id)
+				target_address_string	= target_address.join(',')
+				rewrapper_instance		= @_rewrapper_instances.get(source_id)?[target_address_string]?[1]
 				if !rewrapper_instance
 					return
-				data.unwrapped	= rewrapper_instance['unwrap'](wrapped)
+				data['unwrapped']	= rewrapper_instance['unwrap'](wrapped)
 			)
 	Router:: = Object.create(async-eventer::)
 	Router::
@@ -558,11 +609,14 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 					throw new Error('Routing path creation failed')
 				# Establishing first segment
 				encryptor_instances[first_node_string]	= detox-crypto['Encryptor'](true, detox-crypto['convert_public_key'](first_node))
-				@_ronion.on('create_response', !function create_response_handler ({address, segment_id, command_data})
+				@_ronion['on']('create_response', !function create_response_handler (data)
+					address			= data['address']
+					segment_id		= data['segment_id']
+					command_data	= data['command_data']
 					if !is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)
 						return
 					clearTimeout(segment_establishment_timeout)
-					@_ronion.off('create_response', create_response_handler)
+					@_ronion['off']('create_response', create_response_handler)
 					try
 						encryptor_instances[first_node_string]['put_handshake_message'](command_data)
 					catch
@@ -580,10 +634,13 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 						if !nodes.length
 							@_established_routing_paths.set(source_id, [first_node, route_id])
 							resolve(route_id)
-						@_ronion.on('extend_response', !function extend_response_handler ({address, segment_id, command_data})
+						@_ronion['on']('extend_response', !function extend_response_handler (data)
+							address			= data['address']
+							segment_id		= data['segment_id']
+							command_data	= data['command_data']
 							if !is_string_equal_to_array(current_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)
 								return
-							@_ronion.off('extend_response', extend_response_handler)
+							@_ronion.'off'('extend_response', extend_response_handler)
 							clearTimeout(segment_extension_timeout)
 							# If last node in routing path clearly said extension failed - no need to do something else here
 							if !command_data.length
@@ -603,14 +660,14 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 						current_node_string							:= current_node.join(',')
 						encryptor_instances[current_node_string]	= detox-crypto['Encryptor'](true, detox-crypto['convert_public_key'](current_node))
 						segment_extension_timeout					:= setTimeout (!~>
-							@_ronion.off('extend_response', extend_response_handler)
+							@_ronion['off']('extend_response', extend_response_handler)
 							fail()
 						), ROUTING_PATH_SEGMENT_TIMEOUT
 						@_ronion['extend_request'](current_node, route_id, encryptor_instances[current_node_string]['get_handshake_message']())
 					extend_request()
 				)
 				segment_establishment_timeout	= setTimeout (!~>
-					@_ronion.off('create_response', create_response_handler)
+					@_ronion['off']('create_response', create_response_handler)
 					fail()
 				), ROUTING_PATH_SEGMENT_TIMEOUT
 				route_id						= @_ronion['create_request'](first_node, encryptor_instances[first_node_string]['get_handshake_message']())

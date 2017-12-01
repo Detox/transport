@@ -286,7 +286,8 @@
       if (packets_per_second < 1) {
         packets_per_second = 1;
       }
-      this._socket = webrtcSocket({
+      this._pending_websocket_ids = new Map;
+      x$ = this._socket = webrtcSocket({
         'simple_peer_constructor': simplePeerDetox,
         'simple_peer_opts': {
           'config': {
@@ -299,13 +300,32 @@
           }
         }
       });
-      x$ = this._socket;
+      x$['on']('websocket_peer_connection_alias', function(websocket_host, websocket_port, peer_connection){
+        bootstrap_nodes.forEach(function(bootstrap_node){
+          if (bootstrap_node.host !== websocket_host || bootstrap_node.port !== websocket_port) {
+            return;
+          }
+          this$._pending_websocket_ids.set(peer_connection, bootstrap_node.node_id);
+          return peer_connection['on']('close', function(){
+            this$._pending_websocket_ids['delete'](peer_connection);
+          });
+        });
+      });
       x$['on']('node_connected', function(string_id){
-        var id, peer_connection;
+        var id, peer_connection, expected_id;
         id = hex2array(string_id);
         peer_connection = this$._socket['get_id_mapping'](string_id);
+        if (this$._pending_websocket_ids.has(peer_connection)) {
+          expected_id = this$._pending_websocket_ids.get(peer_connection);
+          this$._pending_websocket_ids['delete'](peer_connection);
+          if (expected_id !== string_id) {
+            peer_connection['destroy']();
+            return;
+          }
+        }
         if (!detoxCrypto['verify'](peer_connection._signature_received, peer_connection._sdp_received, id)) {
           peer_connection['destroy']();
+          return;
         }
         peer_connection['on']('routing_data', function(command, data){
           switch (command) {
@@ -348,10 +368,26 @@
       this._dht.listen(port, ip);
     };
     /**
-     * @return {!Array<string>}
+     * Get an array of bootstrap nodes
+     *
+     * @return {!Array<Object>} Each element is an object with keys `host`, `port` and `node_id`
      */
     y$['get_bootstrap_nodes'] = function(){
-      return this._dht.toJSON().nodes;
+      var peer_connection;
+      return (function(){
+        var i$, ref$, results$ = [];
+        for (i$ in ref$ = this._dht['_rpc']['socket']['socket']['_peer_connections']) {
+          peer_connection = ref$[i$];
+          if (peer_connection['ws_server'] && peer_connection['id']) {
+            results$.push({
+              'node_id': peer_connection['id'],
+              'host': peer_connection['ws_server']['host'],
+              'port': peer_connection['ws_server']['port']
+            });
+          }
+        }
+        return results$;
+      }.call(this)).filter(Boolean);
     };
     /**
      * Start lookup for specified node ID (listen for `node_connected` in order to know when interested node was connected)
@@ -514,9 +550,11 @@
       this._multiplexer = new Map;
       this._demultiplexer = new Map;
       this._established_routing_paths = new Map;
-      this._ronion = ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments).on('create_request', function(arg$){
+      this._ronion = ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)['on']('create_request', function(data){
         var address, segment_id, command_data, source_id, encryptor_instance, e, rewrapper_instance, address_string, encryptor_instances, rewrapper_instances;
-        address = arg$.address, segment_id = arg$.segment_id, command_data = arg$.command_data;
+        address = data['address'];
+        segment_id = data['segment_id'];
+        command_data = data['command_data'];
         source_id = compute_source_id(address, segment_id);
         if (this$._encryptor_instances.has(source_id)) {
           return;
@@ -542,17 +580,17 @@
         this$._encryptor_instances.set(source_id, encryptor_instances);
         this$._rewrapper_instances.set(source_id, rewrapper_instances);
         this$._last_node_in_routing_path.set(source_id, address);
-      }).on('send', function(arg$){
-        var address, packet, node_id;
-        address = arg$.address, packet = arg$.packet;
-        node_id = address;
+      })['on']('send', function(data){
         this$.fire('send', {
-          node_id: node_id,
-          packet: packet
+          'node_id': data['address'],
+          'packet': data['packet']
         });
-      }).on('data', function(arg$){
-        var address, segment_id, target_address, command_data, source_id, last_node_in_routing_path, demultiplexer, data;
-        address = arg$.address, segment_id = arg$.segment_id, target_address = arg$.target_address, command_data = arg$.command_data;
+      })['on']('data', function(data){
+        var address, segment_id, target_address, command_data, source_id, last_node_in_routing_path, demultiplexer;
+        address = data['address'];
+        segment_id = data['segment_id'];
+        target_address = data['target_address'];
+        command_data = data['command_data'];
         source_id = compute_source_id(address, segment_id);
         last_node_in_routing_path = this$._last_node_in_routing_path.get(source_id);
         if (target_address.join(',') !== last_node_in_routing_path.join(',')) {
@@ -566,59 +604,72 @@
         if (demultiplexer['have_more_data']()) {
           data = demultiplexer['get_data']();
           this$.fire('data', {
-            node_id: address,
-            route_id: segment_id,
-            data: data
+            'node_id': address,
+            'route_id': segment_id,
+            'data': data
           });
         }
-      }).on('destroy', function(arg$){
+      })['on']('destroy', function(data){
         var address, segment_id;
-        address = arg$.address, segment_id = arg$.segment_id;
+        address = data['address'];
+        segment_id = data['segment_id'];
         this$._destroy_routing_path(address, segment_id);
         this$.fire('destroyed', {
-          node_id: address,
-          route_id: segment_id
+          'node_id': address,
+          'route_id': segment_id
         });
-      }).on('encrypt', function(data){
+      })['on']('encrypt', function(data){
         var address, segment_id, target_address, plaintext, source_id, target_address_string, encryptor_instance, ref$;
-        address = data.address, segment_id = data.segment_id, target_address = data.target_address, plaintext = data.plaintext;
+        address = data['address'];
+        segment_id = data['segment_id'];
+        target_address = data['target_address'];
+        plaintext = data['plaintext'];
         source_id = compute_source_id(address, segment_id);
         target_address_string = target_address.join(',');
         encryptor_instance = (ref$ = this$._encryptor_instances.get(source_id)) != null ? ref$[target_address_string] : void 8;
         if (!encryptor_instance) {
           return;
         }
-        data.ciphertext = encryptor_instance['encrypt'](plaintext);
-      }).on('decrypt', function(data){
+        data['ciphertext'] = encryptor_instance['encrypt'](plaintext);
+      })['on']('decrypt', function(data){
         var address, segment_id, target_address, ciphertext, source_id, target_address_string, encryptor_instance, ref$;
-        address = data.address, segment_id = data.segment_id, target_address = data.target_address, ciphertext = data.ciphertext;
+        address = data['address'];
+        segment_id = data['segment_id'];
+        target_address = data['target_address'];
+        ciphertext = data['ciphertext'];
         source_id = compute_source_id(address, segment_id);
         target_address_string = target_address.join(',');
         encryptor_instance = (ref$ = this$._encryptor_instances.get(source_id)) != null ? ref$[target_address_string] : void 8;
         if (!encryptor_instance) {
           return;
         }
-        data.plaintext = encryptor_instance['decrypt'](plaintext);
-      }).on('wrap', function(data){
+        data['plaintext'] = encryptor_instance['decrypt'](plaintext);
+      })['on']('wrap', function(data){
         var address, segment_id, target_address, unwrapped, source_id, target_address_string, rewrapper_instance, ref$, ref1$;
-        address = data.address, segment_id = data.segment_id, target_address = data.target_address, unwrapped = data.unwrapped;
+        address = data['address'];
+        segment_id = data['segment_id'];
+        target_address = data['target_address'];
+        unwrapped = data['unwrapped'];
         source_id = compute_source_id(address, segment_id);
         target_address_string = target_address.join(',');
         rewrapper_instance = (ref$ = this$._rewrapper_instances.get(source_id)) != null ? (ref1$ = ref$[target_address_string]) != null ? ref1$[0] : void 8 : void 8;
         if (!rewrapper_instance) {
           return;
         }
-        data.wrapped = rewrapper_instance['wrap'](unwrapped);
-      }).on('unwrap', function(data){
+        data['wrapped'] = rewrapper_instance['wrap'](unwrapped);
+      })['on']('unwrap', function(data){
         var address, segment_id, target_address, wrapped, source_id, target_address_string, rewrapper_instance, ref$, ref1$;
-        address = data.address, segment_id = data.segment_id, target_address = data.target_address, wrapped = data.wrapped;
+        address = data['address'];
+        segment_id = data['segment_id'];
+        target_address = data['target_address'];
+        wrapped = data['wrapped'];
         source_id = compute_source_id(address, segment_id);
         target_address_string = target_address.join(',');
         rewrapper_instance = (ref$ = this$._rewrapper_instances.get(source_id)) != null ? (ref1$ = ref$[target_address_string]) != null ? ref1$[1] : void 8 : void 8;
         if (!rewrapper_instance) {
           return;
         }
-        data.unwrapped = rewrapper_instance['unwrap'](wrapped);
+        data['unwrapped'] = rewrapper_instance['unwrap'](wrapped);
       });
     }
     Router.prototype = Object.create(asyncEventer.prototype);
@@ -651,15 +702,17 @@
           throw new Error('Routing path creation failed');
         };
         encryptor_instances[first_node_string] = detoxCrypto['Encryptor'](true, detoxCrypto['convert_public_key'](first_node));
-        this._ronion.on('create_response', (function(){
-          function create_response_handler(arg$){
+        this._ronion['on']('create_response', (function(){
+          function create_response_handler(data){
             var address, segment_id, command_data, e, max_packet_data_size, current_node, current_node_string, segment_extension_timeout;
-            address = arg$.address, segment_id = arg$.segment_id, command_data = arg$.command_data;
+            address = data['address'];
+            segment_id = data['segment_id'];
+            command_data = data['command_data'];
             if (!is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)) {
               return;
             }
             clearTimeout(segment_establishment_timeout);
-            this._ronion.off('create_response', create_response_handler);
+            this._ronion['off']('create_response', create_response_handler);
             try {
               encryptor_instances[first_node_string]['put_handshake_message'](command_data);
             } catch (e$) {
@@ -680,14 +733,16 @@
                 this._established_routing_paths.set(source_id, [first_node, route_id]);
                 resolve(route_id);
               }
-              this._ronion.on('extend_response', (function(){
-                function extend_response_handler(arg$){
+              this._ronion['on']('extend_response', (function(){
+                function extend_response_handler(data){
                   var address, segment_id, command_data, e;
-                  address = arg$.address, segment_id = arg$.segment_id, command_data = arg$.command_data;
+                  address = data['address'];
+                  segment_id = data['segment_id'];
+                  command_data = data['command_data'];
                   if (!is_string_equal_to_array(current_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)) {
                     return;
                   }
-                  this._ronion.off('extend_response', extend_response_handler);
+                  this._ronion['off']('extend_response', extend_response_handler);
                   clearTimeout(segment_extension_timeout);
                   if (!command_data.length) {
                     fail();
@@ -711,7 +766,7 @@
               current_node_string = current_node.join(',');
               encryptor_instances[current_node_string] = detoxCrypto['Encryptor'](true, detoxCrypto['convert_public_key'](current_node));
               segment_extension_timeout = setTimeout(function(){
-                this$._ronion.off('extend_response', extend_response_handler);
+                this$._ronion['off']('extend_response', extend_response_handler);
                 fail();
               }, ROUTING_PATH_SEGMENT_TIMEOUT);
               this._ronion['extend_request'](current_node, route_id, encryptor_instances[current_node_string]['get_handshake_message']());
@@ -721,7 +776,7 @@
           return create_response_handler;
         }()));
         segment_establishment_timeout = setTimeout(function(){
-          this$._ronion.off('create_response', create_response_handler);
+          this$._ronion['off']('create_response', create_response_handler);
           fail();
         }, ROUTING_PATH_SEGMENT_TIMEOUT);
         route_id = this._ronion['create_request'](first_node, encryptor_instances[first_node_string]['get_handshake_message']());
