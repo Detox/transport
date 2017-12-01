@@ -166,7 +166,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			if !found_psr
 				@'destroy'()
 				return
-			simple-peer::['emit'].call(@, signal)
+			simple-peer::['signal'].call(@, signal)
 		/**
 		 * Data sending method that will be used by DHT
 		 *
@@ -248,7 +248,11 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		if packets_per_second < 1
 			packets_per_second	= 1
 		@_pending_websocket_ids	= new Map
+		extensions				= [
+			"psr:#packet_size:#packets_per_second" # Packet size and rate
+		]
 		@_socket				= webrtc-socket(
+			'extensions'				: extensions
 			'simple_peer_constructor'	: simple-peer-detox
 			'simple_peer_opts'		:
 				'config'				:
@@ -299,10 +303,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				@'fire'('node_disconnected', hex2array(string_id))
 			)
 		@_dht					= new webtorrent-dht(
-			'bootstrap'		: bootstrap_nodes # TODO: Need to associate bootstrap nodes with their DHT public key and check it on connection (webrtc-socket-detox)
-			'extensions'	: [
-				"psr:#packet_size:#packets_per_second" # Packet size and rate
-			]
+			'bootstrap'		: bootstrap_nodes
+			'extensions'	: extensions
 			'hash'			: sha3_256
 			'k'				: bucket_size
 			'nodeId'		: Buffer.from(dht_public_key)

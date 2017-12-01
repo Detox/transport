@@ -189,7 +189,7 @@
         this['destroy']();
         return;
       }
-      simplePeer.prototype['emit'].call(this, signal);
+      simplePeer.prototype['signal'].call(this, signal);
     };
     /**
      * Data sending method that will be used by DHT
@@ -275,7 +275,7 @@
      * @throws {Error}
      */
     function DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packet_size, packets_per_second, bucket_size){
-      var x$, y$, this$ = this;
+      var extensions, x$, y$, this$ = this;
       bucket_size == null && (bucket_size = 2);
       if (!(this instanceof DHT)) {
         return new DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packet_size, packets_per_second, bucket_size);
@@ -288,7 +288,9 @@
         packets_per_second = 1;
       }
       this._pending_websocket_ids = new Map;
+      extensions = ["psr:" + packet_size + ":" + packets_per_second];
       x$ = this._socket = webrtcSocket({
+        'extensions': extensions,
         'simple_peer_constructor': simplePeerDetox,
         'simple_peer_opts': {
           'config': {
@@ -349,7 +351,7 @@
       });
       y$ = this._dht = new webtorrentDht({
         'bootstrap': bootstrap_nodes,
-        'extensions': ["psr:" + packet_size + ":" + packets_per_second],
+        'extensions': extensions,
         'hash': sha3_256,
         'k': bucket_size,
         'nodeId': Buffer.from(dht_public_key),
