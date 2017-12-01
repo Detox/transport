@@ -133,6 +133,7 @@
           this['destroy']();
           return;
         } else if (data.length !== this._packet_size) {
+          this['destroy']();
           return;
         } else {
           this._demultiplexer['feed'](data);

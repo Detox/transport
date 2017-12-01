@@ -121,6 +121,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 						return
 					else if data.length != @_packet_size
 						# Data size must be exactly one packet size
+						@'destroy'()
 						return
 					else
 						@_demultiplexer['feed'](data)
