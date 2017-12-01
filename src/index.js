@@ -692,7 +692,7 @@
     z$['construct_routing_path'] = function(nodes){
       nodes = nodes.slice();
       return new Promise(function(resolve, reject){
-        var last_node_in_routing_path, first_node, first_node_string, encryptor_instances, rewrapper_instances, fail, segment_establishment_timeout, route_id, route_id_string, source_id, this$ = this;
+        var last_node_in_routing_path, first_node, first_node_string, encryptor_instances, rewrapper_instances, fail, x25519_public_key, segment_establishment_timeout, route_id, route_id_string, source_id, this$ = this;
         last_node_in_routing_path = nodes[nodes.length - 1];
         first_node = nodes.shift();
         first_node_string = first_node.join(',');
@@ -702,7 +702,11 @@
           this$._destroy_routing_path(first_node, route_id);
           throw new Error('Routing path creation failed');
         };
-        encryptor_instances[first_node_string] = detoxCrypto['Encryptor'](true, detoxCrypto['convert_public_key'](first_node));
+        x25519_public_key = detoxCrypto['convert_public_key'](first_node);
+        if (!x25519_public_key) {
+          fail();
+        }
+        encryptor_instances[first_node_string] = detoxCrypto['Encryptor'](true, x25519_public_key);
         this._ronion['on']('create_response', (function(){
           function create_response_handler(data){
             var address, segment_id, command_data, e, max_packet_data_size, current_node, current_node_string, segment_extension_timeout;
@@ -729,7 +733,7 @@
             this._multiplexer.set(source_id, fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, max_packet_data_size));
             this._demultiplexer.set(source_id, fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, max_packet_data_size));
             function extend_request(){
-              var this$ = this;
+              var x25519_public_key, this$ = this;
               if (!nodes.length) {
                 this._established_routing_paths.set(source_id, [first_node, route_id]);
                 resolve(route_id);
@@ -765,7 +769,11 @@
               }()));
               current_node = nodes.shift();
               current_node_string = current_node.join(',');
-              encryptor_instances[current_node_string] = detoxCrypto['Encryptor'](true, detoxCrypto['convert_public_key'](current_node));
+              x25519_public_key = detoxCrypto['convert_public_key'](current_node);
+              if (!x25519_public_key) {
+                fail();
+              }
+              encryptor_instances[current_node_string] = detoxCrypto['Encryptor'](true, x25519_public_key);
               segment_extension_timeout = setTimeout(function(){
                 this$._ronion['off']('extend_response', extend_response_handler);
                 fail();

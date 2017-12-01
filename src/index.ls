@@ -609,7 +609,10 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 					@_destroy_routing_path(first_node, route_id)
 					throw new Error('Routing path creation failed')
 				# Establishing first segment
-				encryptor_instances[first_node_string]	= detox-crypto['Encryptor'](true, detox-crypto['convert_public_key'](first_node))
+				x25519_public_key						= detox-crypto['convert_public_key'](first_node)
+				if !x25519_public_key
+					fail()
+				encryptor_instances[first_node_string]	= detox-crypto['Encryptor'](true, x25519_public_key)
 				@_ronion['on']('create_response', !function create_response_handler (data)
 					address			= data['address']
 					segment_id		= data['segment_id']
@@ -659,7 +662,10 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 						)
 						current_node								:= nodes.shift()
 						current_node_string							:= current_node.join(',')
-						encryptor_instances[current_node_string]	= detox-crypto['Encryptor'](true, detox-crypto['convert_public_key'](current_node))
+						x25519_public_key							= detox-crypto['convert_public_key'](current_node)
+						if !x25519_public_key
+							fail()
+						encryptor_instances[current_node_string]	= detox-crypto['Encryptor'](true, x25519_public_key)
 						segment_extension_timeout					:= setTimeout (!~>
 							@_ronion['off']('extend_response', extend_response_handler)
 							fail()
