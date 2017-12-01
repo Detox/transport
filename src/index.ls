@@ -75,7 +75,7 @@ function compute_source_id (address, segment_id)
 function found_introduction_points (introduction_points)
 	void
 
-function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplexer, async-eventer)
+function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplexer, async-eventer)
 	simple-peer		= detox-dht['simple-peer']
 	webrtc-socket	= detox-dht['webrtc-socket']
 	webtorrent-dht	= detox-dht['webtorrent-dht']
@@ -215,7 +215,7 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 	 */
 	function sha3_256 (data)
 		shaObj = new jsSHA('SHA3-256', 'ARRAYBUFFER');
-		shaObj['update'](array)
+		shaObj['update'](data)
 		shaObj['getHash']('HEX')
 	/**
 	 * @param {!Object} message
@@ -309,6 +309,9 @@ function Transport (detox-crypto, detox-dht, ronion, jssha, fixed-size-multiplex
 			'socket'		: @_socket
 			'verify'		: detox-crypto['verify']
 		)
+			..'on'('ready', !~>
+				@'fire'('ready')
+			)
 
 	DHT:: = Object.create(async-eventer::)
 	DHT::

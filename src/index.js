@@ -83,7 +83,7 @@
    * @param {!Array<Uint8Array>} introduction_points
    */
   function found_introduction_points(introduction_points){}
-  function Transport(detoxCrypto, detoxDht, ronion, jssha, fixedSizeMultiplexer, asyncEventer){
+  function Transport(detoxCrypto, detoxDht, ronion, jsSHA, fixedSizeMultiplexer, asyncEventer){
     var simplePeer, webrtcSocket, webtorrentDht, Buffer, x$, y$, z$;
     simplePeer = detoxDht['simple-peer'];
     webrtcSocket = detoxDht['webrtc-socket'];
@@ -248,7 +248,7 @@
     function sha3_256(data){
       var shaObj;
       shaObj = new jsSHA('SHA3-256', 'ARRAYBUFFER');
-      shaObj['update'](array);
+      shaObj['update'](data);
       return shaObj['getHash']('HEX');
     }
     /**
@@ -275,7 +275,7 @@
      * @throws {Error}
      */
     function DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packet_size, packets_per_second, bucket_size){
-      var x$, this$ = this;
+      var x$, y$, this$ = this;
       bucket_size == null && (bucket_size = 2);
       if (!(this instanceof DHT)) {
         return new DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packet_size, packets_per_second, bucket_size);
@@ -347,7 +347,7 @@
       x$['on']('node_disconnected', function(string_id){
         this$['fire']('node_disconnected', hex2array(string_id));
       });
-      this._dht = new webtorrentDht({
+      y$ = this._dht = new webtorrentDht({
         'bootstrap': bootstrap_nodes,
         'extensions': ["psr:" + packet_size + ":" + packets_per_second],
         'hash': sha3_256,
@@ -355,6 +355,9 @@
         'nodeId': dht_public_key,
         'socket': this._socket,
         'verify': detoxCrypto['verify']
+      });
+      y$['on']('ready', function(){
+        this$['fire']('ready');
       });
     }
     DHT.prototype = Object.create(asyncEventer.prototype);
