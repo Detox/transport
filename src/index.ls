@@ -305,12 +305,14 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			]
 			'hash'			: sha3_256
 			'k'				: bucket_size
-			'nodeId'		: dht_public_key
+			'nodeId'		: Buffer.from(dht_public_key)
 			'socket'		: @_socket
 			'verify'		: detox-crypto['verify']
 		)
-			..'on'('ready', !~>
-				@'fire'('ready')
+			..'once'('ready', !~>
+				@_dht['once']('node_connected', !~>
+					@'fire'('ready')
+				)
 			)
 
 	DHT:: = Object.create(async-eventer::)

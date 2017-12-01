@@ -352,12 +352,14 @@
         'extensions': ["psr:" + packet_size + ":" + packets_per_second],
         'hash': sha3_256,
         'k': bucket_size,
-        'nodeId': dht_public_key,
+        'nodeId': Buffer.from(dht_public_key),
         'socket': this._socket,
         'verify': detoxCrypto['verify']
       });
-      y$['on']('ready', function(){
-        this$['fire']('ready');
+      y$['once']('ready', function(){
+        this$._dht['once']('node_connected', function(){
+          this$['fire']('ready');
+        });
       });
     }
     DHT.prototype = Object.create(asyncEventer.prototype);
