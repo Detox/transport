@@ -216,7 +216,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 	function sha3_256 (data)
 		shaObj = new jsSHA('SHA3-256', 'ARRAYBUFFER');
 		shaObj['update'](data)
-		shaObj['getHash']('HEX')
+		Buffer.from(shaObj['getHash']('ARRAYBUFFER'))
 	/**
 	 * @param {!Object} message
 	 *
@@ -311,6 +311,9 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			'socket'		: @_socket
 			'verify'		: detox-crypto['verify']
 		)
+			..on('error', (error) !~>
+				@'fire'('error', error)
+			)
 			..'once'('ready', !~>
 				@'fire'('ready')
 			)
@@ -347,7 +350,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * @param {!Uint8Array} id
 		 */
 		..'lookup' = (id) !->
-			@_dht.lookup(array2hex(id))
+			@_dht.lookup(Buffer.from(id))
 		/**
 		 * Tag connection to specified node ID as used, so that it is not disconnected when not used by DHT itself
 		 *
@@ -388,14 +391,14 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 *
 		 * @param {!Uint8Array}			real_public_key		Ed25519 public key (real one, different from supplied in DHT constructor)
 		 * @param {!Uint8Array}			real_private_key	Corresponding Ed25519 private key
-		 * @param {!Array<Uint8Array>}	introduction_points	Array of public keys of introduction points
+		 * @param {!Array<Uint8Array>}	introduction_nodes	Array of public keys of introduction points
 		 *
 		 * @return {!Object}
 		 */
-		..'generate_introduction_message' = (real_public_key, real_private_key, introduction_points) ->
+		..'generate_introduction_message' = (real_public_key, real_private_key, introduction_nodes) ->
 			time	= +(new Date)
-			value	= new Uint8Array(introduction_points.length * PUBLIC_KEY_LENGTH)
-			for introduction_point, index in introduction_points
+			value	= new Uint8Array(introduction_nodes.length * PUBLIC_KEY_LENGTH)
+			for introduction_point, index in introduction_nodes
 				value.set(introduction_point, index * PUBLIC_KEY_LENGTH)
 			signature_data	= encode_signature_data(
 				'seq'	: time
@@ -427,18 +430,18 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * Find nodes in DHT that are acting as introduction points for specified public key
 		 *
 		 * @param {!Uint8Array}					target_public_key
-		 * @param {!found_introduction_points}	callback
+		 * @param {!found_introduction_nodes}	callback
 		 */
-		..'find_introduction_points' = (target_public_key, callback) !->
+		..'find_introduction_nodes' = (target_public_key, callback) !->
 			hash	= sha3_256(target_public_key)
 			@_dht['get'](hash, (result) !->
-				introduction_points_bulk	= Uint8Array.from(result['v'])
-				introduction_points			= []
-				if introduction_points_bulk.length % PUBLIC_KEY_LENGTH == 0
+				introduction_nodes_bulk	= Uint8Array.from(result['v'])
+				introduction_nodes		= []
+				if introduction_nodes_bulk.length % PUBLIC_KEY_LENGTH == 0
 					return
-				for i from 0 til introduction_points_bulk.length / PUBLIC_KEY_LENGTH
-					introduction_points.push(introduction_points_bulk.subarray(i * PUBLIC_KEY_LENGTH, (i + 1) * PUBLIC_KEY_LENGTH))
-				callback(introduction_points)
+				for i from 0 til introduction_nodes_bulk.length / PUBLIC_KEY_LENGTH
+					introduction_nodes.push(introduction_nodes_bulk.subarray(i * PUBLIC_KEY_LENGTH, (i + 1) * PUBLIC_KEY_LENGTH))
+				callback(introduction_nodes)
 			)
 		/**
 		 * @param {Function} callback

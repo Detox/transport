@@ -251,7 +251,7 @@
       var shaObj;
       shaObj = new jsSHA('SHA3-256', 'ARRAYBUFFER');
       shaObj['update'](data);
-      return shaObj['getHash']('HEX');
+      return Buffer.from(shaObj['getHash']('ARRAYBUFFER'));
     }
     /**
      * @param {!Object} message
@@ -360,6 +360,9 @@
         'socket': this._socket,
         'verify': detoxCrypto['verify']
       });
+      y$.on('error', function(error){
+        this$['fire']('error', error);
+      });
       y$['once']('ready', function(){
         this$['fire']('ready');
       });
@@ -403,7 +406,7 @@
      * @param {!Uint8Array} id
      */
     y$['lookup'] = function(id){
-      this._dht.lookup(array2hex(id));
+      this._dht.lookup(Buffer.from(id));
     };
     /**
      * Tag connection to specified node ID as used, so that it is not disconnected when not used by DHT itself
@@ -455,17 +458,17 @@
      *
      * @param {!Uint8Array}			real_public_key		Ed25519 public key (real one, different from supplied in DHT constructor)
      * @param {!Uint8Array}			real_private_key	Corresponding Ed25519 private key
-     * @param {!Array<Uint8Array>}	introduction_points	Array of public keys of introduction points
+     * @param {!Array<Uint8Array>}	introduction_nodes	Array of public keys of introduction points
      *
      * @return {!Object}
      */
-    y$['generate_introduction_message'] = function(real_public_key, real_private_key, introduction_points){
+    y$['generate_introduction_message'] = function(real_public_key, real_private_key, introduction_nodes){
       var time, value, i$, len$, index, introduction_point, signature_data, signature;
       time = +new Date;
-      value = new Uint8Array(introduction_points.length * PUBLIC_KEY_LENGTH);
-      for (i$ = 0, len$ = introduction_points.length; i$ < len$; ++i$) {
+      value = new Uint8Array(introduction_nodes.length * PUBLIC_KEY_LENGTH);
+      for (i$ = 0, len$ = introduction_nodes.length; i$ < len$; ++i$) {
         index = i$;
-        introduction_point = introduction_points[i$];
+        introduction_point = introduction_nodes[i$];
         value.set(introduction_point, index * PUBLIC_KEY_LENGTH);
       }
       signature_data = encode_signature_data({
@@ -500,23 +503,23 @@
      * Find nodes in DHT that are acting as introduction points for specified public key
      *
      * @param {!Uint8Array}					target_public_key
-     * @param {!found_introduction_points}	callback
+     * @param {!found_introduction_nodes}	callback
      */
-    y$['find_introduction_points'] = function(target_public_key, callback){
+    y$['find_introduction_nodes'] = function(target_public_key, callback){
       var hash;
       hash = sha3_256(target_public_key);
       this._dht['get'](hash, function(result){
-        var introduction_points_bulk, introduction_points, i$, to$, i;
-        introduction_points_bulk = Uint8Array.from(result['v']);
-        introduction_points = [];
-        if (introduction_points_bulk.length % PUBLIC_KEY_LENGTH === 0) {
+        var introduction_nodes_bulk, introduction_nodes, i$, to$, i;
+        introduction_nodes_bulk = Uint8Array.from(result['v']);
+        introduction_nodes = [];
+        if (introduction_nodes_bulk.length % PUBLIC_KEY_LENGTH === 0) {
           return;
         }
-        for (i$ = 0, to$ = introduction_points_bulk.length / PUBLIC_KEY_LENGTH; i$ < to$; ++i$) {
+        for (i$ = 0, to$ = introduction_nodes_bulk.length / PUBLIC_KEY_LENGTH; i$ < to$; ++i$) {
           i = i$;
-          introduction_points.push(introduction_points_bulk.subarray(i * PUBLIC_KEY_LENGTH, (i + 1) * PUBLIC_KEY_LENGTH));
+          introduction_nodes.push(introduction_nodes_bulk.subarray(i * PUBLIC_KEY_LENGTH, (i + 1) * PUBLIC_KEY_LENGTH));
         }
-        callback(introduction_points);
+        callback(introduction_nodes);
       });
     };
     /**
