@@ -76,6 +76,7 @@ function found_introduction_points (introduction_points)
 	void
 
 function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplexer, async-eventer)
+	bencode			= detox-dht['bencode']
 	simple-peer		= detox-dht['simple-peer']
 	webrtc-socket	= detox-dht['webrtc-socket']
 	webtorrent-dht	= detox-dht['webtorrent-dht']
@@ -112,7 +113,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		..'emit' = (event, data) !->
 			switch event
 				case 'signal'
-					data['signature']	= @_sign(string2array(data['sdp']))
+					data['signature']	= Buffer.from(@_sign(string2array(data['sdp'])))
 					simple-peer::['emit'].call(@, 'signal', data)
 				case 'data'
 					if @_sending
@@ -132,7 +133,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 							actual_data = @_demultiplexer['get_data']()
 							command		= actual_data[0]
 							if command == COMMAND_DHT
-								simple-peer::['emit'].call(@, 'data', actual_data.subarray(1))
+								simple-peer::['emit'].call(@, 'data', Buffer.from(actual_data.subarray(1)))
 							else
 								simple-peer::['emit'].call(@, 'routing_data', command, actual_data.subarray(1))
 						@_sending	= true
@@ -148,8 +149,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				@'destroy'()
 				return
 			@_signature_received	= signal['signature']
-			# Already Uint8Array, no need to convert SDP to array
-			@_sdp_received			= signal['sdp']
+			@_sdp_received			= string2array(signal['sdp'])
 			found_psr				= false
 			for extension in signal['extensions']
 				if extension.startsWith('psr:')
@@ -202,7 +202,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			setTimeout (!~>
 				if @destroyed
 					return
-				simple-peer::['send'].call(@, @_multiplexer['get_block']())
+				simple-peer::['send'].call(@, block = @_multiplexer['get_block']())
 				@_sending	= false
 				@_last_sent	= +(new Date)
 			), delay
@@ -312,9 +312,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			'verify'		: detox-crypto['verify']
 		)
 			..'once'('ready', !~>
-				@_dht['once']('node_connected', !~>
-					@'fire'('ready')
-				)
+				@'fire'('ready')
 			)
 
 	DHT:: = Object.create(async-eventer::)

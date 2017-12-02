@@ -84,7 +84,8 @@
    */
   function found_introduction_points(introduction_points){}
   function Transport(detoxCrypto, detoxDht, ronion, jsSHA, fixedSizeMultiplexer, asyncEventer){
-    var simplePeer, webrtcSocket, webtorrentDht, Buffer, x$, y$, z$;
+    var bencode, simplePeer, webrtcSocket, webtorrentDht, Buffer, x$, y$, z$;
+    bencode = detoxDht['bencode'];
     simplePeer = detoxDht['simple-peer'];
     webrtcSocket = detoxDht['webrtc-socket'];
     webtorrentDht = detoxDht['webtorrent-dht'];
@@ -125,7 +126,7 @@
       var actual_data, command;
       switch (event) {
       case 'signal':
-        data['signature'] = this._sign(string2array(data['sdp']));
+        data['signature'] = Buffer.from(this._sign(string2array(data['sdp'])));
         simplePeer.prototype['emit'].call(this, 'signal', data);
         break;
       case 'data':
@@ -144,7 +145,7 @@
             actual_data = this._demultiplexer['get_data']();
             command = actual_data[0];
             if (command === COMMAND_DHT) {
-              simplePeer.prototype['emit'].call(this, 'data', actual_data.subarray(1));
+              simplePeer.prototype['emit'].call(this, 'data', Buffer.from(actual_data.subarray(1)));
             } else {
               simplePeer.prototype['emit'].call(this, 'routing_data', command, actual_data.subarray(1));
             }
@@ -167,7 +168,7 @@
         return;
       }
       this._signature_received = signal['signature'];
-      this._sdp_received = signal['sdp'];
+      this._sdp_received = string2array(signal['sdp']);
       found_psr = false;
       for (i$ = 0, len$ = (ref$ = signal['extensions']).length; i$ < len$; ++i$) {
         extension = ref$[i$];
@@ -228,10 +229,11 @@
       var delay, this$ = this;
       delay = Math.max(0, this._send_delay - (new Date - this._last_sent));
       setTimeout(function(){
+        var block;
         if (this$.destroyed) {
           return;
         }
-        simplePeer.prototype['send'].call(this$, this$._multiplexer['get_block']());
+        simplePeer.prototype['send'].call(this$, block = this$._multiplexer['get_block']());
         this$._sending = false;
         this$._last_sent = +new Date;
       }, delay);
@@ -359,9 +361,7 @@
         'verify': detoxCrypto['verify']
       });
       y$['once']('ready', function(){
-        this$._dht['once']('node_connected', function(){
-          this$['fire']('ready');
-        });
+        this$['fire']('ready');
       });
     }
     DHT.prototype = Object.create(asyncEventer.prototype);
