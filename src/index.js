@@ -6,7 +6,7 @@
  * @license   MIT License, see license.txt
  */
 (function(){
-  var COMMAND_DHT, COMMAND_DATA, COMMAND_TAG, COMMAND_UNTAG, ROUTING_PROTOCOL_VERSION, PUBLIC_KEY_LENGTH, MAC_LENGTH, MIN_PACKET_SIZE, ROUTING_PATH_SEGMENT_TIMEOUT, MAX_DATA_SIZE;
+  var COMMAND_DHT, COMMAND_DATA, COMMAND_TAG, COMMAND_UNTAG, ROUTING_PROTOCOL_VERSION, PUBLIC_KEY_LENGTH, MAC_LENGTH, MIN_PACKET_SIZE, ROUTING_PATH_SEGMENT_TIMEOUT, MAX_DATA_SIZE, PEER_CONNECTION_TIMEOUT;
   COMMAND_DHT = 0;
   COMMAND_DATA = 1;
   COMMAND_TAG = 2;
@@ -17,6 +17,7 @@
   MIN_PACKET_SIZE = 256;
   ROUTING_PATH_SEGMENT_TIMEOUT = 10;
   MAX_DATA_SIZE = Math.pow(2, 24) - 1;
+  PEER_CONNECTION_TIMEOUT = 30;
   /**
    * @param {!Uint8Array} array
    *
@@ -176,7 +177,7 @@
           array = extension.split(':');
           received_packet_size = parseInt(array[1]);
           received_packets_per_second = parseInt(array[2]);
-          if (received_packet_size < 1 || received_packets_per_second < 1) {
+          if (received_packet_size < MIN_PACKET_SIZE || received_packets_per_second < 1) {
             this['destroy']();
             return;
           }
@@ -358,6 +359,7 @@
         'k': bucket_size,
         'nodeId': Buffer.from(dht_public_key),
         'socket': this._socket,
+        'timeout': PEER_CONNECTION_TIMEOUT * 1000,
         'verify': detoxCrypto['verify']
       });
       y$.on('error', function(error){
@@ -510,6 +512,9 @@
       hash = sha3_256(target_public_key);
       this._dht['get'](hash, function(result){
         var introduction_nodes_bulk, introduction_nodes, i$, to$, i;
+        if (!result || !result['v']) {
+          return;
+        }
         introduction_nodes_bulk = Uint8Array.from(result['v']);
         introduction_nodes = [];
         if (introduction_nodes_bulk.length % PUBLIC_KEY_LENGTH === 0) {

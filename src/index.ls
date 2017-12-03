@@ -20,6 +20,8 @@ const MIN_PACKET_SIZE				= 256
 const ROUTING_PATH_SEGMENT_TIMEOUT	= 10
 # 16 MiB is a reasonable size limit for text data, bigger data can be multiplexed on higher level if necessary
 const MAX_DATA_SIZE					= 2 ** 24 - 1
+# Same as in webtorrent-dht
+const PEER_CONNECTION_TIMEOUT		= 30
 
 /**
  * @param {!Uint8Array} array
@@ -156,7 +158,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 					array						= extension.split(':')
 					received_packet_size		= parseInt(array[1])
 					received_packets_per_second	= parseInt(array[2])
-					if received_packet_size < 1 || received_packets_per_second < 1
+					if received_packet_size < MIN_PACKET_SIZE || received_packets_per_second < 1
 						@'destroy'()
 						return
 					@_packet_size			= Math.min(@_packet_size, received_packet_size)
@@ -309,6 +311,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			'k'				: bucket_size
 			'nodeId'		: Buffer.from(dht_public_key)
 			'socket'		: @_socket
+			'timeout'		: PEER_CONNECTION_TIMEOUT * 1000
 			'verify'		: detox-crypto['verify']
 		)
 			..on('error', (error) !~>
@@ -435,6 +438,9 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		..'find_introduction_nodes' = (target_public_key, callback) !->
 			hash	= sha3_256(target_public_key)
 			@_dht['get'](hash, (result) !->
+				if !result || !result['v']
+					# Nothing was found
+					return
 				introduction_nodes_bulk	= Uint8Array.from(result['v'])
 				introduction_nodes		= []
 				if introduction_nodes_bulk.length % PUBLIC_KEY_LENGTH == 0
