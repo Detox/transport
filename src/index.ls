@@ -736,19 +736,32 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 */
 		.._destroy_routing_path = (address, segment_id) !->
 			source_id			= compute_source_id(address, segment_id)
-			encryptor_instances	= @_encryptor_instances.has(source_id)
+			encryptor_instances	= @_encryptor_instances.get(source_id)
 			if !encryptor_instances
 				return
-			for , encryptor_instance of encryptor_instances
-				encryptor_instance['destroy']()
-				try # Not all segments might be established yet, but in any case there will be at most as much of them as instances of encryptor
-					@_ronion['destroy'](address, segment_id)
-			@_encryptor_instances.delete(source_id)
-			@_rewrapper_instances.delete(source_id)
-			@_last_node_in_routing_path.delete(source_id)
-			@_multiplexer.delete(source_id)
-			@_demultiplexer.delete(source_id)
-			@_established_routing_paths.delete(source_id)
+			counter	= Object.keys(encryptor_instances).length
+			!~function destroy_segment
+				if counter
+					--counter
+					# When called from `destroy` event handler, calling `destroy()` method here will fail, but that is expected and is not a problem at all
+					try
+						@_ronion['destroy'](address, segment_id)
+						# Let ronion send DESTROY command before destroying next segment and cleaning `Encryptor` instances
+						@_ronion.once('send', !~>
+							destroy_segment()
+						)
+					catch
+						destroy_segment()
+				else
+					for , encryptor_instance of encryptor_instances
+						encryptor_instance['destroy']()
+					@_encryptor_instances.delete(source_id)
+					@_rewrapper_instances.delete(source_id)
+					@_last_node_in_routing_path.delete(source_id)
+					@_multiplexer.delete(source_id)
+					@_demultiplexer.delete(source_id)
+					@_established_routing_paths.delete(source_id)
+			destroy_segment()
 	Object.defineProperty(Router::, 'constructor', {enumerable: false, value: Router})
 	{
 		'ready'		: detox-crypto['ready']

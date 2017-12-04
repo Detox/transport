@@ -859,25 +859,40 @@
      * @param {!Uint8Array} segment_id
      */
     z$._destroy_routing_path = function(address, segment_id){
-      var source_id, encryptor_instances, i$, encryptor_instance;
+      var source_id, encryptor_instances, counter, this$ = this;
       source_id = compute_source_id(address, segment_id);
-      encryptor_instances = this._encryptor_instances.has(source_id);
+      encryptor_instances = this._encryptor_instances.get(source_id);
       if (!encryptor_instances) {
         return;
       }
-      for (i$ in encryptor_instances) {
-        encryptor_instance = encryptor_instances[i$];
-        encryptor_instance['destroy']();
-        try {
-          this._ronion['destroy'](address, segment_id);
-        } catch (e$) {}
+      counter = Object.keys(encryptor_instances).length;
+      function destroy_segment(){
+        var e, i$, ref$, encryptor_instance;
+        if (counter) {
+          --counter;
+          try {
+            this$._ronion['destroy'](address, segment_id);
+            this$._ronion.once('send', function(){
+              destroy_segment();
+            });
+          } catch (e$) {
+            e = e$;
+            destroy_segment();
+          }
+        } else {
+          for (i$ in ref$ = encryptor_instances) {
+            encryptor_instance = ref$[i$];
+            encryptor_instance['destroy']();
+          }
+          this$._encryptor_instances['delete'](source_id);
+          this$._rewrapper_instances['delete'](source_id);
+          this$._last_node_in_routing_path['delete'](source_id);
+          this$._multiplexer['delete'](source_id);
+          this$._demultiplexer['delete'](source_id);
+          this$._established_routing_paths['delete'](source_id);
+        }
       }
-      this._encryptor_instances['delete'](source_id);
-      this._rewrapper_instances['delete'](source_id);
-      this._last_node_in_routing_path['delete'](source_id);
-      this._multiplexer['delete'](source_id);
-      this._demultiplexer['delete'](source_id);
-      this._established_routing_paths['delete'](source_id);
+      destroy_segment();
     };
     Object.defineProperty(Router.prototype, 'constructor', {
       enumerable: false,
