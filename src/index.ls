@@ -598,7 +598,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 					return
 				data['unwrapped']	= rewrapper_instance['unwrap'](wrapped)
 			)
-		@_max_packet_data_size	= @_ronion['get_max_command_data_length']
+		@_max_packet_data_size	= @_ronion['get_max_command_data_length']()
 	Router:: = Object.create(async-eventer::)
 	Router::
 		/**
@@ -616,7 +616,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 */
 		..'construct_routing_path' = (nodes) ->
 			nodes	= nodes.slice() # Do not modify source array
-			new Promise (resolve, reject) !~>
+			new Promise (resolve) !~>
 				last_node_in_routing_path				= nodes[nodes.length - 1]
 				first_node								= nodes.shift()
 				first_node_string						= first_node.join(',')
@@ -654,6 +654,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 						if !nodes.length
 							@_established_routing_paths.set(source_id, [first_node, route_id])
 							resolve(route_id)
+							return
 						!~function extend_response_handler (data)
 							address			= data['address']
 							segment_id		= data['segment_id']

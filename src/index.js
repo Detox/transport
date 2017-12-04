@@ -689,7 +689,7 @@
         }
         data['unwrapped'] = rewrapper_instance['unwrap'](wrapped);
       });
-      this._max_packet_data_size = this._ronion['get_max_command_data_length'];
+      this._max_packet_data_size = this._ronion['get_max_command_data_length']();
     }
     Router.prototype = Object.create(asyncEventer.prototype);
     z$ = Router.prototype;
@@ -710,7 +710,7 @@
     z$['construct_routing_path'] = function(nodes){
       var this$ = this;
       nodes = nodes.slice();
-      return new Promise(function(resolve, reject){
+      return new Promise(function(resolve){
         var last_node_in_routing_path, first_node, first_node_string, encryptor_instances, rewrapper_instances, fail, x25519_public_key, segment_establishment_timeout, route_id, route_id_string, source_id;
         last_node_in_routing_path = nodes[nodes.length - 1];
         first_node = nodes.shift();
@@ -755,6 +755,7 @@
               if (!nodes.length) {
                 this$._established_routing_paths.set(source_id, [first_node, route_id]);
                 resolve(route_id);
+                return;
               }
               function extend_response_handler(data){
                 var address, segment_id, command_data, e;
