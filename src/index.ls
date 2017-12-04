@@ -498,6 +498,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				@_ronion['create_response'](address, segment_id, encryptor_instance['get_handshake_message']())
 				# At this point we simply assume that initiator received our response
 				@_ronion['confirm_incoming_segment_established'](address, segment_id)
+				@_multiplexer.set(source_id, fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, @_max_packet_data_size))
+				@_demultiplexer.set(source_id, fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, @_max_packet_data_size))
 				if !encryptor_instance['ready']()
 					return
 				rewrapper_instance					= encryptor_instance['get_rewrapper_keys']().map(detox-crypto['Rewrapper'])

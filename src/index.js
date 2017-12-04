@@ -584,6 +584,8 @@
         }
         this$._ronion['create_response'](address, segment_id, encryptor_instance['get_handshake_message']());
         this$._ronion['confirm_incoming_segment_established'](address, segment_id);
+        this$._multiplexer.set(source_id, fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
+        this$._demultiplexer.set(source_id, fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
         if (!encryptor_instance['ready']()) {
           return;
         }
