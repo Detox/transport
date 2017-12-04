@@ -31,8 +31,8 @@ function hex2array (string)
 	array
 
 <-! lib.ready
-test('DHT', (t) !->
-	t.plan(7)
+test('Router', (t) !->
+	t.plan(10)
 
 	data	= crypto.randomBytes(1000)
 	node_1	= detox-crypto.create_keypair(hex2array('4b39c9e51f2b644fd0678769cc53069e9c1a93984bbffd7f0fbca2375c08b815')) # ea977ae216d9de56a85a67f6a10cfd9e67d2b4ddb099892e0df937fa31c02ec0
@@ -99,7 +99,19 @@ test('DHT', (t) !->
 							t.equal(array2hex(node_id), array2hex(path_1.node_id), 'Message to node 1 appears like it is coming from node 2')
 							t.equal(array2hex(data), array2hex(received_data), 'Data received correctly')
 
-							#TODO
+							node_4_instance.once('destroyed', !->
+								t.pass('Destroyed connection with node 4')
+							)
+
+							node_3_instance.once('destroyed', !->
+								t.pass('Destroyed connection with node 3')
+							)
+
+							node_2_instance.once('destroyed', !->
+								t.pass('Destroyed connection with node 2')
+							)
+
+							node_1_instance.destroy_routing_path(path_1.node_id, path_1.route_id)
 						)
 
 						node_4_instance.send_data(node_id, route_id, data)
