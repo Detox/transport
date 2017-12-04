@@ -34,7 +34,7 @@ function hex2array (string)
 
 <-! lib.ready
 test('DHT', (t) !->
-	t.plan(11)
+	t.plan(15)
 
 	bootstrap_node_dht	= detox-crypto.create_keypair(hex2array('561401dff7921304e6c266639cc6a37a14c1600f9928dbf9afc99a61f0732d43')) # ec63345e65cd1efa50816bf91d79e0e2302be7ddb4412b885cc69efe9a3b9e50
 	node_1_dht			= detox-crypto.create_keypair(hex2array('4b39c9e51f2b644fd0678769cc53069e9c1a93984bbffd7f0fbca2375c08b815')) # ea977ae216d9de56a85a67f6a10cfd9e67d2b4ddb099892e0df937fa31c02ec0
@@ -65,13 +65,13 @@ test('DHT', (t) !->
 	node_3_instance.once('ready', ready)
 
 	node_1_instance.once('node_connected', (node_id) !->
-		t.equal(node_id.toString(), bootstrap_node_dht.ed25519.public.toString(), 'Connected to WebRTC (bootstrap) node #1')
+		t.equal(array2hex(node_id), array2hex(bootstrap_node_dht.ed25519.public), 'Connected to WebRTC (bootstrap) node #1')
 	)
 	node_2_instance.once('node_connected', (node_id) !->
-		t.equal(node_id.toString(), bootstrap_node_dht.ed25519.public.toString(), 'Connected to WebRTC (bootstrap) node #2')
+		t.equal(array2hex(node_id), array2hex(bootstrap_node_dht.ed25519.public), 'Connected to WebRTC (bootstrap) node #2')
 	)
 	node_3_instance.once('node_connected', (node_id) !->
-		t.equal(node_id.toString(), bootstrap_node_dht.ed25519.public.toString(), 'Connected to WebRTC (bootstrap) node #3')
+		t.equal(array2hex(node_id), array2hex(bootstrap_node_dht.ed25519.public), 'Connected to WebRTC (bootstrap) node #3')
 	)
 
 	function all_ready
@@ -91,20 +91,37 @@ test('DHT', (t) !->
 			node_3_instance.find_introduction_nodes(node_1_real.ed25519.public, (introduction_nodes_received) !->
 				t.deepEqual(introduction_nodes_received, introduction_nodes, 'Introduction nodes found successfully')
 
-				node_1_instance.once('node_disconnected', !->
-					t.pass('Disconnected from WebRTC node #1')
-				)
-				node_2_instance.once('node_disconnected', !->
-					t.pass('Disconnected from WebRTC node #2')
-				)
-				node_3_instance.once('node_disconnected', !->
-					t.pass('Disconnected from WebRTC node #3')
-				)
+				node_2_instance.once('node_tagged', (id) !->
+					t.equal(array2hex(id), array2hex(node_1_dht.ed25519.public), 'Remote node tagged connection')
 
-				bootstrap_node_instance.destroy()
-				node_1_instance.destroy()
-				node_2_instance.destroy()
-				node_3_instance.destroy()
+					node_2_instance.once('data', (id, data) !->
+						t.equal(array2hex(id), array2hex(node_1_dht.ed25519.public), 'Received data from correct source')
+						t.equal(array2hex(data), array2hex(node_1_real.ed25519.public), 'Received correct data')
+
+						node_2_instance.once('node_untagged', (id) !->
+							t.equal(array2hex(id), array2hex(node_1_dht.ed25519.public), 'Remote node untagged connection')
+
+							node_1_instance.once('node_disconnected', !->
+								t.pass('Disconnected from WebRTC node #1')
+							)
+							node_2_instance.once('node_disconnected', !->
+								t.pass('Disconnected from WebRTC node #2')
+							)
+							node_3_instance.once('node_disconnected', !->
+								t.pass('Disconnected from WebRTC node #3')
+							)
+
+							bootstrap_node_instance.destroy()
+							node_1_instance.destroy()
+							node_2_instance.destroy()
+							node_3_instance.destroy()
+						)
+
+						node_1_instance.del_used_tag(node_2_dht.ed25519.public)
+					)
+					node_1_instance.send_data(node_2_dht.ed25519.public, node_1_real.ed25519.public)
+				)
+				node_1_instance.add_used_tag(node_2_dht.ed25519.public)
 			)
 		)
 
