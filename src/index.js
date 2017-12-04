@@ -687,6 +687,7 @@
         }
         data['unwrapped'] = rewrapper_instance['unwrap'](wrapped);
       });
+      this._max_packet_data_size = this._ronion['get_max_command_data_length'];
     }
     Router.prototype = Object.create(asyncEventer.prototype);
     z$ = Router.prototype;
@@ -705,9 +706,10 @@
      * @return {!Promise} Will resolve with ID of the route or will be rejected if path construction fails
      */
     z$['construct_routing_path'] = function(nodes){
+      var this$ = this;
       nodes = nodes.slice();
       return new Promise(function(resolve, reject){
-        var last_node_in_routing_path, first_node, first_node_string, encryptor_instances, rewrapper_instances, fail, x25519_public_key, segment_establishment_timeout, route_id, route_id_string, source_id, this$ = this;
+        var last_node_in_routing_path, first_node, first_node_string, encryptor_instances, rewrapper_instances, fail, x25519_public_key, segment_establishment_timeout, route_id, route_id_string, source_id;
         last_node_in_routing_path = nodes[nodes.length - 1];
         first_node = nodes.shift();
         first_node_string = first_node.join(',');
@@ -722,9 +724,9 @@
           fail();
         }
         encryptor_instances[first_node_string] = detoxCrypto['Encryptor'](true, x25519_public_key);
-        this._ronion['on']('create_response', (function(){
+        this$._ronion['on']('create_response', (function(){
           function create_response_handler(data){
-            var address, segment_id, command_data, e, max_packet_data_size, current_node, current_node_string, segment_extension_timeout;
+            var address, segment_id, command_data, e, current_node, current_node_string, segment_extension_timeout;
             address = data['address'];
             segment_id = data['segment_id'];
             command_data = data['command_data'];
@@ -732,7 +734,7 @@
               return;
             }
             clearTimeout(segment_establishment_timeout);
-            this._ronion['off']('create_response', create_response_handler);
+            this$._ronion['off']('create_response', create_response_handler);
             try {
               encryptor_instances[first_node_string]['put_handshake_message'](command_data);
             } catch (e$) {
@@ -743,17 +745,16 @@
               fail();
             }
             rewrapper_instances[first_node_string] = encryptor_instances[first_node_string]['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
-            this._ronion['confirm_outgoing_segment_established'](first_node, route_id);
-            max_packet_data_size = encryptor_instances[first_node_string]['get_max_command_data_length']();
-            this._multiplexer.set(source_id, fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, max_packet_data_size));
-            this._demultiplexer.set(source_id, fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, max_packet_data_size));
+            this$._ronion['confirm_outgoing_segment_established'](first_node, route_id);
+            this$._multiplexer.set(source_id, fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
+            this$._demultiplexer.set(source_id, fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
             function extend_request(){
-              var x25519_public_key, this$ = this;
+              var x25519_public_key;
               if (!nodes.length) {
-                this._established_routing_paths.set(source_id, [first_node, route_id]);
+                this$._established_routing_paths.set(source_id, [first_node, route_id]);
                 resolve(route_id);
               }
-              this._ronion['on']('extend_response', (function(){
+              this$._ronion['on']('extend_response', (function(){
                 function extend_response_handler(data){
                   var address, segment_id, command_data, e;
                   address = data['address'];
@@ -762,7 +763,7 @@
                   if (!is_string_equal_to_array(current_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)) {
                     return;
                   }
-                  this._ronion['off']('extend_response', extend_response_handler);
+                  this$._ronion['off']('extend_response', extend_response_handler);
                   clearTimeout(segment_extension_timeout);
                   if (!command_data.length) {
                     fail();
@@ -777,7 +778,7 @@
                     fail();
                   }
                   rewrapper_instances[current_node_string] = encryptor_instances[current_node_string]['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
-                  this._ronion['confirm_extended_path'](first_node, route_id);
+                  this$._ronion['confirm_extended_path'](first_node, route_id);
                   extend_request();
                 }
                 return extend_response_handler;
@@ -793,7 +794,7 @@
                 this$._ronion['off']('extend_response', extend_response_handler);
                 fail();
               }, ROUTING_PATH_SEGMENT_TIMEOUT);
-              this._ronion['extend_request'](current_node, route_id, encryptor_instances[current_node_string]['get_handshake_message']());
+              this$._ronion['extend_request'](current_node, route_id, encryptor_instances[current_node_string]['get_handshake_message']());
             }
             extend_request();
           }
@@ -803,12 +804,12 @@
           this$._ronion['off']('create_response', create_response_handler);
           fail();
         }, ROUTING_PATH_SEGMENT_TIMEOUT);
-        route_id = this._ronion['create_request'](first_node, encryptor_instances[first_node_string]['get_handshake_message']());
+        route_id = this$._ronion['create_request'](first_node, encryptor_instances[first_node_string]['get_handshake_message']());
         route_id_string = route_id.join(',');
         source_id = compute_source_id(first_node, route_id);
-        this._encryptor_instances.set(source_id, encryptor_instances);
-        this._rewrapper_instances.set(source_id, rewrapper_instances);
-        this._last_node_in_routing_path.set(source_id, last_node_in_routing_path);
+        this$._encryptor_instances.set(source_id, encryptor_instances);
+        this$._rewrapper_instances.set(source_id, rewrapper_instances);
+        this$._last_node_in_routing_path.set(source_id, last_node_in_routing_path);
       });
     };
     /**

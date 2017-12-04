@@ -596,6 +596,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 					return
 				data['unwrapped']	= rewrapper_instance['unwrap'](wrapped)
 			)
+		@_max_packet_data_size	= @_ronion['get_max_command_data_length']
 	Router:: = Object.create(async-eventer::)
 	Router::
 		/**
@@ -613,7 +614,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 */
 		..'construct_routing_path' = (nodes) ->
 			nodes	= nodes.slice() # Do not modify source array
-			new Promise (resolve, reject) !->
+			new Promise (resolve, reject) !~>
 				last_node_in_routing_path				= nodes[nodes.length - 1]
 				first_node								= nodes.shift()
 				first_node_string						= first_node.join(',')
@@ -627,7 +628,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				if !x25519_public_key
 					fail()
 				encryptor_instances[first_node_string]	= detox-crypto['Encryptor'](true, x25519_public_key)
-				@_ronion['on']('create_response', !function create_response_handler (data)
+				@_ronion['on']('create_response', !~function create_response_handler (data)
 					address			= data['address']
 					segment_id		= data['segment_id']
 					command_data	= data['command_data']
@@ -643,16 +644,15 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 						fail()
 					rewrapper_instances[first_node_string]	= encryptor_instances[first_node_string]['get_rewrapper_keys']().map(detox-crypto['Rewrapper'])
 					@_ronion['confirm_outgoing_segment_established'](first_node, route_id)
-					max_packet_data_size	= encryptor_instances[first_node_string]['get_max_command_data_length']()
-					@_multiplexer.set(source_id, fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, max_packet_data_size))
-					@_demultiplexer.set(source_id, fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, max_packet_data_size))
+					@_multiplexer.set(source_id, fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, @_max_packet_data_size))
+					@_demultiplexer.set(source_id, fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, @_max_packet_data_size))
 					# Successfully established first segment, extending routing path further
 					var current_node, current_node_string, segment_extension_timeout
-					!function extend_request
+					!~function extend_request
 						if !nodes.length
 							@_established_routing_paths.set(source_id, [first_node, route_id])
 							resolve(route_id)
-						@_ronion['on']('extend_response', !function extend_response_handler (data)
+						@_ronion['on']('extend_response', !~function extend_response_handler (data)
 							address			= data['address']
 							segment_id		= data['segment_id']
 							command_data	= data['command_data']
