@@ -405,7 +405,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				value.set(introduction_point, index * PUBLIC_KEY_LENGTH)
 			signature_data	= encode_signature_data(
 				'seq'	: time
-				'v'		: value
+				'v'		: Buffer.from(value)
 			)
 			signature		= detox-crypto['sign'](signature_data, real_public_key, real_private_key)
 			# This message has signature, so it can be now sent from any node in DHT
@@ -437,13 +437,13 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 */
 		..'find_introduction_nodes' = (target_public_key, callback) !->
 			hash	= sha3_256(target_public_key)
-			@_dht['get'](hash, (result) !->
+			@_dht['get'](hash, (, result) !->
 				if !result || !result['v']
 					# Nothing was found
 					return
 				introduction_nodes_bulk	= Uint8Array.from(result['v'])
 				introduction_nodes		= []
-				if introduction_nodes_bulk.length % PUBLIC_KEY_LENGTH == 0
+				if introduction_nodes_bulk.length % PUBLIC_KEY_LENGTH != 0
 					return
 				for i from 0 til introduction_nodes_bulk.length / PUBLIC_KEY_LENGTH
 					introduction_nodes.push(introduction_nodes_bulk.subarray(i * PUBLIC_KEY_LENGTH, (i + 1) * PUBLIC_KEY_LENGTH))

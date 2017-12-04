@@ -475,7 +475,7 @@
       }
       signature_data = encode_signature_data({
         'seq': time,
-        'v': value
+        'v': Buffer.from(value)
       });
       signature = detoxCrypto['sign'](signature_data, real_public_key, real_private_key);
       return {
@@ -510,14 +510,14 @@
     y$['find_introduction_nodes'] = function(target_public_key, callback){
       var hash;
       hash = sha3_256(target_public_key);
-      this._dht['get'](hash, function(result){
+      this._dht['get'](hash, function(arg$, result){
         var introduction_nodes_bulk, introduction_nodes, i$, to$, i;
         if (!result || !result['v']) {
           return;
         }
         introduction_nodes_bulk = Uint8Array.from(result['v']);
         introduction_nodes = [];
-        if (introduction_nodes_bulk.length % PUBLIC_KEY_LENGTH === 0) {
+        if (introduction_nodes_bulk.length % PUBLIC_KEY_LENGTH !== 0) {
           return;
         }
         for (i$ = 0, to$ = introduction_nodes_bulk.length / PUBLIC_KEY_LENGTH; i$ < to$; ++i$) {
