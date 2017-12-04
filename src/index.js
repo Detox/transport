@@ -659,7 +659,9 @@
         if (!encryptor_instance) {
           return;
         }
-        data['plaintext'] = encryptor_instance['decrypt'](plaintext);
+        try {
+          data['plaintext'] = encryptor_instance['decrypt'](ciphertext);
+        } catch (e$) {}
       })['on']('wrap', function(data){
         var address, segment_id, target_address, unwrapped, source_id, target_address_string, rewrapper_instance, ref$, ref1$;
         address = data['address'];
@@ -754,35 +756,33 @@
                 this$._established_routing_paths.set(source_id, [first_node, route_id]);
                 resolve(route_id);
               }
-              this$._ronion['on']('extend_response', (function(){
-                function extend_response_handler(data){
-                  var address, segment_id, command_data, e;
-                  address = data['address'];
-                  segment_id = data['segment_id'];
-                  command_data = data['command_data'];
-                  if (!is_string_equal_to_array(current_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)) {
-                    return;
-                  }
-                  this$._ronion['off']('extend_response', extend_response_handler);
-                  clearTimeout(segment_extension_timeout);
-                  if (!command_data.length) {
-                    fail();
-                  }
-                  try {
-                    encryptor_instances[current_node_string]['put_handshake_message'](command_data);
-                  } catch (e$) {
-                    e = e$;
-                    fail();
-                  }
-                  if (!encryptor_instances[current_node_string]['ready']()) {
-                    fail();
-                  }
-                  rewrapper_instances[current_node_string] = encryptor_instances[current_node_string]['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
-                  this$._ronion['confirm_extended_path'](first_node, route_id);
-                  extend_request();
+              function extend_response_handler(data){
+                var address, segment_id, command_data, e;
+                address = data['address'];
+                segment_id = data['segment_id'];
+                command_data = data['command_data'];
+                if (!is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)) {
+                  return;
                 }
-                return extend_response_handler;
-              }()));
+                this$._ronion['off']('extend_response', extend_response_handler);
+                clearTimeout(segment_extension_timeout);
+                if (!command_data.length) {
+                  fail();
+                }
+                try {
+                  encryptor_instances[current_node_string]['put_handshake_message'](command_data);
+                } catch (e$) {
+                  e = e$;
+                  fail();
+                }
+                if (!encryptor_instances[current_node_string]['ready']()) {
+                  fail();
+                }
+                rewrapper_instances[current_node_string] = encryptor_instances[current_node_string]['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
+                this$._ronion['confirm_extended_path'](first_node, route_id);
+                extend_request();
+              }
+              this$._ronion['on']('extend_response', extend_response_handler);
               current_node = nodes.shift();
               current_node_string = current_node.join(',');
               x25519_public_key = detoxCrypto['convert_public_key'](current_node);
@@ -793,8 +793,8 @@
               segment_extension_timeout = setTimeout(function(){
                 this$._ronion['off']('extend_response', extend_response_handler);
                 fail();
-              }, ROUTING_PATH_SEGMENT_TIMEOUT);
-              this$._ronion['extend_request'](current_node, route_id, encryptor_instances[current_node_string]['get_handshake_message']());
+              }, ROUTING_PATH_SEGMENT_TIMEOUT * 1000);
+              this$._ronion['extend_request'](first_node, route_id, current_node, encryptor_instances[current_node_string]['get_handshake_message']());
             }
             extend_request();
           }
@@ -803,7 +803,7 @@
         segment_establishment_timeout = setTimeout(function(){
           this$._ronion['off']('create_response', create_response_handler);
           fail();
-        }, ROUTING_PATH_SEGMENT_TIMEOUT);
+        }, ROUTING_PATH_SEGMENT_TIMEOUT * 1000);
         route_id = this$._ronion['create_request'](first_node, encryptor_instances[first_node_string]['get_handshake_message']());
         route_id_string = route_id.join(',');
         source_id = compute_source_id(first_node, route_id);

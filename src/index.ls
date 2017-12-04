@@ -570,7 +570,9 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				encryptor_instance		= @_encryptor_instances.get(source_id)?[target_address_string]
 				if !encryptor_instance
 					return
-				data['plaintext']	= encryptor_instance['decrypt'](plaintext)
+				# This can legitimately throw exceptions if ciphertext is not targeted at this node
+				try
+					data['plaintext']	= encryptor_instance['decrypt'](ciphertext)
 			)
 			.'on'('wrap', (data) !~>
 				address					= data['address']
@@ -652,11 +654,11 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 						if !nodes.length
 							@_established_routing_paths.set(source_id, [first_node, route_id])
 							resolve(route_id)
-						@_ronion['on']('extend_response', !~function extend_response_handler (data)
+						!~function extend_response_handler (data)
 							address			= data['address']
 							segment_id		= data['segment_id']
 							command_data	= data['command_data']
-							if !is_string_equal_to_array(current_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)
+							if !is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)
 								return
 							@_ronion.'off'('extend_response', extend_response_handler)
 							clearTimeout(segment_extension_timeout)
@@ -673,7 +675,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 							@_ronion['confirm_extended_path'](first_node, route_id)
 							# Successfully extended routing path by one more segment, continue extending routing path further
 							extend_request()
-						)
+						@_ronion['on']('extend_response', extend_response_handler)
 						current_node								:= nodes.shift()
 						current_node_string							:= current_node.join(',')
 						x25519_public_key							= detox-crypto['convert_public_key'](current_node)
@@ -683,14 +685,14 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 						segment_extension_timeout					:= setTimeout (!~>
 							@_ronion['off']('extend_response', extend_response_handler)
 							fail()
-						), ROUTING_PATH_SEGMENT_TIMEOUT
-						@_ronion['extend_request'](current_node, route_id, encryptor_instances[current_node_string]['get_handshake_message']())
+						), ROUTING_PATH_SEGMENT_TIMEOUT * 1000
+						@_ronion['extend_request'](first_node, route_id, current_node, encryptor_instances[current_node_string]['get_handshake_message']())
 					extend_request()
 				)
 				segment_establishment_timeout	= setTimeout (!~>
 					@_ronion['off']('create_response', create_response_handler)
 					fail()
-				), ROUTING_PATH_SEGMENT_TIMEOUT
+				), ROUTING_PATH_SEGMENT_TIMEOUT * 1000
 				route_id						= @_ronion['create_request'](first_node, encryptor_instances[first_node_string]['get_handshake_message']())
 				route_id_string					= route_id.join(',')
 				source_id						= compute_source_id(first_node, route_id)
