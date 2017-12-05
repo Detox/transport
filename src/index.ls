@@ -461,8 +461,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 	/**
 	 * @constructor
 	 *
-	 * @param {!Uint8Array}	dht_private_key			X25519 private key that corresponds to Ed25519 key used in DHT
-	 * @param {number}		packet_size				Same as in DHT
+	 * @param {!Uint8Array}	dht_private_key			X25519 private key that corresponds to Ed25519 key used in `DHT` constructor
+	 * @param {number}		packet_size				The same as in `DHT` constructor
 	 * @param {number}		max_pending_segments	How much segments can be in pending state per one address
 	 *
 	 * @return {!Router}
@@ -614,6 +614,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		..'process_packet' = (node_id, packet) !->
 			@_ronion['process_packet'](node_id, packet)
 		/**
+		 * Construct routing path through specified nodes
+		 *
 		 * @param {!Array<Uint8Array>} nodes IDs of the nodes through which routing path must be constructed, last node in the list is responder
 		 *
 		 * @return {!Promise} Will resolve with ID of the route or will be rejected if path construction fails
@@ -705,6 +707,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				@_rewrapper_instances.set(source_id, rewrapper_instances)
 				@_last_node_in_routing_path.set(source_id, last_node_in_routing_path)
 		/**
+		 * Destroy routing path constructed earlier
+		 *
 		 * @param {!Uint8Array} node_id		First node in routing path
 		 * @param {!Uint8Array} route_id	Identifier returned during routing path construction
 		 */
@@ -729,6 +733,9 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			while multiplexer['have_more_blocks']()
 				data_block	= multiplexer['get_block']()
 				@_ronion['data'](node_id, route_id, target_address, data_block)
+		/**
+		 * Destroy all of the routing path constructed earlier
+		 */
 		..'destroy' = !->
 			@_established_routing_paths.forEach ([address, segment_id]) !~>
 				@_destroy_routing_path(address, segment_id)
