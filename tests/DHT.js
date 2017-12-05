@@ -87,34 +87,36 @@
         introduction_nodes = [detoxCrypto.create_keypair().ed25519['public'], detoxCrypto.create_keypair().ed25519['public']];
         introduction_message = node_1_instance.generate_introduction_message(node_1_real.ed25519['public'], node_1_real.ed25519['private'], introduction_nodes);
         node_1_instance._dht.on('put', function(){
-          node_3_instance.find_introduction_nodes(node_1_real.ed25519['public'], function(introduction_nodes_received){
-            t.deepEqual(introduction_nodes_received, introduction_nodes, 'Introduction nodes found successfully');
-            node_2_instance.once('node_tagged', function(id){
-              t.equal(array2hex(id), array2hex(node_1_dht.ed25519['public']), 'Remote node tagged connection');
-              node_2_instance.once('data', function(id, data){
-                t.equal(array2hex(id), array2hex(node_1_dht.ed25519['public']), 'Received data from correct source');
-                t.equal(array2hex(data), array2hex(node_1_real.ed25519['public']), 'Received correct data');
-                node_2_instance.once('node_untagged', function(id){
-                  t.equal(array2hex(id), array2hex(node_1_dht.ed25519['public']), 'Remote node untagged connection');
-                  node_1_instance.once('node_disconnected', function(){
-                    t.pass('Disconnected from WebRTC node #1');
+          setTimeout(function(){
+            node_3_instance.find_introduction_nodes(node_1_real.ed25519['public'], function(introduction_nodes_received){
+              t.deepEqual(introduction_nodes_received, introduction_nodes, 'Introduction nodes found successfully');
+              node_2_instance.once('node_tagged', function(id){
+                t.equal(array2hex(id), array2hex(node_1_dht.ed25519['public']), 'Remote node tagged connection');
+                node_2_instance.once('data', function(id, data){
+                  t.equal(array2hex(id), array2hex(node_1_dht.ed25519['public']), 'Received data from correct source');
+                  t.equal(array2hex(data), array2hex(node_1_real.ed25519['public']), 'Received correct data');
+                  node_2_instance.once('node_untagged', function(id){
+                    t.equal(array2hex(id), array2hex(node_1_dht.ed25519['public']), 'Remote node untagged connection');
+                    node_1_instance.once('node_disconnected', function(){
+                      t.pass('Disconnected from WebRTC node #1');
+                    });
+                    node_2_instance.once('node_disconnected', function(){
+                      t.pass('Disconnected from WebRTC node #2');
+                    });
+                    node_3_instance.once('node_disconnected', function(){
+                      t.pass('Disconnected from WebRTC node #3');
+                    });
+                    bootstrap_node_instance.destroy();
+                    node_1_instance.destroy();
+                    node_2_instance.destroy();
+                    node_3_instance.destroy();
                   });
-                  node_2_instance.once('node_disconnected', function(){
-                    t.pass('Disconnected from WebRTC node #2');
-                  });
-                  node_3_instance.once('node_disconnected', function(){
-                    t.pass('Disconnected from WebRTC node #3');
-                  });
-                  bootstrap_node_instance.destroy();
-                  node_1_instance.destroy();
-                  node_2_instance.destroy();
-                  node_3_instance.destroy();
+                  node_1_instance.del_used_tag(node_2_dht.ed25519['public']);
                 });
-                node_1_instance.del_used_tag(node_2_dht.ed25519['public']);
+                node_1_instance.send_data(node_2_dht.ed25519['public'], node_1_real.ed25519['public']);
               });
-              node_1_instance.send_data(node_2_dht.ed25519['public'], node_1_real.ed25519['public']);
+              node_1_instance.add_used_tag(node_2_dht.ed25519['public']);
             });
-            node_1_instance.add_used_tag(node_2_dht.ed25519['public']);
           });
         });
         return node_2_instance.publish_introduction_message(introduction_message);
