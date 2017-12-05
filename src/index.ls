@@ -31,7 +31,7 @@ const PEER_CONNECTION_TIMEOUT		= 30
 function array2hex (array)
 	string = ''
 	for byte in array
-		string += byte.toString(16).padStart(2, 0)
+		string += byte.toString(16).padStart(2, '0')
 	string
 /**
  * @param {string} string
@@ -69,13 +69,6 @@ function is_string_equal_to_array (string, array)
  */
 function compute_source_id (address, segment_id)
 	address.join(',') + segment_id.join(',')
-/**
- * @interface
- *
- * @param {!Array<Uint8Array>} introduction_points
- */
-function found_introduction_points (introduction_points)
-	void
 
 function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplexer, async-eventer)
 	bencode			= detox-dht['bencode']
@@ -93,10 +86,10 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 	!function simple-peer-detox (options)
 		if !(@ instanceof simple-peer-detox)
 			return new simple-peer-detox(options)
-		@_sign					= options.sign
-		@_packet_size			= options.packet_size
-		@_packets_per_second	= options.packets_per_second
-		@_sending				= options.initiator
+		@_sign					= options['sign']
+		@_packet_size			= options['packet_size']
+		@_packets_per_second	= options['packets_per_second']
+		@_sending				= options['initiator']
 		@'once'('connect', !~>
 			@_send_delay	= 1000 / @_packets_per_second
 			@_multiplexer	= fixed-size-multiplexer['Multiplexer'](@_packet_size, @_packet_size)
@@ -129,9 +122,6 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 					else
 						@_demultiplexer['feed'](data)
 						while @_demultiplexer['have_more_data']()
-							/**
-							 * @type {!Uint8Array}
-							 */
 							actual_data = @_demultiplexer['get_data']()
 							command		= actual_data[0]
 							if command == COMMAND_DHT
@@ -156,8 +146,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			for extension in signal['extensions']
 				if extension.startsWith('psr:')
 					array						= extension.split(':')
-					received_packet_size		= parseInt(array[1])
-					received_packets_per_second	= parseInt(array[2])
+					received_packet_size		= parseInt(array[1], 10)
+					received_packets_per_second	= parseInt(array[2], 10)
 					if received_packet_size < MIN_PACKET_SIZE || received_packets_per_second < 1
 						@'destroy'()
 						return
@@ -172,7 +162,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		/**
 		 * Data sending method that will be used by DHT
 		 *
-		 * @param {Buffer} data
+		 * @param {!Uint8Array} data
 		 */
 		..'send' = (data) !->
 			@_send_multiplex(data, COMMAND_DHT)
@@ -231,8 +221,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 	 *
 	 * @param {!Uint8Array}		dht_public_key		Ed25519 public key, temporary one, just for DHT operation
 	 * @param {!Uint8Array}		dht_private_key		Corresponding Ed25519 private key
-	 * @param {!Array<Object>}	bootstrap_nodes
-	 * @param {!Array<Object>}	ice_servers
+	 * @param {!Array<!Object>}	bootstrap_nodes
+	 * @param {!Array<!Object>}	ice_servers
 	 * @param {number}			packet_size
 	 * @param {number}			packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
 	 * @param {number}			bucket_size
@@ -314,7 +304,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			'timeout'		: PEER_CONNECTION_TIMEOUT * 1000
 			'verify'		: detox-crypto['verify']
 		)
-			..on('error', (error) !~>
+			..'on'('error', (error) !~>
 				@'fire'('error', error)
 			)
 			..'once'('ready', !~>
@@ -330,11 +320,11 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * @param {number}	port
 		 */
 		..'start_bootstrap_node' = (ip, port) !->
-			@_dht.listen(port, ip)
+			@_dht['listen'](port, ip)
 		/**
 		 * Get an array of bootstrap nodes obtained during DHT operation in the same format as `bootstrap_nodes` argument in constructor
 		 *
-		 * @return {!Array<Object>} Each element is an object with keys `host`, `port` and `node_id`
+		 * @return {!Array<!Object>} Each element is an object with keys `host`, `port` and `node_id`
 		 */
 		..'get_bootstrap_nodes' = ->
 			(
@@ -353,7 +343,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * @param {!Uint8Array} id
 		 */
 		..'lookup' = (id) !->
-			@_dht.lookup(Buffer.from(id))
+			@_dht['lookup'](Buffer.from(id))
 		/**
 		 * Tag connection to specified node ID as used, so that it is not disconnected when not used by DHT itself
 		 *
@@ -394,7 +384,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 *
 		 * @param {!Uint8Array}			real_public_key		Ed25519 public key (real one, different from supplied in DHT constructor)
 		 * @param {!Uint8Array}			real_private_key	Corresponding Ed25519 private key
-		 * @param {!Array<Uint8Array>}	introduction_nodes	Array of public keys of introduction points
+		 * @param {!Array<!Uint8Array>}	introduction_nodes	Array of public keys of introduction points
 		 *
 		 * @return {!Object}
 		 */
@@ -425,15 +415,15 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				return
 			@_dht['put'](
 				'k'		: Buffer.from(message['k'])
-				'seq'	: parseInt(message['seq'])
+				'seq'	: parseInt(message['seq'], 10)
 				'sig'	: Buffer.from(message['sig'])
 				'v'		: Buffer.from(message['v'])
 			)
 		/**
 		 * Find nodes in DHT that are acting as introduction points for specified public key
 		 *
-		 * @param {!Uint8Array}					target_public_key
-		 * @param {!found_introduction_nodes}	callback
+		 * @param {!Uint8Array}	target_public_key
+		 * @param {!Function}	callback
 		 */
 		..'find_introduction_nodes' = (target_public_key, callback) !->
 			hash	= sha3_256(target_public_key)
@@ -616,7 +606,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		/**
 		 * Construct routing path through specified nodes
 		 *
-		 * @param {!Array<Uint8Array>} nodes IDs of the nodes through which routing path must be constructed, last node in the list is responder
+		 * @param {!Array<!Uint8Array>} nodes IDs of the nodes through which routing path must be constructed, last node in the list is responder
 		 *
 		 * @return {!Promise} Will resolve with ID of the route or will be rejected if path construction fails
 		 */
@@ -636,7 +626,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				if !x25519_public_key
 					fail()
 				encryptor_instances[first_node_string]	= detox-crypto['Encryptor'](true, x25519_public_key)
-				@_ronion['on']('create_response', !~function create_response_handler (data)
+				!~function create_response_handler (data)
 					address			= data['address']
 					segment_id		= data['segment_id']
 					command_data	= data['command_data']
@@ -695,7 +685,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 						), ROUTING_PATH_SEGMENT_TIMEOUT * 1000
 						@_ronion['extend_request'](first_node, route_id, current_node, encryptor_instances[current_node_string]['get_handshake_message']())
 					extend_request()
-				)
+				@_ronion['on']('create_response', create_response_handler)
 				segment_establishment_timeout	= setTimeout (!~>
 					@_ronion['off']('create_response', create_response_handler)
 					fail()

@@ -28,7 +28,7 @@
     string = '';
     for (i$ = 0, len$ = array.length; i$ < len$; ++i$) {
       byte = array[i$];
-      string += byte.toString(16).padStart(2, 0);
+      string += byte.toString(16).padStart(2, '0');
     }
     return string;
   }
@@ -78,12 +78,6 @@
   function compute_source_id(address, segment_id){
     return address.join(',') + segment_id.join(',');
   }
-  /**
-   * @interface
-   *
-   * @param {!Array<Uint8Array>} introduction_points
-   */
-  function found_introduction_points(introduction_points){}
   function Transport(detoxCrypto, detoxDht, ronion, jsSHA, fixedSizeMultiplexer, asyncEventer){
     var bencode, simplePeer, webrtcSocket, webtorrentDht, Buffer, x$, y$, z$;
     bencode = detoxDht['bencode'];
@@ -103,10 +97,10 @@
       if (!(this instanceof simplePeerDetox)) {
         return new simplePeerDetox(options);
       }
-      this._sign = options.sign;
-      this._packet_size = options.packet_size;
-      this._packets_per_second = options.packets_per_second;
-      this._sending = options.initiator;
+      this._sign = options['sign'];
+      this._packet_size = options['packet_size'];
+      this._packets_per_second = options['packets_per_second'];
+      this._sending = options['initiator'];
       this['once']('connect', function(){
         this$._send_delay = 1000 / this$._packets_per_second;
         this$._multiplexer = fixedSizeMultiplexer['Multiplexer'](this$._packet_size, this$._packet_size);
@@ -140,9 +134,6 @@
         } else {
           this._demultiplexer['feed'](data);
           while (this._demultiplexer['have_more_data']()) {
-            /**
-             * @type {!Uint8Array}
-             */
             actual_data = this._demultiplexer['get_data']();
             command = actual_data[0];
             if (command === COMMAND_DHT) {
@@ -175,8 +166,8 @@
         extension = ref$[i$];
         if (extension.startsWith('psr:')) {
           array = extension.split(':');
-          received_packet_size = parseInt(array[1]);
-          received_packets_per_second = parseInt(array[2]);
+          received_packet_size = parseInt(array[1], 10);
+          received_packets_per_second = parseInt(array[2], 10);
           if (received_packet_size < MIN_PACKET_SIZE || received_packets_per_second < 1) {
             this['destroy']();
             return;
@@ -196,7 +187,7 @@
     /**
      * Data sending method that will be used by DHT
      *
-     * @param {Buffer} data
+     * @param {!Uint8Array} data
      */
     x$['send'] = function(data){
       this._send_multiplex(data, COMMAND_DHT);
@@ -267,8 +258,8 @@
      *
      * @param {!Uint8Array}		dht_public_key		Ed25519 public key, temporary one, just for DHT operation
      * @param {!Uint8Array}		dht_private_key		Corresponding Ed25519 private key
-     * @param {!Array<Object>}	bootstrap_nodes
-     * @param {!Array<Object>}	ice_servers
+     * @param {!Array<!Object>}	bootstrap_nodes
+     * @param {!Array<!Object>}	ice_servers
      * @param {number}			packet_size
      * @param {number}			packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
      * @param {number}			bucket_size
@@ -362,7 +353,7 @@
         'timeout': PEER_CONNECTION_TIMEOUT * 1000,
         'verify': detoxCrypto['verify']
       });
-      y$.on('error', function(error){
+      y$['on']('error', function(error){
         this$['fire']('error', error);
       });
       y$['once']('ready', function(){
@@ -378,12 +369,12 @@
      * @param {number}	port
      */
     y$['start_bootstrap_node'] = function(ip, port){
-      this._dht.listen(port, ip);
+      this._dht['listen'](port, ip);
     };
     /**
      * Get an array of bootstrap nodes obtained during DHT operation in the same format as `bootstrap_nodes` argument in constructor
      *
-     * @return {!Array<Object>} Each element is an object with keys `host`, `port` and `node_id`
+     * @return {!Array<!Object>} Each element is an object with keys `host`, `port` and `node_id`
      */
     y$['get_bootstrap_nodes'] = function(){
       var peer_connection;
@@ -408,7 +399,7 @@
      * @param {!Uint8Array} id
      */
     y$['lookup'] = function(id){
-      this._dht.lookup(Buffer.from(id));
+      this._dht['lookup'](Buffer.from(id));
     };
     /**
      * Tag connection to specified node ID as used, so that it is not disconnected when not used by DHT itself
@@ -460,7 +451,7 @@
      *
      * @param {!Uint8Array}			real_public_key		Ed25519 public key (real one, different from supplied in DHT constructor)
      * @param {!Uint8Array}			real_private_key	Corresponding Ed25519 private key
-     * @param {!Array<Uint8Array>}	introduction_nodes	Array of public keys of introduction points
+     * @param {!Array<!Uint8Array>}	introduction_nodes	Array of public keys of introduction points
      *
      * @return {!Object}
      */
@@ -496,7 +487,7 @@
       }
       this._dht['put']({
         'k': Buffer.from(message['k']),
-        'seq': parseInt(message['seq']),
+        'seq': parseInt(message['seq'], 10),
         'sig': Buffer.from(message['sig']),
         'v': Buffer.from(message['v'])
       });
@@ -504,8 +495,8 @@
     /**
      * Find nodes in DHT that are acting as introduction points for specified public key
      *
-     * @param {!Uint8Array}					target_public_key
-     * @param {!found_introduction_nodes}	callback
+     * @param {!Uint8Array}	target_public_key
+     * @param {!Function}	callback
      */
     y$['find_introduction_nodes'] = function(target_public_key, callback){
       var hash;
@@ -709,7 +700,7 @@
     /**
      * Construct routing path through specified nodes
      *
-     * @param {!Array<Uint8Array>} nodes IDs of the nodes through which routing path must be constructed, last node in the list is responder
+     * @param {!Array<!Uint8Array>} nodes IDs of the nodes through which routing path must be constructed, last node in the list is responder
      *
      * @return {!Promise} Will resolve with ID of the route or will be rejected if path construction fails
      */
@@ -732,81 +723,79 @@
           fail();
         }
         encryptor_instances[first_node_string] = detoxCrypto['Encryptor'](true, x25519_public_key);
-        this$._ronion['on']('create_response', (function(){
-          function create_response_handler(data){
-            var address, segment_id, command_data, e, current_node, current_node_string, segment_extension_timeout;
-            address = data['address'];
-            segment_id = data['segment_id'];
-            command_data = data['command_data'];
-            if (!is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)) {
+        function create_response_handler(data){
+          var address, segment_id, command_data, e, current_node, current_node_string, segment_extension_timeout;
+          address = data['address'];
+          segment_id = data['segment_id'];
+          command_data = data['command_data'];
+          if (!is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)) {
+            return;
+          }
+          clearTimeout(segment_establishment_timeout);
+          this$._ronion['off']('create_response', create_response_handler);
+          try {
+            encryptor_instances[first_node_string]['put_handshake_message'](command_data);
+          } catch (e$) {
+            e = e$;
+            fail();
+          }
+          if (!encryptor_instances[first_node_string]['ready']()) {
+            fail();
+          }
+          rewrapper_instances[first_node_string] = encryptor_instances[first_node_string]['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
+          this$._ronion['confirm_outgoing_segment_established'](first_node, route_id);
+          this$._multiplexer.set(source_id, fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
+          this$._demultiplexer.set(source_id, fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
+          function extend_request(){
+            var x25519_public_key;
+            if (!nodes.length) {
+              this$._established_routing_paths.set(source_id, [first_node, route_id]);
+              resolve(route_id);
               return;
             }
-            clearTimeout(segment_establishment_timeout);
-            this$._ronion['off']('create_response', create_response_handler);
-            try {
-              encryptor_instances[first_node_string]['put_handshake_message'](command_data);
-            } catch (e$) {
-              e = e$;
-              fail();
-            }
-            if (!encryptor_instances[first_node_string]['ready']()) {
-              fail();
-            }
-            rewrapper_instances[first_node_string] = encryptor_instances[first_node_string]['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
-            this$._ronion['confirm_outgoing_segment_established'](first_node, route_id);
-            this$._multiplexer.set(source_id, fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
-            this$._demultiplexer.set(source_id, fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
-            function extend_request(){
-              var x25519_public_key;
-              if (!nodes.length) {
-                this$._established_routing_paths.set(source_id, [first_node, route_id]);
-                resolve(route_id);
+            function extend_response_handler(data){
+              var address, segment_id, command_data, e;
+              address = data['address'];
+              segment_id = data['segment_id'];
+              command_data = data['command_data'];
+              if (!is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)) {
                 return;
               }
-              function extend_response_handler(data){
-                var address, segment_id, command_data, e;
-                address = data['address'];
-                segment_id = data['segment_id'];
-                command_data = data['command_data'];
-                if (!is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)) {
-                  return;
-                }
-                this$._ronion['off']('extend_response', extend_response_handler);
-                clearTimeout(segment_extension_timeout);
-                if (!command_data.length) {
-                  fail();
-                }
-                try {
-                  encryptor_instances[current_node_string]['put_handshake_message'](command_data);
-                } catch (e$) {
-                  e = e$;
-                  fail();
-                }
-                if (!encryptor_instances[current_node_string]['ready']()) {
-                  fail();
-                }
-                rewrapper_instances[current_node_string] = encryptor_instances[current_node_string]['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
-                this$._ronion['confirm_extended_path'](first_node, route_id);
-                extend_request();
-              }
-              this$._ronion['on']('extend_response', extend_response_handler);
-              current_node = nodes.shift();
-              current_node_string = current_node.join(',');
-              x25519_public_key = detoxCrypto['convert_public_key'](current_node);
-              if (!x25519_public_key) {
+              this$._ronion['off']('extend_response', extend_response_handler);
+              clearTimeout(segment_extension_timeout);
+              if (!command_data.length) {
                 fail();
               }
-              encryptor_instances[current_node_string] = detoxCrypto['Encryptor'](true, x25519_public_key);
-              segment_extension_timeout = setTimeout(function(){
-                this$._ronion['off']('extend_response', extend_response_handler);
+              try {
+                encryptor_instances[current_node_string]['put_handshake_message'](command_data);
+              } catch (e$) {
+                e = e$;
                 fail();
-              }, ROUTING_PATH_SEGMENT_TIMEOUT * 1000);
-              this$._ronion['extend_request'](first_node, route_id, current_node, encryptor_instances[current_node_string]['get_handshake_message']());
+              }
+              if (!encryptor_instances[current_node_string]['ready']()) {
+                fail();
+              }
+              rewrapper_instances[current_node_string] = encryptor_instances[current_node_string]['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
+              this$._ronion['confirm_extended_path'](first_node, route_id);
+              extend_request();
             }
-            extend_request();
+            this$._ronion['on']('extend_response', extend_response_handler);
+            current_node = nodes.shift();
+            current_node_string = current_node.join(',');
+            x25519_public_key = detoxCrypto['convert_public_key'](current_node);
+            if (!x25519_public_key) {
+              fail();
+            }
+            encryptor_instances[current_node_string] = detoxCrypto['Encryptor'](true, x25519_public_key);
+            segment_extension_timeout = setTimeout(function(){
+              this$._ronion['off']('extend_response', extend_response_handler);
+              fail();
+            }, ROUTING_PATH_SEGMENT_TIMEOUT * 1000);
+            this$._ronion['extend_request'](first_node, route_id, current_node, encryptor_instances[current_node_string]['get_handshake_message']());
           }
-          return create_response_handler;
-        }()));
+          extend_request();
+        }
+        this$._ronion['on']('create_response', create_response_handler);
         segment_establishment_timeout = setTimeout(function(){
           this$._ronion['off']('create_response', create_response_handler);
           fail();
