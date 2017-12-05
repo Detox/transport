@@ -192,9 +192,9 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			# Subtract from necessary delay actual amount of time already passed and make sure it is not negative
 			delay	= Math.max(0, @_send_delay - (new Date - @_last_sent))
 			setTimeout (!~>
-				if @destroyed
+				if @'destroyed'
 					return
-				simple-peer::['send'].call(@, block = @_multiplexer['get_block']())
+				simple-peer::['send'].call(@, @_multiplexer['get_block']())
 				@_sending	= false
 				@_last_sent	= +(new Date)
 			), delay
@@ -258,7 +258,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				bootstrap_nodes.forEach (bootstrap_node) ~>
 					if bootstrap_node.host != websocket_host || bootstrap_node.port != websocket_port
 						return
-					@_pending_websocket_ids.set(peer_connection, bootstrap_node.node_id)
+					@_pending_websocket_ids.set(peer_connection, bootstrap_node['node_id'])
 					peer_connection['on']('close', !~>
 						@_pending_websocket_ids.delete(peer_connection)
 					)
@@ -746,7 +746,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 					try
 						@_ronion['destroy'](address, segment_id)
 						# Let ronion send DESTROY command before destroying next segment and cleaning `Encryptor` instances
-						@_ronion.once('send', !~>
+						@_ronion['once']('send', !~>
 							destroy_segment()
 						)
 					catch

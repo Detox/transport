@@ -19,7 +19,7 @@ bootstrap_port	= 16882
 function array2hex (array)
 	string = ''
 	for byte in array
-		string += byte.toString(16).padStart(2, 0)
+		string += byte.toString(16).padStart(2, '0')
 	string
 /**
  * @param {string} string

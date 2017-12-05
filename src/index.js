@@ -221,11 +221,10 @@
       var delay, this$ = this;
       delay = Math.max(0, this._send_delay - (new Date - this._last_sent));
       setTimeout(function(){
-        var block;
-        if (this$.destroyed) {
+        if (this$['destroyed']) {
           return;
         }
-        simplePeer.prototype['send'].call(this$, block = this$._multiplexer['get_block']());
+        simplePeer.prototype['send'].call(this$, this$._multiplexer['get_block']());
         this$._sending = false;
         this$._last_sent = +new Date;
       }, delay);
@@ -302,7 +301,7 @@
           if (bootstrap_node.host !== websocket_host || bootstrap_node.port !== websocket_port) {
             return;
           }
-          this$._pending_websocket_ids.set(peer_connection, bootstrap_node.node_id);
+          this$._pending_websocket_ids.set(peer_connection, bootstrap_node['node_id']);
           return peer_connection['on']('close', function(){
             this$._pending_websocket_ids['delete'](peer_connection);
           });
@@ -870,7 +869,7 @@
           --counter;
           try {
             this$._ronion['destroy'](address, segment_id);
-            this$._ronion.once('send', function(){
+            this$._ronion['once']('send', function(){
               destroy_segment();
             });
           } catch (e$) {

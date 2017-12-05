@@ -22,7 +22,7 @@
     string = '';
     for (i$ = 0, len$ = array.length; i$ < len$; ++i$) {
       byte = array[i$];
-      string += byte.toString(16).padStart(2, 0);
+      string += byte.toString(16).padStart(2, '0');
     }
     return string;
   }
