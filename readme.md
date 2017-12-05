@@ -4,9 +4,34 @@ High-level utilities that combine under simple interfaces complexity of the tran
 Essentially provides wrapper functions and objects for:
 * DHT (based on [WebTorrent DHT](https://github.com/nazar-pc/webtorrent-dht))
 * Anonymous routing (based on [Ronion](https://github.com/nazar-pc/ronion))
-* Both of above use `@detox-crypto` for cryptographic needs
+* Both of above use `@detox/crypto` for cryptographic needs
 
-# API
+## How to install
+```
+npm install @detox/transport
+```
+
+## How to use
+NOTE: In modern versions of Node.js (4.x and higher) `Buffer` inherits `Uint8Array`, so you can pass `Buffer` directly whenever `Uint8Array` is expected.
+
+Node.js:
+```javascript
+var detox_transport = require('@detox/transport')
+
+detox_transport.ready(function () {
+    // Do stuff
+});
+```
+Browser:
+```javascript
+requirejs(['@detox/transport'], function (detox_transport) {
+    detox_transport.ready(function () {
+        // Do stuff
+    });
+})
+```
+
+## API
 ### detox_transport.ready(callback)
 * `callback` - Callback function that is called when library is ready for use
 

@@ -5,9 +5,10 @@
 		"detox",
 		"transport",
 		"dht",
-		"routing"
+		"routing",
+		"anonymous"
 	],
-	"version"         : "",
+	"version"         : "0.1.0",
 	"homepage"        : "https://github.com/Detox/detox-transport",
 	"author"          : {
 		"name"  : "Nazar Mokrynskyi",
