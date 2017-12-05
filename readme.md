@@ -2,10 +2,102 @@
 High-level utilities that combine under simple interfaces complexity of the transport layer used in Detox project.
 
 Essentially provides wrapper functions and objects for:
-* DHT
-* Anonymous routing
+* DHT (based on WebTorrent DHT)
+* Anonymous routing (based on Ronion)
+* Both of above use `@detox-crypto` for cryptographic needs
 
-WIP, don't use for any purposes yet.
+# API
+### detox_transport.ready(callback)
+* `callback` - Callback function that is called when library is ready for use
+
+### detox_transport.DHT(dht_public_key : Uint8Array, dht_private_key : Uint8Array, bootstrap_nodes : Object[], ice_servers : Object[], packet_size : number, packets_per_second : number, bucket_size = 2 : number)
+Constructor for DHT object.
+
+* `dht_public_key` and `dht_private_key` - are Ed25519 keypair as in `@detox/crypto` used to represent node itself in DHT network, typically temporary
+* `bootstrap_nodes` - array of objects with keys (all of them are required) `node_id` (`dht_public_key` of corresponding node), `host` and `ip`
+* `ice_servers` - array of objects as `config.iceServers` in [simple-peer constructor](https://github.com/feross/simple-peer#peer--new-simplepeeropts)
+* `packet_size` - data are always sent over the network in packets of this fixed size
+* `packets_per_second` - packets are sent at constant rate (which together with `packet_size` can be used to identify bandwidth requirements for specific connection)
+* `bucket_size` - size of the bucket used in DHT internals (directly affects number of active WebRTC connections)
+
+### detox_transport.DHT.start_bootstrap_node(ip : string, port : number)
+Start bootstrap server (WebSocket) listening on specified IP and port.
+
+### detox_transport.DHT.get_bootstrap_nodes() : Object
+Returns array of collected bootstrap nodes obtained during DHT operation in the same format as `bootstrap_nodes` argument in constructor.
+
+### detox_transport.DHT.lookup(id : Uint8Array)
+Start lookup for specified node ID (listen for `node_connected` in order to know when interested node was connected).
+
+### detox_transport.DHT.add_used_tag(id : Uint8Array)
+Tag connection to specified node ID as used, so that it is not disconnected when not used by DHT itself.
+
+### detox_transport.DHT.del_used_tag(id : Uint8Array)
+Remove tag from connection, so that it can be disconnected if not needed by DHT anymore.
+
+### detox_transport.DHT.send_data(id : Uint8Array, data : Uint8Array)
+Send data to specified node ID.
+
+### detox_transport.DHT.generate_introduction_message(real_public_key : Uint8Array, real_private_key : Uint8Array, introduction_nodes : Uint8Array[]) : Object
+Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity).
+
+Introduction message that contains a list of introduction nodes that can be used to contact user of real long-term keypair.
+
+`dht_public_key` and `dht_private_key` are Ed25519 keypair as in `@detox/crypto` that is typically different from DHT keypair and is used as real long-term keypair.
+`introduction_nodes` is a list of nodes IDs (`dht_public_key` of corresponding nodes).
+
+### detox_transport.DHT.publish_introduction_message(message : Object)
+Publish message with introduction nodes (typically happens on different node than `generate_introduction_message()`)
+
+### detox_transport.DHT.find_introduction_nodes(target_public_key : Uint8Array, callback : Function)
+Find nodes in DHT that are acting as introduction points for specified public key.
+
+### detox_transport.DHT.destroy(callback : Function)
+Stop WebSocket server if running, close all active WebRTC connections.
+
+### detox_transport.DHT.on(event: string, callback: Function) : detox_transport.DHT
+Register event handler.
+
+### detox_transport.DHT.once(event: string, callback: Function) : detox_transport.DHT
+Register one-time event handler (just `on()` + `off()` under the hood).
+
+### detox_transport.DHT.off(event: string[, callback: Function]) : detox_transport.DHT
+Unregister event handler.
+
+### Event: node_connected
+Payload is single `Uint8Array` argument `id`.
+Event is fired when new remote node is connected to our DHT instance.
+
+### Event: node_disconnected
+Payload is single `Uint8Array` argument `id`.
+Event is fired when new remote node is disconnected to our DHT instance.
+
+### Event: node_tagged
+Payload is single `Uint8Array` argument `id`.
+Event is fired when new remote node tagged connection as used using `add_used_tag()` method.
+
+### Event: node_untagged
+Payload is single `Uint8Array` argument `id`.
+Event is fired when new remote node untagged connection as used using `del_used_tag()` method.
+
+### Event: data
+Payload consists of two `Uint8Array` arguments: `id` and `data`.
+Event is fired when new remote node have sent data using `send_data()` method.
+
+### Event: ready
+No payload.
+Event is fired when DHT instance is ready to be used.
+
+### Event: error
+Payload is single argument `error`.
+Event is fired when errors occur in underlying DHT implementation.
+
+TODO: Router API
+
+## Contribution
+Feel free to create issues and send pull requests (for big changes create an issue first and link it from the PR), they are highly appreciated!
+
+When reading LiveScript code make sure to configure 1 tab to be 4 spaces (GitHub uses 8 by default), otherwise code might be hard to read.
 
 ## License
 MIT, see license.txt

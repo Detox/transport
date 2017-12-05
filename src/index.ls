@@ -231,7 +231,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 	 *
 	 * @param {!Uint8Array}		dht_public_key		Ed25519 public key, temporary one, just for DHT operation
 	 * @param {!Uint8Array}		dht_private_key		Corresponding Ed25519 private key
-	 * @param {!Array<string>}	bootstrap_nodes
+	 * @param {!Array<Object>}	bootstrap_nodes
 	 * @param {!Array<Object>}	ice_servers
 	 * @param {number}			packet_size
 	 * @param {number}			packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
@@ -326,13 +326,13 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		/**
 		 * Start WebSocket server listening on specified ip:port, so that current node will be capable of acting as bootstrap node for other users
 		 *
-		 * @param {number}	port
 		 * @param {string}	ip
+		 * @param {number}	port
 		 */
-		..'start_bootstrap_node' = (port, ip) !->
+		..'start_bootstrap_node' = (ip, port) !->
 			@_dht.listen(port, ip)
 		/**
-		 * Get an array of bootstrap nodes
+		 * Get an array of bootstrap nodes obtained during DHT operation in the same format as `bootstrap_nodes` argument in constructor
 		 *
 		 * @return {!Array<Object>} Each element is an object with keys `host`, `port` and `node_id`
 		 */
@@ -450,6 +450,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				callback(introduction_nodes)
 			)
 		/**
+		 * Stop WebSocket server if running, close all active WebRTC connections
+		 *
 		 * @param {Function} callback
 		 */
 		..'destroy' = (callback) !->

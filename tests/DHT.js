@@ -50,7 +50,7 @@
       node_2_dht = detoxCrypto.create_keypair(hex2array('910e5d834e32835d427ca4507c4a6a6c1715fd7cbd290cda8d4c1aa90d0f251d'));
       node_3_dht = detoxCrypto.create_keypair(hex2array('7be95d9a4aecf3d353a5a9264b0c76497d977393d2b549f3cec51837f3b528e0'));
       bootstrap_node_instance = lib.DHT(bootstrap_node_dht.ed25519['public'], bootstrap_node_dht.ed25519['private'], [], [], 1024, 5, 2);
-      bootstrap_node_instance.start_bootstrap_node(bootstrap_port, bootstrap_ip);
+      bootstrap_node_instance.start_bootstrap_node(bootstrap_ip, bootstrap_port);
       bootstrap_node_info = {
         node_id: array2hex(bootstrap_node_dht.ed25519['public']),
         host: bootstrap_ip,
