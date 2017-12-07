@@ -551,7 +551,7 @@
         throw new Error('Minimal supported packet size is ' + MIN_PACKET_SIZE);
       }
       asyncEventer.call(this);
-      packet_size = packet_size - 2;
+      packet_size = packet_size - 3;
       this._encryptor_instances = new Map;
       this._rewrapper_instances = new Map;
       this._last_node_in_routing_path = new Map;

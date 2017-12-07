@@ -465,8 +465,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		if packet_size < MIN_PACKET_SIZE
 			throw new Error('Minimal supported packet size is ' + MIN_PACKET_SIZE)
 		async-eventer.call(@)
-		# Should be 2 bytes smaller than `packet_size` for DHT because it will be later sent through DHT's peer connection
-		packet_size					= packet_size - 2
+		# Should be smaller than `packet_size` for DHT because it will be later sent through DHT's peer connection (2 bytes for multiplexer and 1 for command)
+		packet_size					= packet_size - 3
 		@_encryptor_instances		= new Map
 		@_rewrapper_instances		= new Map
 		@_last_node_in_routing_path	= new Map
