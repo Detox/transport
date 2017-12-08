@@ -74,7 +74,7 @@ Introduction message that contains a list of introduction nodes that can be used
 ### detox_transport.DHT.publish_introduction_message(message : Object)
 Publish message with introduction nodes (typically happens on different node than `generate_introduction_message()`)
 
-### detox_transport.DHT.find_introduction_nodes(target_public_key : Uint8Array, callback : Function)
+### detox_transport.DHT.find_introduction_nodes(target_public_key : Uint8Array, success_callback : Function, failure_callback : Function)
 Find nodes in DHT that are acting as introduction points for specified public key.
 
 ### detox_transport.DHT.destroy(callback : Function)

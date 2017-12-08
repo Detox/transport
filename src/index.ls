@@ -423,13 +423,15 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * Find nodes in DHT that are acting as introduction points for specified public key
 		 *
 		 * @param {!Uint8Array}	target_public_key
-		 * @param {!Function}	callback
+		 * @param {!Function}	success_callback
+		 * @param {!Function}	failure_callback
 		 */
-		..'find_introduction_nodes' = (target_public_key, callback) !->
+		..'find_introduction_nodes' = (target_public_key, success_callback, failure_callback) !->
 			hash	= sha3_256(target_public_key)
 			@_dht['get'](hash, (, result) !->
 				if !result || !result['v']
 					# Nothing was found
+					failure_callback()
 					return
 				introduction_nodes_bulk	= Uint8Array.from(result['v'])
 				introduction_nodes		= []
@@ -437,7 +439,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 					return
 				for i from 0 til introduction_nodes_bulk.length / PUBLIC_KEY_LENGTH
 					introduction_nodes.push(introduction_nodes_bulk.subarray(i * PUBLIC_KEY_LENGTH, (i + 1) * PUBLIC_KEY_LENGTH))
-				callback(introduction_nodes)
+				success_callback(introduction_nodes)
 			)
 		/**
 		 * Stop WebSocket server if running, close all active WebRTC connections

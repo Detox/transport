@@ -495,14 +495,16 @@
      * Find nodes in DHT that are acting as introduction points for specified public key
      *
      * @param {!Uint8Array}	target_public_key
-     * @param {!Function}	callback
+     * @param {!Function}	success_callback
+     * @param {!Function}	failure_callback
      */
-    y$['find_introduction_nodes'] = function(target_public_key, callback){
+    y$['find_introduction_nodes'] = function(target_public_key, success_callback, failure_callback){
       var hash;
       hash = sha3_256(target_public_key);
       this._dht['get'](hash, function(arg$, result){
         var introduction_nodes_bulk, introduction_nodes, i$, to$, i;
         if (!result || !result['v']) {
+          failure_callback();
           return;
         }
         introduction_nodes_bulk = Uint8Array.from(result['v']);
@@ -514,7 +516,7 @@
           i = i$;
           introduction_nodes.push(introduction_nodes_bulk.subarray(i * PUBLIC_KEY_LENGTH, (i + 1) * PUBLIC_KEY_LENGTH));
         }
-        callback(introduction_nodes);
+        success_callback(introduction_nodes);
       });
     };
     /**
