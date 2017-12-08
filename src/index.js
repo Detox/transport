@@ -591,10 +591,7 @@
         this$._rewrapper_instances.set(source_id, rewrapper_instances);
         this$._last_node_in_routing_path.set(source_id, address);
       })['on']('send', function(data){
-        this$['fire']('send', {
-          'node_id': data['address'],
-          'packet': data['packet']
-        });
+        this$['fire']('send', data['address'], data['packet']);
       })['on']('data', function(data){
         var address, segment_id, target_address, command_data, source_id, last_node_in_routing_path, demultiplexer;
         address = data['address'];
@@ -613,21 +610,14 @@
         demultiplexer['feed'](command_data);
         if (demultiplexer['have_more_data']()) {
           data = demultiplexer['get_data']();
-          this$['fire']('data', {
-            'node_id': address,
-            'route_id': segment_id,
-            'data': data
-          });
+          this$['fire']('data', address, segment_id, data);
         }
       })['on']('destroy', function(data){
         var address, segment_id;
         address = data['address'];
         segment_id = data['segment_id'];
         this$._destroy_routing_path(address, segment_id);
-        this$['fire']('destroyed', {
-          'node_id': address,
-          'route_id': segment_id
-        });
+        this$['fire']('destroyed', address, segment_id);
       })['on']('encrypt', function(data){
         var address, segment_id, target_address, plaintext, source_id, target_address_string, encryptor_instance, ref$;
         address = data['address'];

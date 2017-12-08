@@ -70,7 +70,7 @@ test('Router', (t) !->
 	global.node_5_instance = node_5_instance
 
 	for let node in Object.values(nodes)
-		node.on('send', ({node_id, packet}) !->
+		node.on('send', (node_id, packet) !->
 			nodes[array2hex(node_id)].process_packet(node._public_key, packet)
 		)
 
@@ -91,11 +91,11 @@ test('Router', (t) !->
 
 					t.pass('Routing path created without errors #2 (5-3-4-2-1)')
 
-					node_4_instance.once('data', ({node_id, route_id, data : received_data}) !->
+					node_4_instance.once('data', (node_id, route_id, received_data) !->
 						t.equal(array2hex(node_id), array2hex(node_3.ed25519.public), 'Message from node 1 appears like it is coming from node 3')
 						t.equal(array2hex(data), array2hex(received_data), 'Data received correctly')
 
-						node_1_instance.once('data', ({node_id, route_id, data : received_data})!->
+						node_1_instance.once('data', (node_id, route_id, received_data)!->
 							t.equal(array2hex(node_id), array2hex(path_1.node_id), 'Message to node 1 appears like it is coming from node 2')
 							t.equal(array2hex(data), array2hex(received_data), 'Data received correctly')
 

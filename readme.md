@@ -160,24 +160,15 @@ Register one-time event handler (just `on()` + `off()` under the hood).
 Unregister event handler.
 
 ### Event: send
-Payload object (all properties are `Uint8Array`):
-```javascript
-{node_id, packet}
-```
+Payload consists of two `Uint8Array` arguments: `node_id` and `packet`.
 Event is fired when `packet` needs to be sent to `node_id` node.
 
 ### Event: data
-Payload object (all properties are `Uint8Array`):
-```javascript
-{node_id, route_id, data}
-```
+Payload consists of three `Uint8Array` arguments: `node_id`, `route_id` and `data`.
 Event is fired when `data` were received from the responder on routing path with started at `node_id` with `route_id`.
 
 ### Event: destroyed
-Payload object (all properties are `Uint8Array`):
-```javascript
-{node_id, route_id}
-```
+Payload consists of two `Uint8Array` arguments: `node_id` and `route_id`.
 Event is fired when routing path started at `node_id` with `route_id` was destroyed (initiated by another side).
 
 ## Contribution

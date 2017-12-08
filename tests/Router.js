@@ -84,14 +84,10 @@
             route_id: route_id
           };
           t.pass('Routing path created without errors #2 (5-3-4-2-1)');
-          node_4_instance.once('data', function(arg$){
-            var node_id, route_id, received_data;
-            node_id = arg$.node_id, route_id = arg$.route_id, received_data = arg$.data;
+          node_4_instance.once('data', function(node_id, route_id, received_data){
             t.equal(array2hex(node_id), array2hex(node_3.ed25519['public']), 'Message from node 1 appears like it is coming from node 3');
             t.equal(array2hex(data), array2hex(received_data), 'Data received correctly');
-            node_1_instance.once('data', function(arg$){
-              var node_id, route_id, received_data;
-              node_id = arg$.node_id, route_id = arg$.route_id, received_data = arg$.data;
+            node_1_instance.once('data', function(node_id, route_id, received_data){
               t.equal(array2hex(node_id), array2hex(path_1.node_id), 'Message to node 1 appears like it is coming from node 2');
               t.equal(array2hex(data), array2hex(received_data), 'Data received correctly');
               node_4_instance.once('destroyed', function(){
@@ -117,9 +113,7 @@
         t.fail('Routing path created without errors #1 (1-2-3-4)');
       });
       function fn$(node){
-        node.on('send', function(arg$){
-          var node_id, packet;
-          node_id = arg$.node_id, packet = arg$.packet;
+        node.on('send', function(node_id, packet){
           nodes[array2hex(node_id)].process_packet(node._public_key, packet);
         });
       }
