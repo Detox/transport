@@ -34,7 +34,7 @@ function hex2array (string)
 
 <-! lib.ready
 test('DHT', (t) !->
-	t.plan(15)
+	t.plan(16)
 
 	bootstrap_node_dht	= detox-crypto.create_keypair(hex2array('561401dff7921304e6c266639cc6a37a14c1600f9928dbf9afc99a61f0732d43')) # ec63345e65cd1efa50816bf91d79e0e2302be7ddb4412b885cc69efe9a3b9e50
 	node_1_dht			= detox-crypto.create_keypair(hex2array('4b39c9e51f2b644fd0678769cc53069e9c1a93984bbffd7f0fbca2375c08b815')) # ea977ae216d9de56a85a67f6a10cfd9e67d2b4ddb099892e0df937fa31c02ec0
@@ -96,8 +96,9 @@ test('DHT', (t) !->
 					node_2_instance.once('node_tagged', (id) !->
 						t.equal(array2hex(id), array2hex(node_1_dht.ed25519.public), 'Remote node tagged connection')
 
-						node_2_instance.once('data', (id, data) !->
+						node_2_instance.once('data', (id, command, data) !->
 							t.equal(array2hex(id), array2hex(node_1_dht.ed25519.public), 'Received data from correct source')
+							t.equal(command, 0, 'Received command is correct')
 							t.equal(array2hex(data), array2hex(node_1_real.ed25519.public), 'Received correct data')
 
 							node_2_instance.once('node_untagged', (id) !->
@@ -121,7 +122,7 @@ test('DHT', (t) !->
 
 							node_1_instance.del_used_tag(node_2_dht.ed25519.public)
 						)
-						node_1_instance.send_data(node_2_dht.ed25519.public, node_1_real.ed25519.public)
+						node_1_instance.send_data(node_2_dht.ed25519.public, 0, node_1_real.ed25519.public)
 					)
 					node_1_instance.add_used_tag(node_2_dht.ed25519.public)
 				)

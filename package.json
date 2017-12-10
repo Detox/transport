@@ -8,7 +8,7 @@
 		"routing",
 		"anonymous"
 	],
-	"version"         : "0.4.0",
+	"version"         : "0.5.0",
 	"homepage"        : "https://github.com/Detox/detox-transport",
 	"author"          : {
 		"name"  : "Nazar Mokrynskyi",

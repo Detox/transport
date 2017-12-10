@@ -43,7 +43,7 @@
   lib.ready(function(){
     test('DHT', function(t){
       var bootstrap_node_dht, node_1_dht, node_1_real, node_2_dht, node_3_dht, bootstrap_node_instance, bootstrap_node_info, node_1_instance, node_2_instance, node_3_instance, wait_for;
-      t.plan(15);
+      t.plan(16);
       bootstrap_node_dht = detoxCrypto.create_keypair(hex2array('561401dff7921304e6c266639cc6a37a14c1600f9928dbf9afc99a61f0732d43'));
       node_1_dht = detoxCrypto.create_keypair(hex2array('4b39c9e51f2b644fd0678769cc53069e9c1a93984bbffd7f0fbca2375c08b815'));
       node_1_real = detoxCrypto.create_keypair(hex2array('cefed82d3c4e04af9c8ca516db37b48a09f602a7f11c565dc6707cfe2fa3373d'));
@@ -92,8 +92,9 @@
               t.deepEqual(introduction_nodes_received, introduction_nodes, 'Introduction nodes found successfully');
               node_2_instance.once('node_tagged', function(id){
                 t.equal(array2hex(id), array2hex(node_1_dht.ed25519['public']), 'Remote node tagged connection');
-                node_2_instance.once('data', function(id, data){
+                node_2_instance.once('data', function(id, command, data){
                   t.equal(array2hex(id), array2hex(node_1_dht.ed25519['public']), 'Received data from correct source');
+                  t.equal(command, 0, 'Received command is correct');
                   t.equal(array2hex(data), array2hex(node_1_real.ed25519['public']), 'Received correct data');
                   node_2_instance.once('node_untagged', function(id){
                     t.equal(array2hex(id), array2hex(node_1_dht.ed25519['public']), 'Remote node untagged connection');
@@ -113,7 +114,7 @@
                   });
                   node_1_instance.del_used_tag(node_2_dht.ed25519['public']);
                 });
-                node_1_instance.send_data(node_2_dht.ed25519['public'], node_1_real.ed25519['public']);
+                node_1_instance.send_data(node_2_dht.ed25519['public'], 0, node_1_real.ed25519['public']);
               });
               node_1_instance.add_used_tag(node_2_dht.ed25519['public']);
             });

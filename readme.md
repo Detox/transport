@@ -60,8 +60,10 @@ Tag connection to specified node ID as used, so that it is not disconnected when
 ### detox_transport.DHT.del_used_tag(id : Uint8Array)
 Remove tag from connection, so that it can be disconnected if not needed by DHT anymore.
 
-### detox_transport.DHT.send_data(id : Uint8Array, data : Uint8Array)
+### detox_transport.DHT.send_data(id : Uint8Array, command : number, data : Uint8Array)
 Send data to specified node ID.
+
+`command` can be any number from the range `0..245`.
 
 ### detox_transport.DHT.generate_introduction_message(real_public_key : Uint8Array, real_private_key : Uint8Array, introduction_nodes : Uint8Array[]) : Object
 Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity).
@@ -106,7 +108,7 @@ Payload is single `Uint8Array` argument `id`.
 Event is fired when new remote node untagged connection as used using `del_used_tag()` method.
 
 ### Event: data
-Payload consists of two `Uint8Array` arguments: `id` and `data`.
+Payload consists of three arguments: `id` (`Uint8Array`), `command` (`number`) and `data` (`Uint8Array`).
 Event is fired when new remote node have sent data using `send_data()` method.
 
 ### Event: ready

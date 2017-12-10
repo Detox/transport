@@ -6,11 +6,11 @@
  * @license   MIT License, see license.txt
  */
 (function(){
-  var COMMAND_DHT, COMMAND_DATA, COMMAND_TAG, COMMAND_UNTAG, ROUTING_PROTOCOL_VERSION, PUBLIC_KEY_LENGTH, MAC_LENGTH, MIN_PACKET_SIZE, ROUTING_PATH_SEGMENT_TIMEOUT, MAX_DATA_SIZE, PEER_CONNECTION_TIMEOUT;
+  var COMMAND_DHT, COMMAND_TAG, COMMAND_UNTAG, COMMAND_RANGE_RESERVED_TILL, ROUTING_PROTOCOL_VERSION, PUBLIC_KEY_LENGTH, MAC_LENGTH, MIN_PACKET_SIZE, ROUTING_PATH_SEGMENT_TIMEOUT, MAX_DATA_SIZE, PEER_CONNECTION_TIMEOUT;
   COMMAND_DHT = 0;
-  COMMAND_DATA = 1;
-  COMMAND_TAG = 2;
-  COMMAND_UNTAG = 3;
+  COMMAND_TAG = 1;
+  COMMAND_UNTAG = 2;
+  COMMAND_RANGE_RESERVED_TILL = 10;
   ROUTING_PROTOCOL_VERSION = 0;
   PUBLIC_KEY_LENGTH = 32;
   MAC_LENGTH = 16;
@@ -139,7 +139,7 @@
             if (command === COMMAND_DHT) {
               simplePeer.prototype['emit'].call(this, 'data', Buffer.from(actual_data.subarray(1)));
             } else {
-              simplePeer.prototype['emit'].call(this, 'routing_data', command, actual_data.subarray(1));
+              simplePeer.prototype['emit'].call(this, 'custom_data', command, actual_data.subarray(1));
             }
           }
           this._sending = true;
@@ -323,7 +323,7 @@
           peer_connection['destroy']();
           return;
         }
-        peer_connection['on']('routing_data', function(command, data){
+        peer_connection['on']('custom_data', function(command, data){
           switch (command) {
           case COMMAND_TAG:
             this$._socket['add_tag'](string_id, 'detox-responder');
@@ -333,8 +333,11 @@
             this$._socket['del_tag'](string_id, 'detox-responder');
             this$['fire']('node_untagged', id);
             break;
-          case COMMAND_DATA:
-            this$['fire']('data', id, data);
+          default:
+            if (command < COMMAND_RANGE_RESERVED_TILL) {
+              return;
+            }
+            this$['fire']('data', id, command - COMMAND_RANGE_RESERVED_TILL, data);
           }
         });
         this$['fire']('node_connected', id);
@@ -431,10 +434,11 @@
     /**
      * Send data to specified node ID
      *
-     * @param {!Uint8Array} id
-     * @param {!Uint8Array} data
+     * @param {!Uint8Array}	id
+     * @param {number}		command	0..245
+     * @param {!Uint8Array}	data
      */
-    y$['send_data'] = function(id, data){
+    y$['send_data'] = function(id, command, data){
       var string_id, peer_connection;
       if (data.length > this._packet_size) {
         return;
@@ -442,7 +446,7 @@
       string_id = array2hex(id);
       peer_connection = this._socket['get_id_mapping'](string_id);
       if (peer_connection) {
-        peer_connection._send_routing_data(data, COMMAND_DATA);
+        peer_connection._send_routing_data(data, command + COMMAND_RANGE_RESERVED_TILL);
       }
     };
     /**

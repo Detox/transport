@@ -4,10 +4,10 @@
  * @copyright Copyright (c) 2017, Nazar Mokrynskyi
  * @license   MIT License, see license.txt
  */
-const COMMAND_DHT	= 0
-const COMMAND_DATA	= 1
-const COMMAND_TAG	= 2
-const COMMAND_UNTAG	= 3
+const COMMAND_DHT					= 0
+const COMMAND_TAG					= 1
+const COMMAND_UNTAG					= 2
+const COMMAND_RANGE_RESERVED_TILL	= 10 # 3..9 are also reserved for future use, everything above is available for user
 
 const ROUTING_PROTOCOL_VERSION		= 0
 # Length of Ed25519 public key in bytes
@@ -127,7 +127,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 							if command == COMMAND_DHT
 								simple-peer::['emit'].call(@, 'data', Buffer.from(actual_data.subarray(1)))
 							else
-								simple-peer::['emit'].call(@, 'routing_data', command, actual_data.subarray(1))
+								simple-peer::['emit'].call(@, 'custom_data', command, actual_data.subarray(1))
 						@_sending	= true
 						@_real_send()
 				else
@@ -278,7 +278,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 					# Drop connection if node failed to sign SDP with its public message
 					peer_connection['destroy']()
 					return
-				peer_connection['on']('routing_data', (command, data) !~>
+				peer_connection['on']('custom_data', (command, data) !~>
 					switch command
 						case COMMAND_TAG
 							@_socket['add_tag'](string_id, 'detox-responder')
@@ -286,8 +286,10 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 						case COMMAND_UNTAG
 							@_socket['del_tag'](string_id, 'detox-responder')
 							@'fire'('node_untagged', id)
-						case COMMAND_DATA
-							@'fire'('data', id, data)
+						else
+							if command < COMMAND_RANGE_RESERVED_TILL
+								return
+							@'fire'('data', id, command - COMMAND_RANGE_RESERVED_TILL, data)
 				)
 				@'fire'('node_connected', id)
 			)
@@ -369,16 +371,17 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		/**
 		 * Send data to specified node ID
 		 *
-		 * @param {!Uint8Array} id
-		 * @param {!Uint8Array} data
+		 * @param {!Uint8Array}	id
+		 * @param {number}		command	0..245
+		 * @param {!Uint8Array}	data
 		 */
-		..'send_data' = (id, data) !->
+		..'send_data' = (id, command, data) !->
 			if data.length > @_packet_size
 				return
 			string_id		= array2hex(id)
 			peer_connection	= @_socket['get_id_mapping'](string_id)
 			if peer_connection
-				peer_connection._send_routing_data(data, COMMAND_DATA)
+				peer_connection._send_routing_data(data, command + COMMAND_RANGE_RESERVED_TILL)
 		/**
 		 * Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity)
 		 *
