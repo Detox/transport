@@ -18,8 +18,8 @@ const MAC_LENGTH					= 16
 const MIN_PACKET_SIZE				= 256
 # Max time in seconds allowed for routing path segment creation after which creation is considered failed
 const ROUTING_PATH_SEGMENT_TIMEOUT	= 10
-# 16 MiB is a reasonable size limit for text data, bigger data can be multiplexed on higher level if necessary
-const MAX_DATA_SIZE					= 2 ** 24 - 1
+# 65 KiB is what is necessary for DHT messages and will also be necessary for routing data, bigger data will be multiplexed on higher levels when necessary
+const MAX_DATA_SIZE					= 2 ** 16 - 1
 # Same as in webtorrent-dht
 const PEER_CONNECTION_TIMEOUT		= 30
 
@@ -92,8 +92,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		@_sending				= options['initiator']
 		@'once'('connect', !~>
 			@_send_delay	= 1000 / @_packets_per_second
-			@_multiplexer	= fixed-size-multiplexer['Multiplexer'](@_packet_size, @_packet_size)
-			@_demultiplexer	= fixed-size-multiplexer['Demultiplexer'](@_packet_size, @_packet_size)
+			@_multiplexer	= fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, @_packet_size)
+			@_demultiplexer	= fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, @_packet_size)
 			@_last_sent		= +(new Date)
 			if @_sending
 				@_real_send()

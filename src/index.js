@@ -16,7 +16,7 @@
   MAC_LENGTH = 16;
   MIN_PACKET_SIZE = 256;
   ROUTING_PATH_SEGMENT_TIMEOUT = 10;
-  MAX_DATA_SIZE = Math.pow(2, 24) - 1;
+  MAX_DATA_SIZE = Math.pow(2, 16) - 1;
   PEER_CONNECTION_TIMEOUT = 30;
   /**
    * @param {!Uint8Array} array
@@ -103,8 +103,8 @@
       this._sending = options['initiator'];
       this['once']('connect', function(){
         this$._send_delay = 1000 / this$._packets_per_second;
-        this$._multiplexer = fixedSizeMultiplexer['Multiplexer'](this$._packet_size, this$._packet_size);
-        this$._demultiplexer = fixedSizeMultiplexer['Demultiplexer'](this$._packet_size, this$._packet_size);
+        this$._multiplexer = fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, this$._packet_size);
+        this$._demultiplexer = fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, this$._packet_size);
         this$._last_sent = +new Date;
         if (this$._sending) {
           this$._real_send();
