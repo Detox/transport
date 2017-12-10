@@ -755,9 +755,10 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			destroy_segment()
 	Object.defineProperty(Router::, 'constructor', {enumerable: false, value: Router})
 	{
-		'ready'		: detox-crypto['ready']
-		'DHT'		: DHT
-		'Router'	: Router
+		'ready'			: detox-crypto['ready']
+		'DHT'			: DHT
+		'Router'		: Router
+		'MAX_DATA_SIZE'	: MAX_DATA_SIZE
 	}
 
 if typeof define == 'function' && define['amd']

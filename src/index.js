@@ -890,7 +890,8 @@
     return {
       'ready': detoxCrypto['ready'],
       'DHT': DHT,
-      'Router': Router
+      'Router': Router,
+      'MAX_DATA_SIZE': MAX_DATA_SIZE
     };
   }
   if (typeof define === 'function' && define['amd']) {

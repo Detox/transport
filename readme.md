@@ -171,6 +171,9 @@ Event is fired when `data` were received from the responder on routing path with
 Payload consists of two `Uint8Array` arguments: `node_id` and `route_id`.
 Event is fired when routing path started at `node_id` with `route_id` was destroyed (initiated by another side).
 
+### detox_transport.MAX_DATA_SIZE : number
+Constant that defines max data size supported for sending by DHT and Router.
+
 ## Contribution
 Feel free to create issues and send pull requests (for big changes create an issue first and link it from the PR), they are highly appreciated!
 
