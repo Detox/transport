@@ -32,7 +32,7 @@ function hex2array (string)
 
 <-! lib.ready
 test('Router', (t) !->
-	t.plan(10)
+	t.plan(12)
 
 	data	= crypto.randomBytes(1000)
 	node_1	= detox-crypto.create_keypair(hex2array('4b39c9e51f2b644fd0678769cc53069e9c1a93984bbffd7f0fbca2375c08b815')) # ea977ae216d9de56a85a67f6a10cfd9e67d2b4ddb099892e0df937fa31c02ec0
@@ -91,12 +91,14 @@ test('Router', (t) !->
 
 					t.pass('Routing path created without errors #2 (5-3-4-2-1)')
 
-					node_4_instance.once('data', (node_id, route_id, received_data) !->
+					node_4_instance.once('data', (node_id, route_id, command, received_data) !->
 						t.equal(array2hex(node_id), array2hex(node_3.ed25519.public), 'Message from node 1 appears like it is coming from node 3')
+						t.equal(command, 1, 'Command received correctly')
 						t.equal(array2hex(data), array2hex(received_data), 'Data received correctly')
 
-						node_1_instance.once('data', (node_id, route_id, received_data)!->
+						node_1_instance.once('data', (node_id, route_id, command, received_data)!->
 							t.equal(array2hex(node_id), array2hex(path_1.node_id), 'Message to node 1 appears like it is coming from node 2')
+							t.equal(command, 2, 'Command received correctly')
 							t.equal(array2hex(data), array2hex(received_data), 'Data received correctly')
 
 							node_4_instance.once('destroyed', !->
@@ -114,10 +116,10 @@ test('Router', (t) !->
 							node_1_instance.destroy_routing_path(path_1.node_id, path_1.route_id)
 						)
 
-						node_4_instance.send_data(node_id, route_id, data)
+						node_4_instance.send_data(node_id, route_id, 2, data)
 					)
 
-					node_1_instance.send_data(path_1.node_id, path_1.route_id, data)
+					node_1_instance.send_data(path_1.node_id, path_1.route_id, 1, data)
 				.catch (error) !->
 					console.error error
 					t.fail('Routing path created without errors #2 (5-3-4-2-1)')

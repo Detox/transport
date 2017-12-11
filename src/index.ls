@@ -510,7 +510,6 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				@'fire'('send', address, packet)
 			)
 			.'on'('data', (address, segment_id, target_address, command, command_data) !~>
-				# TODO: handle `command`
 				source_id					= compute_source_id(address, segment_id)
 				last_node_in_routing_path	= @_last_node_in_routing_path.get(source_id)
 				if target_address.join(',') != last_node_in_routing_path.join(',')
@@ -523,7 +522,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				# Data are always more or equal to block size, so no need to do `while` loop
 				if demultiplexer['have_more_data']()
 					data	= demultiplexer['get_data']()
-					@'fire'('data', address, segment_id, data)
+					@'fire'('data', address, segment_id, command, data)
 			)
 			.'on'('destroy', (address, segment_id) !~>
 				@_destroy_routing_path(address, segment_id)
@@ -688,11 +687,12 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		/**
 		 * Send data to the responder on specified routing path
 		 *
-		 * @param {!Uint8Array} node_id		First node in routing path
-		 * @param {!Uint8Array} route_id	Identifier returned during routing path construction
-		 * @param {!Uint8Array} data
+		 * @param {!Uint8Array}	node_id		First node in routing path
+		 * @param {!Uint8Array}	route_id	Identifier returned during routing path construction
+		 * @param {number}		command		Command from range `0..245`
+		 * @param {!Uint8Array}	data
 		 */
-		..'send_data' = (node_id, route_id, data) !->
+		..'send_data' = (node_id, route_id, command, data) !->
 			if data.length > MAX_DATA_SIZE
 				return
 			source_id		= compute_source_id(node_id, route_id)
@@ -703,8 +703,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			multiplexer['feed'](data)
 			while multiplexer['have_more_blocks']()
 				data_block	= multiplexer['get_block']()
-				# TODO: actual command instead of `0` here
-				@_ronion['data'](node_id, route_id, target_address, 0, data_block)
+				@_ronion['data'](node_id, route_id, target_address, command, data_block)
 		/**
 		 * Destroy all of the routing path constructed earlier
 		 */

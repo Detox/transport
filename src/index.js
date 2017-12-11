@@ -609,7 +609,7 @@
         demultiplexer['feed'](command_data);
         if (demultiplexer['have_more_data']()) {
           data = demultiplexer['get_data']();
-          this$['fire']('data', address, segment_id, data);
+          this$['fire']('data', address, segment_id, command, data);
         }
       })['on']('destroy', function(address, segment_id){
         this$._destroy_routing_path(address, segment_id);
@@ -799,11 +799,12 @@
     /**
      * Send data to the responder on specified routing path
      *
-     * @param {!Uint8Array} node_id		First node in routing path
-     * @param {!Uint8Array} route_id	Identifier returned during routing path construction
-     * @param {!Uint8Array} data
+     * @param {!Uint8Array}	node_id		First node in routing path
+     * @param {!Uint8Array}	route_id	Identifier returned during routing path construction
+     * @param {number}		command		Command from range `0..245`
+     * @param {!Uint8Array}	data
      */
-    z$['send_data'] = function(node_id, route_id, data){
+    z$['send_data'] = function(node_id, route_id, command, data){
       var source_id, target_address, multiplexer, data_block;
       if (data.length > MAX_DATA_SIZE) {
         return;
@@ -817,7 +818,7 @@
       multiplexer['feed'](data);
       while (multiplexer['have_more_blocks']()) {
         data_block = multiplexer['get_block']();
-        this._ronion['data'](node_id, route_id, target_address, 0, data_block);
+        this._ronion['data'](node_id, route_id, target_address, command, data_block);
       }
     };
     /**

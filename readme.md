@@ -142,11 +142,12 @@ Destroy routing path constructed earlier.
 * `node_id` - first node in routing path
 * `route_id` - identifier returned during routing path construction
 
-### detox_transport.Router.send_data(node_id : Uint8Array, route_id : Uint8Array, data : Uint8Array)
+### detox_transport.Router.send_data(node_id : Uint8Array, route_id : Uint8Array, command : number, data : Uint8Array)
 Send data to the responder on specified routing path.
 
 * `node_id` - first node in routing path
 * `route_id` - identifier returned during routing path construction
+* `command` - command for data, can be any number from the range `0..245`
 * `data` - data being sent
 
 ### detox_transport.Router.destroy()
@@ -166,8 +167,9 @@ Payload consists of two `Uint8Array` arguments: `node_id` and `packet`.
 Event is fired when `packet` needs to be sent to `node_id` node.
 
 ### Event: data
-Payload consists of three `Uint8Array` arguments: `node_id`, `route_id` and `data`.
-Event is fired when `data` were received from the responder on routing path with started at `node_id` with `route_id`.
+Payload consists of four arguments, all of which except `command` are `Uint8Array`: `node_id`, `route_id`, `command` and `data`.
+
+Event is fired when `data` were received from the responder with specified `command` on routing path with started at `node_id` with `route_id`.
 
 ### Event: destroyed
 Payload consists of two `Uint8Array` arguments: `node_id` and `route_id`.
