@@ -479,10 +479,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		@_demultiplexer				= new Map
 		@_established_routing_paths	= new Map
 		@_ronion					= ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)
-			.'on'('create_request', (data) !~>
-				address			= data['address']
-				segment_id		= data['segment_id']
-				command_data	= data['command_data']
+			.'on'('create_request', (address, segment_id, command_data) !~>
 				source_id	= compute_source_id(address, segment_id)
 				if @_encryptor_instances.has(source_id)
 					# Something wrong is happening, refuse to handle
@@ -509,14 +506,11 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				@_rewrapper_instances.set(source_id, rewrapper_instances)
 				@_last_node_in_routing_path.set(source_id, address)
 			)
-			.'on'('send', (data) !~>
-				@'fire'('send', data['address'], data['packet'])
+			.'on'('send', (address, packet) !~>
+				@'fire'('send', address, packet)
 			)
-			.'on'('data', (data) !~>
-				address						= data['address']
-				segment_id					= data['segment_id']
-				target_address				= data['target_address']
-				command_data				= data['command_data']
+			.'on'('data', (address, segment_id, target_address, command, command_data) !~>
+				# TODO: handle `command`
 				source_id					= compute_source_id(address, segment_id)
 				last_node_in_routing_path	= @_last_node_in_routing_path.get(source_id)
 				if target_address.join(',') != last_node_in_routing_path.join(',')
@@ -531,9 +525,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 					data	= demultiplexer['get_data']()
 					@'fire'('data', address, segment_id, data)
 			)
-			.'on'('destroy', (data) !~>
-				address		= data['address']
-				segment_id	= data['segment_id']
+			.'on'('destroy', (address, segment_id) !~>
 				@_destroy_routing_path(address, segment_id)
 				@'fire'('destroyed', address, segment_id)
 			)
@@ -621,10 +613,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				if !x25519_public_key
 					fail()
 				encryptor_instances[first_node_string]	= detox-crypto['Encryptor'](true, x25519_public_key)
-				!~function create_response_handler (data)
-					address			= data['address']
-					segment_id		= data['segment_id']
-					command_data	= data['command_data']
+				!~function create_response_handler (address, segment_id, command_data)
 					if !is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)
 						return
 					clearTimeout(segment_establishment_timeout)
@@ -646,10 +635,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 							@_established_routing_paths.set(source_id, [first_node, route_id])
 							resolve(route_id)
 							return
-						!~function extend_response_handler (data)
-							address			= data['address']
-							segment_id		= data['segment_id']
-							command_data	= data['command_data']
+						!~function extend_response_handler (address, segment_id, command_data)
 							if !is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)
 								return
 							@_ronion.'off'('extend_response', extend_response_handler)
@@ -717,7 +703,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			multiplexer['feed'](data)
 			while multiplexer['have_more_blocks']()
 				data_block	= multiplexer['get_block']()
-				@_ronion['data'](node_id, route_id, target_address, data_block)
+				# TODO: actual command instead of `0` here
+				@_ronion['data'](node_id, route_id, target_address, 0, data_block)
 		/**
 		 * Destroy all of the routing path constructed earlier
 		 */

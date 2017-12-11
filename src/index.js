@@ -564,11 +564,8 @@
       this._multiplexer = new Map;
       this._demultiplexer = new Map;
       this._established_routing_paths = new Map;
-      this._ronion = ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)['on']('create_request', function(data){
-        var address, segment_id, command_data, source_id, encryptor_instance, e, rewrapper_instance, address_string, encryptor_instances, rewrapper_instances;
-        address = data['address'];
-        segment_id = data['segment_id'];
-        command_data = data['command_data'];
+      this._ronion = ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)['on']('create_request', function(address, segment_id, command_data){
+        var source_id, encryptor_instance, e, rewrapper_instance, address_string, encryptor_instances, rewrapper_instances;
         source_id = compute_source_id(address, segment_id);
         if (this$._encryptor_instances.has(source_id)) {
           return;
@@ -596,14 +593,10 @@
         this$._encryptor_instances.set(source_id, encryptor_instances);
         this$._rewrapper_instances.set(source_id, rewrapper_instances);
         this$._last_node_in_routing_path.set(source_id, address);
-      })['on']('send', function(data){
-        this$['fire']('send', data['address'], data['packet']);
-      })['on']('data', function(data){
-        var address, segment_id, target_address, command_data, source_id, last_node_in_routing_path, demultiplexer;
-        address = data['address'];
-        segment_id = data['segment_id'];
-        target_address = data['target_address'];
-        command_data = data['command_data'];
+      })['on']('send', function(address, packet){
+        this$['fire']('send', address, packet);
+      })['on']('data', function(address, segment_id, target_address, command, command_data){
+        var source_id, last_node_in_routing_path, demultiplexer, data;
         source_id = compute_source_id(address, segment_id);
         last_node_in_routing_path = this$._last_node_in_routing_path.get(source_id);
         if (target_address.join(',') !== last_node_in_routing_path.join(',')) {
@@ -618,10 +611,7 @@
           data = demultiplexer['get_data']();
           this$['fire']('data', address, segment_id, data);
         }
-      })['on']('destroy', function(data){
-        var address, segment_id;
-        address = data['address'];
-        segment_id = data['segment_id'];
+      })['on']('destroy', function(address, segment_id){
         this$._destroy_routing_path(address, segment_id);
         this$['fire']('destroyed', address, segment_id);
       })['on']('encrypt', function(data){
@@ -718,11 +708,8 @@
           fail();
         }
         encryptor_instances[first_node_string] = detoxCrypto['Encryptor'](true, x25519_public_key);
-        function create_response_handler(data){
-          var address, segment_id, command_data, e, current_node, current_node_string, segment_extension_timeout;
-          address = data['address'];
-          segment_id = data['segment_id'];
-          command_data = data['command_data'];
+        function create_response_handler(address, segment_id, command_data){
+          var e, current_node, current_node_string, segment_extension_timeout;
           if (!is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)) {
             return;
           }
@@ -748,11 +735,8 @@
               resolve(route_id);
               return;
             }
-            function extend_response_handler(data){
-              var address, segment_id, command_data, e;
-              address = data['address'];
-              segment_id = data['segment_id'];
-              command_data = data['command_data'];
+            function extend_response_handler(address, segment_id, command_data){
+              var e;
               if (!is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)) {
                 return;
               }
@@ -833,7 +817,7 @@
       multiplexer['feed'](data);
       while (multiplexer['have_more_blocks']()) {
         data_block = multiplexer['get_block']();
-        this._ronion['data'](node_id, route_id, target_address, data_block);
+        this._ronion['data'](node_id, route_id, target_address, 0, data_block);
       }
     };
     /**
