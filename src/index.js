@@ -6,11 +6,11 @@
  * @license   MIT License, see license.txt
  */
 (function(){
-  var COMMAND_DHT, COMMAND_TAG, COMMAND_UNTAG, COMMAND_RANGE_RESERVED_TILL, ROUTING_PROTOCOL_VERSION, PUBLIC_KEY_LENGTH, MAC_LENGTH, MIN_PACKET_SIZE, ROUTING_PATH_SEGMENT_TIMEOUT, MAX_DATA_SIZE, PEER_CONNECTION_TIMEOUT;
+  var COMMAND_DHT, COMMAND_TAG, COMMAND_UNTAG, CUSTOM_COMMANDS_OFFSET, ROUTING_PROTOCOL_VERSION, PUBLIC_KEY_LENGTH, MAC_LENGTH, MIN_PACKET_SIZE, ROUTING_PATH_SEGMENT_TIMEOUT, MAX_DATA_SIZE, PEER_CONNECTION_TIMEOUT;
   COMMAND_DHT = 0;
   COMMAND_TAG = 1;
   COMMAND_UNTAG = 2;
-  COMMAND_RANGE_RESERVED_TILL = 10;
+  CUSTOM_COMMANDS_OFFSET = 10;
   ROUTING_PROTOCOL_VERSION = 0;
   PUBLIC_KEY_LENGTH = 32;
   MAC_LENGTH = 16;
@@ -334,10 +334,10 @@
             this$['fire']('node_untagged', id);
             break;
           default:
-            if (command < COMMAND_RANGE_RESERVED_TILL) {
+            if (command < CUSTOM_COMMANDS_OFFSET) {
               return;
             }
-            this$['fire']('data', id, command - COMMAND_RANGE_RESERVED_TILL, data);
+            this$['fire']('data', id, command - CUSTOM_COMMANDS_OFFSET, data);
           }
         });
         this$['fire']('node_connected', id);
@@ -446,7 +446,7 @@
       string_id = array2hex(id);
       peer_connection = this._socket['get_id_mapping'](string_id);
       if (peer_connection) {
-        peer_connection._send_routing_data(data, command + COMMAND_RANGE_RESERVED_TILL);
+        peer_connection._send_routing_data(data, command + CUSTOM_COMMANDS_OFFSET);
       }
     };
     /**

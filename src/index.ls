@@ -4,10 +4,10 @@
  * @copyright Copyright (c) 2017, Nazar Mokrynskyi
  * @license   MIT License, see license.txt
  */
-const COMMAND_DHT					= 0
-const COMMAND_TAG					= 1
-const COMMAND_UNTAG					= 2
-const COMMAND_RANGE_RESERVED_TILL	= 10 # 3..9 are also reserved for future use, everything above is available for user
+const COMMAND_DHT				= 0
+const COMMAND_TAG				= 1
+const COMMAND_UNTAG				= 2
+const CUSTOM_COMMANDS_OFFSET	= 10 # 3..9 are also reserved for future use, everything above is available for the user
 
 const ROUTING_PROTOCOL_VERSION		= 0
 # Length of Ed25519 public key in bytes
@@ -287,9 +287,9 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 							@_socket['del_tag'](string_id, 'detox-responder')
 							@'fire'('node_untagged', id)
 						else
-							if command < COMMAND_RANGE_RESERVED_TILL
+							if command < CUSTOM_COMMANDS_OFFSET
 								return
-							@'fire'('data', id, command - COMMAND_RANGE_RESERVED_TILL, data)
+							@'fire'('data', id, command - CUSTOM_COMMANDS_OFFSET, data)
 				)
 				@'fire'('node_connected', id)
 			)
@@ -381,7 +381,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			string_id		= array2hex(id)
 			peer_connection	= @_socket['get_id_mapping'](string_id)
 			if peer_connection
-				peer_connection._send_routing_data(data, command + COMMAND_RANGE_RESERVED_TILL)
+				peer_connection._send_routing_data(data, command + CUSTOM_COMMANDS_OFFSET)
 		/**
 		 * Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity)
 		 *
