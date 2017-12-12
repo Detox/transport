@@ -405,10 +405,10 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			Uint8Array.from(
 				bencode['encode'](
 					{
-						'k'		: real_public_key
+						'k'		: Buffer.from(real_public_key)
 						'seq'	: time
-						'sig'	: signature
-						'v'		: value
+						'sig'	: Buffer.from(signature)
+						'v'		: Buffer.from(value)
 					}
 				)
 			)

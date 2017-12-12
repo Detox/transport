@@ -473,10 +473,10 @@
       });
       signature = detoxCrypto['sign'](signature_data, real_public_key, real_private_key);
       return Uint8Array.from(bencode['encode']({
-        'k': real_public_key,
+        'k': Buffer.from(real_public_key),
         'seq': time,
-        'sig': signature,
-        'v': value
+        'sig': Buffer.from(signature),
+        'v': Buffer.from(value)
       }));
     };
     /**
