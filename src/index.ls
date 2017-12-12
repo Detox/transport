@@ -389,7 +389,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * @param {!Uint8Array}			real_private_key	Corresponding Ed25519 private key
 		 * @param {!Array<!Uint8Array>}	introduction_nodes	Array of public keys of introduction points
 		 *
-		 * @return {!Object}
+		 * @return {!Uint8Array}
 		 */
 		..'generate_introduction_message' = (real_public_key, real_private_key, introduction_nodes) ->
 			time	= +(new Date)
@@ -402,26 +402,27 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			)
 			signature		= detox-crypto['sign'](signature_data, real_public_key, real_private_key)
 			# This message has signature, so it can be now sent from any node in DHT
-			{
-				'k'		: real_public_key
-				'seq'	: time
-				'sig'	: signature
-				'v'		: value
-			}
+			Uint8Array.from(
+				bencode['encode'](
+					{
+						'k'		: real_public_key
+						'seq'	: time
+						'sig'	: signature
+						'v'		: value
+					}
+				)
+			)
 		/**
 		 * Publish message with introduction nodes (typically happens on different node than `generate_introduction_message()`)
 		 *
-		 * @param {!Object} message
+		 * @param {!Uint8Array} message
 		 */
 		..'publish_introduction_message' = (message) !->
-			if !message['k'] || !message['seq'] || !message['sig'] || !message['v']
+			try
+				message	= bencode['decode'](Buffer.from(message))
+			if !message || !message['k'] || !message['seq'] || !message['sig'] || !message['v']
 				return
-			@_dht['put'](
-				'k'		: Buffer.from(message['k'])
-				'seq'	: parseInt(message['seq'], 10)
-				'sig'	: Buffer.from(message['sig'])
-				'v'		: Buffer.from(message['v'])
-			)
+			@_dht['put'](message)
 		/**
 		 * Find nodes in DHT that are acting as introduction points for specified public key
 		 *

@@ -65,7 +65,7 @@ Send data to specified node ID.
 
 `command` can be any number from the range `0..245`.
 
-### detox_transport.DHT.generate_introduction_message(real_public_key : Uint8Array, real_private_key : Uint8Array, introduction_nodes : Uint8Array[]) : Object
+### detox_transport.DHT.generate_introduction_message(real_public_key : Uint8Array, real_private_key : Uint8Array, introduction_nodes : Uint8Array[]) : Uint8Array
 Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity).
 
 Introduction message that contains a list of introduction nodes that can be used to contact user of real long-term keypair.
@@ -73,7 +73,7 @@ Introduction message that contains a list of introduction nodes that can be used
 `dht_public_key` and `dht_private_key` are Ed25519 keypair as in `@detox/crypto` that is typically different from DHT keypair and is used as real long-term keypair.
 `introduction_nodes` is a list of nodes IDs (`dht_public_key` of corresponding nodes).
 
-### detox_transport.DHT.publish_introduction_message(message : Object)
+### detox_transport.DHT.publish_introduction_message(message : Uint8Array)
 Publish message with introduction nodes (typically happens on different node than `generate_introduction_message()`)
 
 ### detox_transport.DHT.find_introduction_nodes(target_public_key : Uint8Array, success_callback : Function, failure_callback : Function)

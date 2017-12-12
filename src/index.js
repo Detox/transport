@@ -456,7 +456,7 @@
      * @param {!Uint8Array}			real_private_key	Corresponding Ed25519 private key
      * @param {!Array<!Uint8Array>}	introduction_nodes	Array of public keys of introduction points
      *
-     * @return {!Object}
+     * @return {!Uint8Array}
      */
     y$['generate_introduction_message'] = function(real_public_key, real_private_key, introduction_nodes){
       var time, value, i$, len$, index, introduction_point, signature_data, signature;
@@ -472,28 +472,26 @@
         'v': Buffer.from(value)
       });
       signature = detoxCrypto['sign'](signature_data, real_public_key, real_private_key);
-      return {
+      return Uint8Array.from(bencode['encode']({
         'k': real_public_key,
         'seq': time,
         'sig': signature,
         'v': value
-      };
+      }));
     };
     /**
      * Publish message with introduction nodes (typically happens on different node than `generate_introduction_message()`)
      *
-     * @param {!Object} message
+     * @param {!Uint8Array} message
      */
     y$['publish_introduction_message'] = function(message){
-      if (!message['k'] || !message['seq'] || !message['sig'] || !message['v']) {
+      try {
+        message = bencode['decode'](Buffer.from(message));
+      } catch (e$) {}
+      if (!message || !message['k'] || !message['seq'] || !message['sig'] || !message['v']) {
         return;
       }
-      this._dht['put']({
-        'k': Buffer.from(message['k']),
-        'seq': parseInt(message['seq'], 10),
-        'sig': Buffer.from(message['sig']),
-        'v': Buffer.from(message['v'])
-      });
+      this._dht['put'](message);
     };
     /**
      * Find nodes in DHT that are acting as introduction points for specified public key
