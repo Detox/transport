@@ -42,7 +42,7 @@
   lib.ready(function(){
     test('Router', function(t){
       var data, node_1, node_2, node_3, node_4, node_5, node_1_instance, node_2_instance, node_3_instance, node_4_instance, node_5_instance, nodes, ref$, i$, len$;
-      t.plan(12);
+      t.plan(10);
       data = crypto.randomBytes(1000);
       node_1 = detoxCrypto.create_keypair(hex2array('4b39c9e51f2b644fd0678769cc53069e9c1a93984bbffd7f0fbca2375c08b815'));
       node_2 = detoxCrypto.create_keypair(hex2array('910e5d834e32835d427ca4507c4a6a6c1715fd7cbd290cda8d4c1aa90d0f251d'));
@@ -92,16 +92,8 @@
               t.equal(array2hex(node_id), array2hex(path_1.node_id), 'Message to node 1 appears like it is coming from node 2');
               t.equal(command, 2, 'Command received correctly');
               t.equal(array2hex(data), array2hex(received_data), 'Data received correctly');
-              node_4_instance.once('destroyed', function(){
-                t.pass('Destroyed connection with node 4');
-              });
-              node_3_instance.once('destroyed', function(){
-                t.pass('Destroyed connection with node 3');
-              });
-              node_2_instance.once('destroyed', function(){
-                t.pass('Destroyed connection with node 2');
-              });
-              node_1_instance.destroy_routing_path(path_1.node_id, path_1.route_id);
+              node_1_instance.destroy();
+              t.equal(node_1_instance._established_routing_paths.size, 0, 'Routing path on node 1 was destroyed properly');
             });
             node_4_instance.send_data(node_id, route_id, 2, data);
           });

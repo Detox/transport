@@ -480,6 +480,9 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		@_demultiplexer				= new Map
 		@_established_routing_paths	= new Map
 		@_ronion					= ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)
+			.'on'('activity', (address, segment_id) !~>
+				@'fire'('activity', address, segment_id)
+			)
 			.'on'('create_request', (address, segment_id, command_data) !~>
 				source_id	= compute_source_id(address, segment_id)
 				if @_encryptor_instances.has(source_id)
@@ -524,10 +527,6 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				if demultiplexer['have_more_data']()
 					data	= demultiplexer['get_data']()
 					@'fire'('data', address, segment_id, command, data)
-			)
-			.'on'('destroy', (address, segment_id) !~>
-				@_destroy_routing_path(address, segment_id)
-				@'fire'('destroyed', address, segment_id)
 			)
 			.'on'('encrypt', (data) !~>
 				address					= data['address']
@@ -720,29 +719,14 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			encryptor_instances	= @_encryptor_instances.get(source_id)
 			if !encryptor_instances
 				return
-			counter	= Object.keys(encryptor_instances).length
-			!~function destroy_segment
-				if counter
-					--counter
-					# When called from `destroy` event handler, calling `destroy()` method here will fail, but that is expected and is not a problem at all
-					try
-						@_ronion['destroy'](address, segment_id)
-						# Let ronion send DESTROY command before destroying next segment and cleaning `Encryptor` instances
-						@_ronion['once']('send', !~>
-							destroy_segment()
-						)
-					catch
-						destroy_segment()
-				else
-					for , encryptor_instance of encryptor_instances
-						encryptor_instance['destroy']()
-					@_encryptor_instances.delete(source_id)
-					@_rewrapper_instances.delete(source_id)
-					@_last_node_in_routing_path.delete(source_id)
-					@_multiplexer.delete(source_id)
-					@_demultiplexer.delete(source_id)
-					@_established_routing_paths.delete(source_id)
-			destroy_segment()
+			for , encryptor_instance of encryptor_instances
+				encryptor_instance['destroy']()
+			@_encryptor_instances.delete(source_id)
+			@_rewrapper_instances.delete(source_id)
+			@_last_node_in_routing_path.delete(source_id)
+			@_multiplexer.delete(source_id)
+			@_demultiplexer.delete(source_id)
+			@_established_routing_paths.delete(source_id)
 	Object.defineProperty(Router::, 'constructor', {enumerable: false, value: Router})
 	{
 		'ready'			: detox-crypto['ready']

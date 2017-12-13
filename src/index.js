@@ -562,7 +562,9 @@
       this._multiplexer = new Map;
       this._demultiplexer = new Map;
       this._established_routing_paths = new Map;
-      this._ronion = ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)['on']('create_request', function(address, segment_id, command_data){
+      this._ronion = ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)['on']('activity', function(address, segment_id){
+        this$['fire']('activity', address, segment_id);
+      })['on']('create_request', function(address, segment_id, command_data){
         var source_id, encryptor_instance, e, rewrapper_instance, address_string, encryptor_instances, rewrapper_instances;
         source_id = compute_source_id(address, segment_id);
         if (this$._encryptor_instances.has(source_id)) {
@@ -609,9 +611,6 @@
           data = demultiplexer['get_data']();
           this$['fire']('data', address, segment_id, command, data);
         }
-      })['on']('destroy', function(address, segment_id){
-        this$._destroy_routing_path(address, segment_id);
-        this$['fire']('destroyed', address, segment_id);
       })['on']('encrypt', function(data){
         var address, segment_id, target_address, plaintext, source_id, target_address_string, encryptor_instance, ref$;
         address = data['address'];
@@ -835,40 +834,22 @@
      * @param {!Uint8Array} segment_id
      */
     z$._destroy_routing_path = function(address, segment_id){
-      var source_id, encryptor_instances, counter, this$ = this;
+      var source_id, encryptor_instances, i$, encryptor_instance;
       source_id = compute_source_id(address, segment_id);
       encryptor_instances = this._encryptor_instances.get(source_id);
       if (!encryptor_instances) {
         return;
       }
-      counter = Object.keys(encryptor_instances).length;
-      function destroy_segment(){
-        var e, i$, ref$, encryptor_instance;
-        if (counter) {
-          --counter;
-          try {
-            this$._ronion['destroy'](address, segment_id);
-            this$._ronion['once']('send', function(){
-              destroy_segment();
-            });
-          } catch (e$) {
-            e = e$;
-            destroy_segment();
-          }
-        } else {
-          for (i$ in ref$ = encryptor_instances) {
-            encryptor_instance = ref$[i$];
-            encryptor_instance['destroy']();
-          }
-          this$._encryptor_instances['delete'](source_id);
-          this$._rewrapper_instances['delete'](source_id);
-          this$._last_node_in_routing_path['delete'](source_id);
-          this$._multiplexer['delete'](source_id);
-          this$._demultiplexer['delete'](source_id);
-          this$._established_routing_paths['delete'](source_id);
-        }
+      for (i$ in encryptor_instances) {
+        encryptor_instance = encryptor_instances[i$];
+        encryptor_instance['destroy']();
       }
-      destroy_segment();
+      this._encryptor_instances['delete'](source_id);
+      this._rewrapper_instances['delete'](source_id);
+      this._last_node_in_routing_path['delete'](source_id);
+      this._multiplexer['delete'](source_id);
+      this._demultiplexer['delete'](source_id);
+      this._established_routing_paths['delete'](source_id);
     };
     Object.defineProperty(Router.prototype, 'constructor', {
       enumerable: false,

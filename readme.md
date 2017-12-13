@@ -162,6 +162,12 @@ Register one-time event handler (just `on()` + `off()` under the hood).
 ### detox_transport.Router.off(event: string[, callback: Function]) : detox_transport.Router
 Unregister event handler.
 
+### Event: activity
+Payload consists of two `Uint8Array` arguments: `node_id` and `route_id`.
+Event is fired when packet is sent/received from/to `address` with segment ID `segment_id`.
+
+This event can be used to track when packets are flowing on certain `address` and `segment_id` and decide when to consider routing path as inactive and destroy it.
+
 ### Event: send
 Payload consists of two `Uint8Array` arguments: `node_id` and `packet`.
 Event is fired when `packet` needs to be sent to `node_id` node.
@@ -170,10 +176,6 @@ Event is fired when `packet` needs to be sent to `node_id` node.
 Payload consists of four arguments, all of which except `command` are `Uint8Array`: `node_id`, `route_id`, `command` and `data`.
 
 Event is fired when `data` were received from the responder with specified `command` on routing path with started at `node_id` with `route_id`.
-
-### Event: destroyed
-Payload consists of two `Uint8Array` arguments: `node_id` and `route_id`.
-Event is fired when routing path started at `node_id` with `route_id` was destroyed (initiated by another side).
 
 ### detox_transport.MAX_DATA_SIZE : number
 Constant that defines max data size supported for sending by DHT and Router.
