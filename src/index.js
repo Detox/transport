@@ -458,7 +458,7 @@
      *
      * @return {!Uint8Array}
      */
-    y$['generate_introduction_message'] = function(real_public_key, real_private_key, introduction_nodes){
+    y$['generate_announcement_message'] = function(real_public_key, real_private_key, introduction_nodes){
       var time, value, i$, len$, index, introduction_point, signature_data, signature;
       time = +new Date;
       value = new Uint8Array(introduction_nodes.length * PUBLIC_KEY_LENGTH);
@@ -480,11 +480,11 @@
       }));
     };
     /**
-     * Publish message with introduction nodes (typically happens on different node than `generate_introduction_message()`)
+     * Publish message with introduction nodes (typically happens on different node than `generate_announcement_message()`)
      *
      * @param {!Uint8Array} message
      */
-    y$['publish_introduction_message'] = function(message){
+    y$['publish_announcement_message'] = function(message){
       try {
         message = bencode['decode'](Buffer.from(message));
       } catch (e$) {}

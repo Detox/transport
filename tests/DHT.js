@@ -79,13 +79,13 @@
         t.equal(array2hex(node_id), array2hex(bootstrap_node_dht.ed25519['public']), 'Connected to WebRTC (bootstrap) node #3');
       });
       function all_ready(){
-        var introduction_nodes, introduction_message;
+        var introduction_nodes, announcement_message;
         t.pass('Nodes are ready');
         t.deepEqual(node_1_instance.get_bootstrap_nodes()[0], bootstrap_node_info, 'Bootstrap nodes are returned correctly #1');
         t.deepEqual(node_2_instance.get_bootstrap_nodes()[0], bootstrap_node_info, 'Bootstrap nodes are returned correctly #2');
         t.deepEqual(node_3_instance.get_bootstrap_nodes()[0], bootstrap_node_info, 'Bootstrap nodes are returned correctly #3');
         introduction_nodes = [detoxCrypto.create_keypair().ed25519['public'], detoxCrypto.create_keypair().ed25519['public']];
-        introduction_message = node_1_instance.generate_introduction_message(node_1_real.ed25519['public'], node_1_real.ed25519['private'], introduction_nodes);
+        announcement_message = node_1_instance.generate_announcement_message(node_1_real.ed25519['public'], node_1_real.ed25519['private'], introduction_nodes);
         node_1_instance._dht.on('put', function(){
           setTimeout(function(){
             node_3_instance.find_introduction_nodes(node_1_real.ed25519['public'], function(introduction_nodes_received){
@@ -120,7 +120,7 @@
             });
           });
         });
-        return node_2_instance.publish_introduction_message(introduction_message);
+        return node_2_instance.publish_announcement_message(announcement_message);
       }
     });
   });

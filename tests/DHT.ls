@@ -85,7 +85,7 @@ test('DHT', (t) !->
 			detox-crypto.create_keypair().ed25519.public
 			detox-crypto.create_keypair().ed25519.public
 		]
-		introduction_message	= node_1_instance.generate_introduction_message(node_1_real.ed25519.public, node_1_real.ed25519.private, introduction_nodes)
+		announcement_message	= node_1_instance.generate_announcement_message(node_1_real.ed25519.public, node_1_real.ed25519.private, introduction_nodes)
 
 		node_1_instance._dht.on('put', !->
 			# Just for robustness of test execution on Travis CI
@@ -128,5 +128,5 @@ test('DHT', (t) !->
 				)
 		)
 
-		node_2_instance.publish_introduction_message(introduction_message)
+		node_2_instance.publish_announcement_message(announcement_message)
 )

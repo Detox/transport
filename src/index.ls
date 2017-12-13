@@ -391,7 +391,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 *
 		 * @return {!Uint8Array}
 		 */
-		..'generate_introduction_message' = (real_public_key, real_private_key, introduction_nodes) ->
+		..'generate_announcement_message' = (real_public_key, real_private_key, introduction_nodes) ->
 			time	= +(new Date)
 			value	= new Uint8Array(introduction_nodes.length * PUBLIC_KEY_LENGTH)
 			for introduction_point, index in introduction_nodes
@@ -413,11 +413,11 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				)
 			)
 		/**
-		 * Publish message with introduction nodes (typically happens on different node than `generate_introduction_message()`)
+		 * Publish message with introduction nodes (typically happens on different node than `generate_announcement_message()`)
 		 *
 		 * @param {!Uint8Array} message
 		 */
-		..'publish_introduction_message' = (message) !->
+		..'publish_announcement_message' = (message) !->
 			try
 				message	= bencode['decode'](Buffer.from(message))
 			if !message || !message['k'] || !message['seq'] || !message['sig'] || !message['v']
