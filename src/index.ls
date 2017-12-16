@@ -18,8 +18,10 @@ const MAC_LENGTH					= 16
 const ROUTING_PATH_SEGMENT_TIMEOUT	= 10
 # 65 KiB is what is enough for DHT messages and will also be enough for routing data, bigger data will be multiplexed on higher levels when necessary
 const MAX_DATA_SIZE					= 2 ** 16 - 1
-# Fixed packet size for all communications
-const PACKET_SIZE					= 512
+# Fixed packet size for all DHT communications
+const DHT_PACKET_SIZE				= 512
+# 3 bytes (2 for multiplexer and 1 for command) smaller than packet size in DHT in order to avoid fragmentation when sending over peer connection
+const ROUTER_PACKET_SIZE			= DHT_PACKET_SIZE - 3
 # Same as in webtorrent-dht
 const PEER_CONNECTION_TIMEOUT		= 30
 
@@ -91,8 +93,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		@_sending				= options['initiator']
 		@'once'('connect', !~>
 			@_send_delay	= 1000 / @_packets_per_second
-			@_multiplexer	= fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, PACKET_SIZE)
-			@_demultiplexer	= fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, PACKET_SIZE)
+			@_multiplexer	= fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, DHT_PACKET_SIZE)
+			@_demultiplexer	= fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, DHT_PACKET_SIZE)
 			@_last_sent		= +(new Date)
 			if @_sending
 				@_real_send()
@@ -114,7 +116,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 						# Data are sent in alternating order, sending data when receiving is expected violates the protocol
 						@'destroy'()
 						return
-					else if data.length != PACKET_SIZE
+					else if data.length != DHT_PACKET_SIZE
 						# Data size must be exactly one packet size
 						@'destroy'()
 						return
@@ -440,15 +442,13 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		if !(@ instanceof Router)
 			return new Router(dht_private_key, max_pending_segments)
 		async-eventer.call(@)
-		# 3 bytes (2 for multiplexer and 1 for command) smaller than packet size in DHT in order to avoid fragmentation when sending over peer connection
-		packet_size					= PACKET_SIZE - 3
 		@_encryptor_instances		= new Map
 		@_rewrapper_instances		= new Map
 		@_last_node_in_routing_path	= new Map
 		@_multiplexer				= new Map
 		@_demultiplexer				= new Map
 		@_established_routing_paths	= new Map
-		@_ronion					= ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)
+		@_ronion					= ronion(ROUTING_PROTOCOL_VERSION, ROUTER_PACKET_SIZE, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)
 			.'on'('activity', (address, segment_id) !~>
 				@'fire'('activity', address, segment_id)
 			)

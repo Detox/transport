@@ -6,7 +6,7 @@
  * @license   MIT License, see license.txt
  */
 (function(){
-  var COMMAND_DHT, COMMAND_TAG, COMMAND_UNTAG, CUSTOM_COMMANDS_OFFSET, ROUTING_PROTOCOL_VERSION, PUBLIC_KEY_LENGTH, MAC_LENGTH, ROUTING_PATH_SEGMENT_TIMEOUT, MAX_DATA_SIZE, PACKET_SIZE, PEER_CONNECTION_TIMEOUT;
+  var COMMAND_DHT, COMMAND_TAG, COMMAND_UNTAG, CUSTOM_COMMANDS_OFFSET, ROUTING_PROTOCOL_VERSION, PUBLIC_KEY_LENGTH, MAC_LENGTH, ROUTING_PATH_SEGMENT_TIMEOUT, MAX_DATA_SIZE, DHT_PACKET_SIZE, ROUTER_PACKET_SIZE, PEER_CONNECTION_TIMEOUT;
   COMMAND_DHT = 0;
   COMMAND_TAG = 1;
   COMMAND_UNTAG = 2;
@@ -16,7 +16,8 @@
   MAC_LENGTH = 16;
   ROUTING_PATH_SEGMENT_TIMEOUT = 10;
   MAX_DATA_SIZE = Math.pow(2, 16) - 1;
-  PACKET_SIZE = 512;
+  DHT_PACKET_SIZE = 512;
+  ROUTER_PACKET_SIZE = DHT_PACKET_SIZE - 3;
   PEER_CONNECTION_TIMEOUT = 30;
   /**
    * @param {!Uint8Array} array
@@ -102,8 +103,8 @@
       this._sending = options['initiator'];
       this['once']('connect', function(){
         this$._send_delay = 1000 / this$._packets_per_second;
-        this$._multiplexer = fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, PACKET_SIZE);
-        this$._demultiplexer = fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, PACKET_SIZE);
+        this$._multiplexer = fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, DHT_PACKET_SIZE);
+        this$._demultiplexer = fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, DHT_PACKET_SIZE);
         this$._last_sent = +new Date;
         if (this$._sending) {
           this$._real_send();
@@ -127,7 +128,7 @@
         if (this._sending) {
           this['destroy']();
           return;
-        } else if (data.length !== PACKET_SIZE) {
+        } else if (data.length !== DHT_PACKET_SIZE) {
           this['destroy']();
           return;
         } else {
@@ -512,20 +513,19 @@
      * @throws {Error}
      */
     function Router(dht_private_key, max_pending_segments){
-      var packet_size, this$ = this;
+      var this$ = this;
       max_pending_segments == null && (max_pending_segments = 10);
       if (!(this instanceof Router)) {
         return new Router(dht_private_key, max_pending_segments);
       }
       asyncEventer.call(this);
-      packet_size = PACKET_SIZE - 3;
       this._encryptor_instances = new Map;
       this._rewrapper_instances = new Map;
       this._last_node_in_routing_path = new Map;
       this._multiplexer = new Map;
       this._demultiplexer = new Map;
       this._established_routing_paths = new Map;
-      this._ronion = ronion(ROUTING_PROTOCOL_VERSION, packet_size, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)['on']('activity', function(address, segment_id){
+      this._ronion = ronion(ROUTING_PROTOCOL_VERSION, ROUTER_PACKET_SIZE, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)['on']('activity', function(address, segment_id){
         this$['fire']('activity', address, segment_id);
       })['on']('create_request', function(address, segment_id, command_data){
         var source_id, encryptor_instance, e, rewrapper_instance, address_string, encryptor_instances, rewrapper_instances;
