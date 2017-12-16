@@ -6,7 +6,7 @@
  * @license   MIT License, see license.txt
  */
 (function(){
-  var COMMAND_DHT, COMMAND_TAG, COMMAND_UNTAG, CUSTOM_COMMANDS_OFFSET, ROUTING_PROTOCOL_VERSION, PUBLIC_KEY_LENGTH, MAC_LENGTH, MIN_PACKET_SIZE, ROUTING_PATH_SEGMENT_TIMEOUT, MAX_DATA_SIZE, PEER_CONNECTION_TIMEOUT;
+  var COMMAND_DHT, COMMAND_TAG, COMMAND_UNTAG, CUSTOM_COMMANDS_OFFSET, ROUTING_PROTOCOL_VERSION, PUBLIC_KEY_LENGTH, MAC_LENGTH, ROUTING_PATH_SEGMENT_TIMEOUT, MAX_DATA_SIZE, PACKET_SIZE, PEER_CONNECTION_TIMEOUT;
   COMMAND_DHT = 0;
   COMMAND_TAG = 1;
   COMMAND_UNTAG = 2;
@@ -14,9 +14,9 @@
   ROUTING_PROTOCOL_VERSION = 0;
   PUBLIC_KEY_LENGTH = 32;
   MAC_LENGTH = 16;
-  MIN_PACKET_SIZE = 256;
   ROUTING_PATH_SEGMENT_TIMEOUT = 10;
   MAX_DATA_SIZE = Math.pow(2, 16) - 1;
+  PACKET_SIZE = 512;
   PEER_CONNECTION_TIMEOUT = 30;
   /**
    * @param {!Uint8Array} array
@@ -98,13 +98,12 @@
         return new simplePeerDetox(options);
       }
       this._sign = options['sign'];
-      this._packet_size = options['packet_size'];
       this._packets_per_second = options['packets_per_second'];
       this._sending = options['initiator'];
       this['once']('connect', function(){
         this$._send_delay = 1000 / this$._packets_per_second;
-        this$._multiplexer = fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, this$._packet_size);
-        this$._demultiplexer = fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, this$._packet_size);
+        this$._multiplexer = fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, PACKET_SIZE);
+        this$._demultiplexer = fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, PACKET_SIZE);
         this$._last_sent = +new Date;
         if (this$._sending) {
           this$._real_send();
@@ -128,7 +127,7 @@
         if (this._sending) {
           this['destroy']();
           return;
-        } else if (data.length !== this._packet_size) {
+        } else if (data.length !== PACKET_SIZE) {
           this['destroy']();
           return;
         } else {
@@ -154,34 +153,12 @@
      * @param {!Object} signal
      */
     x$['signal'] = function(signal){
-      var found_psr, i$, ref$, len$, extension, array, received_packet_size, received_packets_per_second;
-      if (!signal['signature'] || !signal['extensions']) {
+      if (!signal['signature']) {
         this['destroy']();
         return;
       }
       this._signature_received = signal['signature'];
       this._sdp_received = string2array(signal['sdp']);
-      found_psr = false;
-      for (i$ = 0, len$ = (ref$ = signal['extensions']).length; i$ < len$; ++i$) {
-        extension = ref$[i$];
-        if (extension.startsWith('psr:')) {
-          array = extension.split(':');
-          received_packet_size = parseInt(array[1], 10);
-          received_packets_per_second = parseInt(array[2], 10);
-          if (received_packet_size < MIN_PACKET_SIZE || received_packets_per_second < 1) {
-            this['destroy']();
-            return;
-          }
-          this._packet_size = Math.min(this._packet_size, received_packet_size);
-          this._packets_per_second = Math.min(this._packets_per_second, received_packets_per_second);
-          found_psr = true;
-          break;
-        }
-      }
-      if (!found_psr) {
-        this['destroy']();
-        return;
-      }
       simplePeer.prototype['signal'].call(this, signal);
     };
     /**
@@ -259,37 +236,28 @@
      * @param {!Uint8Array}		dht_private_key		Corresponding Ed25519 private key
      * @param {!Array<!Object>}	bootstrap_nodes
      * @param {!Array<!Object>}	ice_servers
-     * @param {number}			packet_size
      * @param {number}			packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
      * @param {number}			bucket_size
      *
      * @return {!DHT}
-     *
-     * @throws {Error}
      */
-    function DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packet_size, packets_per_second, bucket_size){
-      var extensions, x$, y$, this$ = this;
+    function DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packets_per_second, bucket_size){
+      var x$, y$, this$ = this;
       bucket_size == null && (bucket_size = 2);
       if (!(this instanceof DHT)) {
-        return new DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packet_size, packets_per_second, bucket_size);
-      }
-      if (packet_size < MIN_PACKET_SIZE) {
-        throw new Error('Minimal supported packet size is ' + MIN_PACKET_SIZE);
+        return new DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packets_per_second, bucket_size);
       }
       asyncEventer.call(this);
       if (packets_per_second < 1) {
         packets_per_second = 1;
       }
       this._pending_websocket_ids = new Map;
-      extensions = ["psr:" + packet_size + ":" + packets_per_second];
       x$ = this._socket = webrtcSocket({
-        'extensions': extensions,
         'simple_peer_constructor': simplePeerDetox,
         'simple_peer_opts': {
           'config': {
             'iceServers': ice_servers
           },
-          'packet_size': packet_size,
           'packets_per_second': packets_per_second,
           'sign': function(data){
             return detoxCrypto['sign'](data, dht_public_key, dht_private_key);
@@ -347,7 +315,6 @@
       });
       y$ = this._dht = new webtorrentDht({
         'bootstrap': bootstrap_nodes,
-        'extensions': extensions,
         'hash': sha3_256,
         'k': bucket_size,
         'nodeId': Buffer.from(dht_public_key),
@@ -440,7 +407,7 @@
      */
     y$['send_data'] = function(id, command, data){
       var string_id, peer_connection;
-      if (data.length > this._packet_size) {
+      if (data.length > MAX_DATA_SIZE) {
         return;
       }
       string_id = array2hex(id);
@@ -538,24 +505,20 @@
      * @constructor
      *
      * @param {!Uint8Array}	dht_private_key			X25519 private key that corresponds to Ed25519 key used in `DHT` constructor
-     * @param {number}		packet_size				The same as in `DHT` constructor
      * @param {number}		max_pending_segments	How much segments can be in pending state per one address
      *
      * @return {!Router}
      *
      * @throws {Error}
      */
-    function Router(dht_private_key, packet_size, max_pending_segments){
-      var this$ = this;
+    function Router(dht_private_key, max_pending_segments){
+      var packet_size, this$ = this;
       max_pending_segments == null && (max_pending_segments = 10);
       if (!(this instanceof Router)) {
-        return new Router(dht_private_key, packet_size, max_pending_segments);
-      }
-      if (packet_size < MIN_PACKET_SIZE) {
-        throw new Error('Minimal supported packet size is ' + MIN_PACKET_SIZE);
+        return new Router(dht_private_key, max_pending_segments);
       }
       asyncEventer.call(this);
-      packet_size = packet_size - 3;
+      packet_size = PACKET_SIZE - 3;
       this._encryptor_instances = new Map;
       this._rewrapper_instances = new Map;
       this._last_node_in_routing_path = new Map;

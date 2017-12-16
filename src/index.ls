@@ -14,12 +14,12 @@ const ROUTING_PROTOCOL_VERSION		= 0
 const PUBLIC_KEY_LENGTH				= 32
 # ChaChaPoly+BLAKE2b
 const MAC_LENGTH					= 16
-# Fixed minimal reasonable packet size, will definitely fit Noise handshake message and with non-zero chance DHT queries/responses; 512+ is recommended though
-const MIN_PACKET_SIZE				= 256
 # Max time in seconds allowed for routing path segment creation after which creation is considered failed
 const ROUTING_PATH_SEGMENT_TIMEOUT	= 10
 # 65 KiB is what is enough for DHT messages and will also be enough for routing data, bigger data will be multiplexed on higher levels when necessary
 const MAX_DATA_SIZE					= 2 ** 16 - 1
+# Fixed packet size for all communications
+const PACKET_SIZE					= 512
 # Same as in webtorrent-dht
 const PEER_CONNECTION_TIMEOUT		= 30
 
@@ -87,13 +87,12 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		if !(@ instanceof simple-peer-detox)
 			return new simple-peer-detox(options)
 		@_sign					= options['sign']
-		@_packet_size			= options['packet_size']
 		@_packets_per_second	= options['packets_per_second']
 		@_sending				= options['initiator']
 		@'once'('connect', !~>
 			@_send_delay	= 1000 / @_packets_per_second
-			@_multiplexer	= fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, @_packet_size)
-			@_demultiplexer	= fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, @_packet_size)
+			@_multiplexer	= fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, PACKET_SIZE)
+			@_demultiplexer	= fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, PACKET_SIZE)
 			@_last_sent		= +(new Date)
 			if @_sending
 				@_real_send()
@@ -115,7 +114,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 						# Data are sent in alternating order, sending data when receiving is expected violates the protocol
 						@'destroy'()
 						return
-					else if data.length != @_packet_size
+					else if data.length != PACKET_SIZE
 						# Data size must be exactly one packet size
 						@'destroy'()
 						return
@@ -136,28 +135,12 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * @param {!Object} signal
 		 */
 		..'signal' = (signal) !->
-			if !signal['signature'] || !signal['extensions']
-				# Drop connection if signature or extensions not specified
+			if !signal['signature']
+				# Drop connection if signature not specified
 				@'destroy'()
 				return
 			@_signature_received	= signal['signature']
 			@_sdp_received			= string2array(signal['sdp'])
-			found_psr				= false
-			for extension in signal['extensions']
-				if extension.startsWith('psr:')
-					array						= extension.split(':')
-					received_packet_size		= parseInt(array[1], 10)
-					received_packets_per_second	= parseInt(array[2], 10)
-					if received_packet_size < MIN_PACKET_SIZE || received_packets_per_second < 1
-						@'destroy'()
-						return
-					@_packet_size			= Math.min(@_packet_size, received_packet_size)
-					@_packets_per_second	= Math.min(@_packets_per_second, received_packets_per_second)
-					found_psr				= true
-					break
-			if !found_psr
-				@'destroy'()
-				return
 			simple-peer::['signal'].call(@, signal)
 		/**
 		 * Data sending method that will be used by DHT
@@ -223,33 +206,23 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 	 * @param {!Uint8Array}		dht_private_key		Corresponding Ed25519 private key
 	 * @param {!Array<!Object>}	bootstrap_nodes
 	 * @param {!Array<!Object>}	ice_servers
-	 * @param {number}			packet_size
 	 * @param {number}			packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
 	 * @param {number}			bucket_size
 	 *
 	 * @return {!DHT}
-	 *
-	 * @throws {Error}
 	 */
-	!function DHT (dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packet_size, packets_per_second, bucket_size = 2)
+	!function DHT (dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packets_per_second, bucket_size = 2)
 		if !(@ instanceof DHT)
-			return new DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packet_size, packets_per_second, bucket_size)
-		if packet_size < MIN_PACKET_SIZE
-			throw new Error('Minimal supported packet size is ' + MIN_PACKET_SIZE)
+			return new DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packets_per_second, bucket_size)
 		async-eventer.call(@)
 		if packets_per_second < 1
 			packets_per_second	= 1
 		@_pending_websocket_ids	= new Map
-		extensions				= [
-			"psr:#packet_size:#packets_per_second" # Packet size and rate
-		]
 		@_socket				= webrtc-socket(
-			'extensions'				: extensions
 			'simple_peer_constructor'	: simple-peer-detox
 			'simple_peer_opts'		:
 				'config'				:
 					'iceServers'	: ice_servers
-				'packet_size'			: packet_size
 				'packets_per_second'	: packets_per_second
 				'sign'					: (data) ->
 					detox-crypto['sign'](data, dht_public_key, dht_private_key)
@@ -298,7 +271,6 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			)
 		@_dht					= new webtorrent-dht(
 			'bootstrap'		: bootstrap_nodes
-			'extensions'	: extensions
 			'hash'			: sha3_256
 			'k'				: bucket_size
 			'nodeId'		: Buffer.from(dht_public_key)
@@ -376,7 +348,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * @param {!Uint8Array}	data
 		 */
 		..'send_data' = (id, command, data) !->
-			if data.length > @_packet_size
+			if data.length > MAX_DATA_SIZE
 				return
 			string_id		= array2hex(id)
 			peer_connection	= @_socket['get_id_mapping'](string_id)
@@ -458,21 +430,18 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 	 * @constructor
 	 *
 	 * @param {!Uint8Array}	dht_private_key			X25519 private key that corresponds to Ed25519 key used in `DHT` constructor
-	 * @param {number}		packet_size				The same as in `DHT` constructor
 	 * @param {number}		max_pending_segments	How much segments can be in pending state per one address
 	 *
 	 * @return {!Router}
 	 *
 	 * @throws {Error}
 	 */
-	!function Router (dht_private_key, packet_size, max_pending_segments = 10)
+	!function Router (dht_private_key, max_pending_segments = 10)
 		if !(@ instanceof Router)
-			return new Router(dht_private_key, packet_size, max_pending_segments)
-		if packet_size < MIN_PACKET_SIZE
-			throw new Error('Minimal supported packet size is ' + MIN_PACKET_SIZE)
+			return new Router(dht_private_key, max_pending_segments)
 		async-eventer.call(@)
-		# Should be smaller than `packet_size` for DHT because it will be later sent through DHT's peer connection (2 bytes for multiplexer and 1 for command)
-		packet_size					= packet_size - 3
+		# 3 bytes (2 for multiplexer and 1 for command) smaller than packet size in DHT in order to avoid fragmentation when sending over peer connection
+		packet_size					= PACKET_SIZE - 3
 		@_encryptor_instances		= new Map
 		@_rewrapper_instances		= new Map
 		@_last_node_in_routing_path	= new Map
@@ -496,6 +465,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				@_ronion['create_response'](address, segment_id, encryptor_instance['get_handshake_message']())
 				# At this point we simply assume that initiator received our response
 				@_ronion['confirm_incoming_segment_established'](address, segment_id)
+				# Make sure each chunk after encryption will fit perfectly into DHT packet
 				@_multiplexer.set(source_id, fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, @_max_packet_data_size))
 				@_demultiplexer.set(source_id, fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, @_max_packet_data_size))
 				if !encryptor_instance['ready']()
@@ -625,6 +595,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 						fail()
 					rewrapper_instances[first_node_string]	= encryptor_instances[first_node_string]['get_rewrapper_keys']().map(detox-crypto['Rewrapper'])
 					@_ronion['confirm_outgoing_segment_established'](first_node, route_id)
+					# Make sure each chunk after encryption will fit perfectly into DHT packet
 					@_multiplexer.set(source_id, fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, @_max_packet_data_size))
 					@_demultiplexer.set(source_id, fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, @_max_packet_data_size))
 					# Successfully established first segment, extending routing path further

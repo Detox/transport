@@ -43,11 +43,11 @@ test('Router', (t) !->
 
 	var node_1_instance, node_2_instance, node_3_instance, node_4_instance, node_5_instance
 	t.doesNotThrow (!->
-		node_1_instance	:= lib.Router(node_1.x25519.private, 256, 20)
-		node_2_instance	:= lib.Router(node_2.x25519.private, 256, 20)
-		node_3_instance	:= lib.Router(node_3.x25519.private, 256, 20)
-		node_4_instance	:= lib.Router(node_4.x25519.private, 256, 20)
-		node_5_instance	:= lib.Router(node_5.x25519.private, 256, 20)
+		node_1_instance	:= lib.Router(node_1.x25519.private, 20)
+		node_2_instance	:= lib.Router(node_2.x25519.private, 20)
+		node_3_instance	:= lib.Router(node_3.x25519.private, 20)
+		node_4_instance	:= lib.Router(node_4.x25519.private, 20)
+		node_5_instance	:= lib.Router(node_5.x25519.private, 20)
 	), 'Instance created without errors'
 
 	nodes	=

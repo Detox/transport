@@ -35,14 +35,13 @@ requirejs(['@detox/transport'], function (detox_transport) {
 ### detox_transport.ready(callback)
 * `callback` - Callback function that is called when library is ready for use
 
-### detox_transport.DHT(dht_public_key : Uint8Array, dht_private_key : Uint8Array, bootstrap_nodes : Object[], ice_servers : Object[], packet_size : number, packets_per_second : number, bucket_size = 2 : number) : detox_transport.DHT
+### detox_transport.DHT(dht_public_key : Uint8Array, dht_private_key : Uint8Array, bootstrap_nodes : Object[], ice_servers : Object[], packets_per_second : number, bucket_size = 2 : number) : detox_transport.DHT
 Constructor for DHT object, offers BitTorrent-like DHT based on [WebTorrent DHT](https://github.com/nazar-pc/webtorrent-dht) with just a few high-level APIs available for the user.
 
 * `dht_public_key` and `dht_private_key` - are Ed25519 keypair as in `@detox/crypto` used to represent node itself in DHT network, typically temporary
 * `bootstrap_nodes` - array of objects with keys (all of them are required) `node_id` (`dht_public_key` of corresponding node), `host` and `ip`
 * `ice_servers` - array of objects as `config.iceServers` in [simple-peer constructor](https://github.com/feross/simple-peer#peer--new-simplepeeropts)
-* `packet_size` - data are always sent over the network in packets of this fixed size, `256` is minimal supported size, actual size is negotiated between 2 sides on connection
-* `packets_per_second` - packets are sent at constant rate (which together with `packet_size` can be used to identify bandwidth requirements for specific connection), `1` is minimal supported rate, actual rate is negotiated between 2 sides on connection
+* `packets_per_second` - packets are sent at constant rate (which together with fixed packet size of 512 bytes can be used to identify bandwidth requirements for specific connection), `1` is minimal supported rate, actual rate is negotiated between 2 sides on connection
 * `bucket_size` - size of the bucket used in DHT internals (directly affects number of active WebRTC connections)
 
 ### detox_transport.DHT.start_bootstrap_node(ip : string, port : number)
@@ -119,11 +118,10 @@ Event is fired when DHT instance is ready to be used.
 Payload is single argument `error`.
 Event is fired when errors occur in underlying DHT implementation.
 
-### detox_transport.Router(dht_private_key : Uint8Array, packet_size, max_pending_segments = 10) : detox_transport.Router
+### detox_transport.Router(dht_private_key : Uint8Array, max_pending_segments = 10 : number) : detox_transport.Router
 Constructor for Router object, offers anonymous routing functionality based on [Ronion](https://github.com/nazar-pc/ronion) spec and reference implementation with just a few high-level APIs available for the user.
 
 * `dht_private_key` - X25519 private key that corresponds to Ed25519 key used in `DHT` constructor
-* `packet_size` - the same as in `DHT` constructor
 * `max_pending_segments` - How much segments can be in pending state per one address
 
 ### detox_transport.Router.process_packet(node_id : Uint8Array, packet : Uint8Array)

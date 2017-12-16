@@ -50,11 +50,11 @@
       node_4 = detoxCrypto.create_keypair(hex2array('561401dff7921304e6c266639cc6a37a14c1600f9928dbf9afc99a61f0732d43'));
       node_5 = detoxCrypto.create_keypair(hex2array('cefed82d3c4e04af9c8ca516db37b48a09f602a7f11c565dc6707cfe2fa3373d'));
       t.doesNotThrow(function(){
-        node_1_instance = lib.Router(node_1.x25519['private'], 256, 20);
-        node_2_instance = lib.Router(node_2.x25519['private'], 256, 20);
-        node_3_instance = lib.Router(node_3.x25519['private'], 256, 20);
-        node_4_instance = lib.Router(node_4.x25519['private'], 256, 20);
-        node_5_instance = lib.Router(node_5.x25519['private'], 256, 20);
+        node_1_instance = lib.Router(node_1.x25519['private'], 20);
+        node_2_instance = lib.Router(node_2.x25519['private'], 20);
+        node_3_instance = lib.Router(node_3.x25519['private'], 20);
+        node_4_instance = lib.Router(node_4.x25519['private'], 20);
+        node_5_instance = lib.Router(node_5.x25519['private'], 20);
       }, 'Instance created without errors');
       nodes = (ref$ = {}, ref$[array2hex(node_1.ed25519['public'])] = node_1_instance, ref$[array2hex(node_2.ed25519['public'])] = node_2_instance, ref$[array2hex(node_3.ed25519['public'])] = node_3_instance, ref$[array2hex(node_4.ed25519['public'])] = node_4_instance, ref$[array2hex(node_5.ed25519['public'])] = node_5_instance, ref$);
       node_1_instance._public_key = node_1.ed25519['public'];

@@ -49,16 +49,16 @@
       node_1_real = detoxCrypto.create_keypair(hex2array('cefed82d3c4e04af9c8ca516db37b48a09f602a7f11c565dc6707cfe2fa3373d'));
       node_2_dht = detoxCrypto.create_keypair(hex2array('910e5d834e32835d427ca4507c4a6a6c1715fd7cbd290cda8d4c1aa90d0f251d'));
       node_3_dht = detoxCrypto.create_keypair(hex2array('7be95d9a4aecf3d353a5a9264b0c76497d977393d2b549f3cec51837f3b528e0'));
-      bootstrap_node_instance = lib.DHT(bootstrap_node_dht.ed25519['public'], bootstrap_node_dht.ed25519['private'], [], [], 1024, 5, 2);
+      bootstrap_node_instance = lib.DHT(bootstrap_node_dht.ed25519['public'], bootstrap_node_dht.ed25519['private'], [], [], 5, 2);
       bootstrap_node_instance.start_bootstrap_node(bootstrap_ip, bootstrap_port);
       bootstrap_node_info = {
         node_id: array2hex(bootstrap_node_dht.ed25519['public']),
         host: bootstrap_ip,
         port: bootstrap_port
       };
-      node_1_instance = lib.DHT(node_1_dht.ed25519['public'], node_1_dht.ed25519['private'], [bootstrap_node_info], [], 512, 5, 2);
-      node_2_instance = lib.DHT(node_2_dht.ed25519['public'], node_2_dht.ed25519['private'], [bootstrap_node_info], [], 512, 5, 2);
-      node_3_instance = lib.DHT(node_3_dht.ed25519['public'], node_3_dht.ed25519['private'], [bootstrap_node_info], [], 512, 5, 2);
+      node_1_instance = lib.DHT(node_1_dht.ed25519['public'], node_1_dht.ed25519['private'], [bootstrap_node_info], [], 5, 2);
+      node_2_instance = lib.DHT(node_2_dht.ed25519['public'], node_2_dht.ed25519['private'], [bootstrap_node_info], [], 5, 2);
+      node_3_instance = lib.DHT(node_3_dht.ed25519['public'], node_3_dht.ed25519['private'], [bootstrap_node_info], [], 5, 2);
       wait_for = 3;
       function ready(){
         --wait_for;
