@@ -445,8 +445,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		@_encryptor_instances		= new Map
 		@_rewrapper_instances		= new Map
 		@_last_node_in_routing_path	= new Map
-		@_multiplexer				= new Map
-		@_demultiplexer				= new Map
+		@_multiplexers				= new Map
+		@_demultiplexers			= new Map
 		@_established_routing_paths	= new Map
 		@_ronion					= ronion(ROUTING_PROTOCOL_VERSION, ROUTER_PACKET_SIZE, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)
 			.'on'('activity', (address, segment_id) !~>
@@ -466,8 +466,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				# At this point we simply assume that initiator received our response
 				@_ronion['confirm_incoming_segment_established'](address, segment_id)
 				# Make sure each chunk after encryption will fit perfectly into DHT packet
-				@_multiplexer.set(source_id, fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, @_max_packet_data_size))
-				@_demultiplexer.set(source_id, fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, @_max_packet_data_size))
+				@_multiplexers.set(source_id, fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, @_max_packet_data_size))
+				@_demultiplexers.set(source_id, fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, @_max_packet_data_size))
 				if !encryptor_instance['ready']()
 					return
 				rewrapper_instance					= encryptor_instance['get_rewrapper_keys']().map(detox-crypto['Rewrapper'])
@@ -489,7 +489,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				if target_address.join(',') != last_node_in_routing_path.join(',')
 					# We only accept data back from responder
 					return
-				demultiplexer				= @_demultiplexer.get(source_id)
+				demultiplexer				= @_demultiplexers.get(source_id)
 				if !demultiplexer
 					return
 				demultiplexer['feed'](command_data)
@@ -596,8 +596,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 					rewrapper_instances[first_node_string]	= encryptor_instances[first_node_string]['get_rewrapper_keys']().map(detox-crypto['Rewrapper'])
 					@_ronion['confirm_outgoing_segment_established'](first_node, route_id)
 					# Make sure each chunk after encryption will fit perfectly into DHT packet
-					@_multiplexer.set(source_id, fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, @_max_packet_data_size))
-					@_demultiplexer.set(source_id, fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, @_max_packet_data_size))
+					@_multiplexers.set(source_id, fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, @_max_packet_data_size))
+					@_demultiplexers.set(source_id, fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, @_max_packet_data_size))
 					# Successfully established first segment, extending routing path further
 					var current_node, current_node_string, segment_extension_timeout
 					!~function extend_request
@@ -675,7 +675,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				return
 			source_id		= compute_source_id(node_id, route_id)
 			target_address	= @_last_node_in_routing_path.get(source_id)
-			multiplexer		= @_multiplexer.get(source_id)
+			multiplexer		= @_multiplexers.get(source_id)
 			if !multiplexer
 				return
 			multiplexer['feed'](data)
@@ -702,8 +702,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 			@_encryptor_instances.delete(source_id)
 			@_rewrapper_instances.delete(source_id)
 			@_last_node_in_routing_path.delete(source_id)
-			@_multiplexer.delete(source_id)
-			@_demultiplexer.delete(source_id)
+			@_multiplexers.delete(source_id)
+			@_demultiplexers.delete(source_id)
 			@_established_routing_paths.delete(source_id)
 	Object.defineProperty(Router::, 'constructor', {enumerable: false, value: Router})
 	{

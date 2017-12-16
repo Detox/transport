@@ -522,8 +522,8 @@
       this._encryptor_instances = new Map;
       this._rewrapper_instances = new Map;
       this._last_node_in_routing_path = new Map;
-      this._multiplexer = new Map;
-      this._demultiplexer = new Map;
+      this._multiplexers = new Map;
+      this._demultiplexers = new Map;
       this._established_routing_paths = new Map;
       this._ronion = ronion(ROUTING_PROTOCOL_VERSION, ROUTER_PACKET_SIZE, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)['on']('activity', function(address, segment_id){
         this$['fire']('activity', address, segment_id);
@@ -542,8 +542,8 @@
         }
         this$._ronion['create_response'](address, segment_id, encryptor_instance['get_handshake_message']());
         this$._ronion['confirm_incoming_segment_established'](address, segment_id);
-        this$._multiplexer.set(source_id, fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
-        this$._demultiplexer.set(source_id, fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
+        this$._multiplexers.set(source_id, fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
+        this$._demultiplexers.set(source_id, fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
         if (!encryptor_instance['ready']()) {
           return;
         }
@@ -565,7 +565,7 @@
         if (target_address.join(',') !== last_node_in_routing_path.join(',')) {
           return;
         }
-        demultiplexer = this$._demultiplexer.get(source_id);
+        demultiplexer = this$._demultiplexers.get(source_id);
         if (!demultiplexer) {
           return;
         }
@@ -686,8 +686,8 @@
           }
           rewrapper_instances[first_node_string] = encryptor_instances[first_node_string]['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
           this$._ronion['confirm_outgoing_segment_established'](first_node, route_id);
-          this$._multiplexer.set(source_id, fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
-          this$._demultiplexer.set(source_id, fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
+          this$._multiplexers.set(source_id, fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
+          this$._demultiplexers.set(source_id, fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
           function extend_request(){
             var x25519_public_key;
             if (!nodes.length) {
@@ -779,7 +779,7 @@
       }
       source_id = compute_source_id(node_id, route_id);
       target_address = this._last_node_in_routing_path.get(source_id);
-      multiplexer = this._multiplexer.get(source_id);
+      multiplexer = this._multiplexers.get(source_id);
       if (!multiplexer) {
         return;
       }
@@ -818,8 +818,8 @@
       this._encryptor_instances['delete'](source_id);
       this._rewrapper_instances['delete'](source_id);
       this._last_node_in_routing_path['delete'](source_id);
-      this._multiplexer['delete'](source_id);
-      this._demultiplexer['delete'](source_id);
+      this._multiplexers['delete'](source_id);
+      this._demultiplexers['delete'](source_id);
       this._established_routing_paths['delete'](source_id);
     };
     Object.defineProperty(Router.prototype, 'constructor', {
