@@ -18,7 +18,7 @@ const MAC_LENGTH					= 16
 const MIN_PACKET_SIZE				= 256
 # Max time in seconds allowed for routing path segment creation after which creation is considered failed
 const ROUTING_PATH_SEGMENT_TIMEOUT	= 10
-# 65 KiB is what is necessary for DHT messages and will also be necessary for routing data, bigger data will be multiplexed on higher levels when necessary
+# 65 KiB is what is enough for DHT messages and will also be enough for routing data, bigger data will be multiplexed on higher levels when necessary
 const MAX_DATA_SIZE					= 2 ** 16 - 1
 # Same as in webtorrent-dht
 const PEER_CONNECTION_TIMEOUT		= 30
