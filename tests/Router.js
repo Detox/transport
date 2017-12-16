@@ -42,7 +42,7 @@
   lib.ready(function(){
     test('Router', function(t){
       var data, node_1, node_2, node_3, node_4, node_5, node_1_instance, node_2_instance, node_3_instance, node_4_instance, node_5_instance, nodes, ref$, i$, len$;
-      t.plan(10);
+      t.plan(11);
       data = crypto.randomBytes(1000);
       node_1 = detoxCrypto.create_keypair(hex2array('4b39c9e51f2b644fd0678769cc53069e9c1a93984bbffd7f0fbca2375c08b815'));
       node_2 = detoxCrypto.create_keypair(hex2array('910e5d834e32835d427ca4507c4a6a6c1715fd7cbd290cda8d4c1aa90d0f251d'));
@@ -56,6 +56,7 @@
         node_4_instance = lib.Router(node_4.x25519['private'], 20);
         node_5_instance = lib.Router(node_5.x25519['private'], 20);
       }, 'Instance created without errors');
+      t.equal(node_1_instance.get_max_packet_data_size(), 487, 'Max packet data size is correct');
       nodes = (ref$ = {}, ref$[array2hex(node_1.ed25519['public'])] = node_1_instance, ref$[array2hex(node_2.ed25519['public'])] = node_2_instance, ref$[array2hex(node_3.ed25519['public'])] = node_3_instance, ref$[array2hex(node_4.ed25519['public'])] = node_4_instance, ref$[array2hex(node_5.ed25519['public'])] = node_5_instance, ref$);
       node_1_instance._public_key = node_1.ed25519['public'];
       node_2_instance._public_key = node_2.ed25519['public'];

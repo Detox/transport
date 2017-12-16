@@ -140,6 +140,9 @@ Destroy routing path constructed earlier.
 * `node_id` - first node in routing path
 * `route_id` - identifier returned during routing path construction
 
+### detox_transport.Router.get_max_packet_data_size() : number
+Max data size that will fit into single packet without fragmentation
+
 ### detox_transport.Router.send_data(node_id : Uint8Array, route_id : Uint8Array, command : number, data : Uint8Array)
 Send data to the responder on specified routing path.
 

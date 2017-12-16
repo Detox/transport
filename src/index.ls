@@ -656,6 +656,13 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		..'destroy_routing_path' = (node_id, route_id) !->
 			@_destroy_routing_path(node_id, route_id)
 		/**
+		 * Max data size that will fit into single packet without fragmentation
+		 *
+		 * @return {number}
+		 */
+		..'get_max_packet_data_size' = ->
+			@_max_packet_data_size
+		/**
 		 * Send data to the responder on specified routing path
 		 *
 		 * @param {!Uint8Array}	node_id		First node in routing path

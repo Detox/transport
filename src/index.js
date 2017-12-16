@@ -757,6 +757,14 @@
       this._destroy_routing_path(node_id, route_id);
     };
     /**
+     * Max data size that will fit into single packet without fragmentation
+     *
+     * @return {number}
+     */
+    z$['get_max_packet_data_size'] = function(){
+      return this._max_packet_data_size;
+    };
+    /**
      * Send data to the responder on specified routing path
      *
      * @param {!Uint8Array}	node_id		First node in routing path

@@ -32,7 +32,7 @@ function hex2array (string)
 
 <-! lib.ready
 test('Router', (t) !->
-	t.plan(10)
+	t.plan(11)
 
 	data	= crypto.randomBytes(1000)
 	node_1	= detox-crypto.create_keypair(hex2array('4b39c9e51f2b644fd0678769cc53069e9c1a93984bbffd7f0fbca2375c08b815')) # ea977ae216d9de56a85a67f6a10cfd9e67d2b4ddb099892e0df937fa31c02ec0
@@ -49,6 +49,8 @@ test('Router', (t) !->
 		node_4_instance	:= lib.Router(node_4.x25519.private, 20)
 		node_5_instance	:= lib.Router(node_5.x25519.private, 20)
 	), 'Instance created without errors'
+
+	t.equal(node_1_instance.get_max_packet_data_size(), 487, 'Max packet data size is correct')
 
 	nodes	=
 		(array2hex(node_1.ed25519.public))	: node_1_instance
