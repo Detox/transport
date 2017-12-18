@@ -296,6 +296,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * @param {number}	port
 		 */
 		..'start_bootstrap_node' = (ip, port) !->
+			if @_destroyed
+				return
 			@_dht['listen'](port, ip)
 		/**
 		 * Get an array of bootstrap nodes obtained during DHT operation in the same format as `bootstrap_nodes` argument in constructor
@@ -303,6 +305,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * @return {!Array<!Object>} Each element is an object with keys `host`, `port` and `node_id`
 		 */
 		..'get_bootstrap_nodes' = ->
+			if @_destroyed
+				return []
 			(
 				for , peer_connection of @_dht['_rpc']['socket']['socket']['_peer_connections']
 					if peer_connection['ws_server'] && peer_connection['id']
@@ -319,6 +323,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * @param {!Uint8Array} id
 		 */
 		..'lookup' = (id) !->
+			if @_destroyed
+				return
 			@_dht['lookup'](Buffer.from(id))
 		/**
 		 * Tag connection to specified node ID as used, so that it is not disconnected when not used by DHT itself
@@ -326,6 +332,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * @param {!Uint8Array} id
 		 */
 		..'add_used_tag' = (id) !->
+			if @_destroyed
+				return
 			string_id	= array2hex(id)
 			peer_connection	= @_socket['get_id_mapping'](string_id)
 			if peer_connection
@@ -337,6 +345,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * @param {!Uint8Array} id
 		 */
 		..'del_used_tag' = (id) !->
+			if @_destroyed
+				return
 			string_id	= array2hex(id)
 			peer_connection	= @_socket['get_id_mapping'](string_id)
 			if peer_connection
@@ -350,7 +360,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * @param {!Uint8Array}	data
 		 */
 		..'send_data' = (id, command, data) !->
-			if data.length > MAX_DATA_SIZE
+			if @_destroyed || data.length > MAX_DATA_SIZE
 				return
 			string_id		= array2hex(id)
 			peer_connection	= @_socket['get_id_mapping'](string_id)
@@ -392,6 +402,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * @param {!Uint8Array} message
 		 */
 		..'publish_announcement_message' = (message) !->
+			if @_destroyed
+				return
 			try
 				message	= bencode['decode'](Buffer.from(message))
 			if !message || !message['k'] || !message['seq'] || !message['sig'] || !message['v']
@@ -405,6 +417,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * @param {!Function}	failure_callback
 		 */
 		..'find_introduction_nodes' = (target_public_key, success_callback, failure_callback) !->
+			if @_destroyed
+				return
 			hash	= sha3_256(target_public_key)
 			@_dht['get'](hash, (, result) !->
 				if !result || !result['v']
@@ -427,6 +441,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		..'destroy' = (callback) !->
 			@_dht['destroy'](callback)
 			delete @_dht
+			@_destroyed	= true
 	Object.defineProperty(DHT::, 'constructor', {enumerable: false, value: DHT})
 	/**
 	 * @constructor

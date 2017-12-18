@@ -339,6 +339,9 @@
      * @param {number}	port
      */
     y$['start_bootstrap_node'] = function(ip, port){
+      if (this._destroyed) {
+        return;
+      }
       this._dht['listen'](port, ip);
     };
     /**
@@ -348,6 +351,9 @@
      */
     y$['get_bootstrap_nodes'] = function(){
       var peer_connection;
+      if (this._destroyed) {
+        return [];
+      }
       return (function(){
         var i$, ref$, results$ = [];
         for (i$ in ref$ = this._dht['_rpc']['socket']['socket']['_peer_connections']) {
@@ -369,6 +375,9 @@
      * @param {!Uint8Array} id
      */
     y$['lookup'] = function(id){
+      if (this._destroyed) {
+        return;
+      }
       this._dht['lookup'](Buffer.from(id));
     };
     /**
@@ -378,6 +387,9 @@
      */
     y$['add_used_tag'] = function(id){
       var string_id, peer_connection;
+      if (this._destroyed) {
+        return;
+      }
       string_id = array2hex(id);
       peer_connection = this._socket['get_id_mapping'](string_id);
       if (peer_connection) {
@@ -392,6 +404,9 @@
      */
     y$['del_used_tag'] = function(id){
       var string_id, peer_connection;
+      if (this._destroyed) {
+        return;
+      }
       string_id = array2hex(id);
       peer_connection = this._socket['get_id_mapping'](string_id);
       if (peer_connection) {
@@ -408,7 +423,7 @@
      */
     y$['send_data'] = function(id, command, data){
       var string_id, peer_connection;
-      if (data.length > MAX_DATA_SIZE) {
+      if (this._destroyed || data.length > MAX_DATA_SIZE) {
         return;
       }
       string_id = array2hex(id);
@@ -453,6 +468,9 @@
      * @param {!Uint8Array} message
      */
     y$['publish_announcement_message'] = function(message){
+      if (this._destroyed) {
+        return;
+      }
       try {
         message = bencode['decode'](Buffer.from(message));
       } catch (e$) {}
@@ -470,6 +488,9 @@
      */
     y$['find_introduction_nodes'] = function(target_public_key, success_callback, failure_callback){
       var hash;
+      if (this._destroyed) {
+        return;
+      }
       hash = sha3_256(target_public_key);
       this._dht['get'](hash, function(arg$, result){
         var introduction_nodes_bulk, introduction_nodes, i$, to$, i;
@@ -497,6 +518,7 @@
     y$['destroy'] = function(callback){
       this._dht['destroy'](callback);
       delete this._dht;
+      this._destroyed = true;
     };
     Object.defineProperty(DHT.prototype, 'constructor', {
       enumerable: false,
