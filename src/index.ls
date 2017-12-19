@@ -89,13 +89,12 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		if !(@ instanceof simple-peer-detox)
 			return new simple-peer-detox(options)
 		@_sign					= options['sign']
-		@_packets_per_second	= options['packets_per_second']
+		@_send_delay			= 1000 / options['packets_per_second']
 		@_sending				= options['initiator']
+		@_multiplexer			= fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, DHT_PACKET_SIZE)
+		@_demultiplexer			= fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, DHT_PACKET_SIZE)
 		@'once'('connect', !~>
-			@_send_delay	= 1000 / @_packets_per_second
-			@_multiplexer	= fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, DHT_PACKET_SIZE)
-			@_demultiplexer	= fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, DHT_PACKET_SIZE)
-			@_last_sent		= +(new Date)
+			@_last_sent	= +(new Date)
 			if @_sending
 				@_real_send()
 		)

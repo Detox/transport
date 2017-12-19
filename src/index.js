@@ -99,12 +99,11 @@
         return new simplePeerDetox(options);
       }
       this._sign = options['sign'];
-      this._packets_per_second = options['packets_per_second'];
+      this._send_delay = 1000 / options['packets_per_second'];
       this._sending = options['initiator'];
+      this._multiplexer = fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, DHT_PACKET_SIZE);
+      this._demultiplexer = fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, DHT_PACKET_SIZE);
       this['once']('connect', function(){
-        this$._send_delay = 1000 / this$._packets_per_second;
-        this$._multiplexer = fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, DHT_PACKET_SIZE);
-        this$._demultiplexer = fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, DHT_PACKET_SIZE);
         this$._last_sent = +new Date;
         if (this$._sending) {
           this$._real_send();
