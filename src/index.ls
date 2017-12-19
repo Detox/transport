@@ -582,7 +582,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 */
 		..'construct_routing_path' = (nodes) ->
 			nodes	= nodes.slice() # Do not modify source array
-			new Promise (resolve) !~>
+			new Promise (resolve, reject) !~>
 				last_node_in_routing_path				= nodes[nodes.length - 1]
 				first_node								= nodes.shift()
 				first_node_string						= first_node.join(',')
@@ -590,11 +590,12 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				rewrapper_instances						= Object.create(null)
 				fail									= !~>
 					@_destroy_routing_path(first_node, route_id)
-					throw new Error('Routing path creation failed')
+					reject('Routing path creation failed')
 				# Establishing first segment
 				x25519_public_key						= detox-crypto['convert_public_key'](first_node)
 				if !x25519_public_key
 					fail()
+					return
 				encryptor_instances[first_node_string]	= detox-crypto['Encryptor'](true, x25519_public_key)
 				!~function create_response_handler (address, segment_id, command_data)
 					if !is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)
@@ -605,8 +606,10 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 						encryptor_instances[first_node_string]['put_handshake_message'](command_data)
 					catch
 						fail()
+						return
 					if !encryptor_instances[first_node_string]['ready']()
 						fail()
+						return
 					rewrapper_instances[first_node_string]	= encryptor_instances[first_node_string]['get_rewrapper_keys']().map(detox-crypto['Rewrapper'])
 					@_ronion['confirm_outgoing_segment_established'](first_node, route_id)
 					# Make sure each chunk after encryption will fit perfectly into DHT packet
@@ -627,12 +630,15 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 							# If last node in routing path clearly said extension failed - no need to do something else here
 							if !command_data.length
 								fail()
+								return
 							try
 								encryptor_instances[current_node_string]['put_handshake_message'](command_data)
 							catch
 								fail()
+								return
 							if !encryptor_instances[current_node_string]['ready']()
 								fail()
+								return
 							rewrapper_instances[current_node_string]	= encryptor_instances[current_node_string]['get_rewrapper_keys']().map(detox-crypto['Rewrapper'])
 							@_ronion['confirm_extended_path'](first_node, route_id)
 							# Successfully extended routing path by one more segment, continue extending routing path further
@@ -643,10 +649,12 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 						x25519_public_key							= detox-crypto['convert_public_key'](current_node)
 						if !x25519_public_key
 							fail()
+							return
 						encryptor_instances[current_node_string]	= detox-crypto['Encryptor'](true, x25519_public_key)
 						segment_extension_timeout					:= setTimeout (!~>
 							@_ronion['off']('extend_response', extend_response_handler)
 							fail()
+							return
 						), ROUTING_PATH_SEGMENT_TIMEOUT * 1000
 						@_ronion['extend_request'](first_node, route_id, current_node, encryptor_instances[current_node_string]['get_handshake_message']())
 					extend_request()
@@ -654,6 +662,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				segment_establishment_timeout	= setTimeout (!~>
 					@_ronion['off']('create_response', create_response_handler)
 					fail()
+					return
 				), ROUTING_PATH_SEGMENT_TIMEOUT * 1000
 				route_id						= @_ronion['create_request'](first_node, encryptor_instances[first_node_string]['get_handshake_message']())
 				route_id_string					= route_id.join(',')
