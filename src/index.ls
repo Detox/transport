@@ -622,7 +622,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 						!~function extend_response_handler (address, segment_id, command_data)
 							if !is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)
 								return
-							@_ronion.'off'('extend_response', extend_response_handler)
+							@_ronion['off']('extend_response', extend_response_handler)
 							clearTimeout(segment_extension_timeout)
 							# If last node in routing path clearly said extension failed - no need to do something else here
 							if !command_data.length
