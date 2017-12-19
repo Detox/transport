@@ -757,7 +757,6 @@
             segment_extension_timeout = setTimeout(function(){
               this$._ronion['off']('extend_response', extend_response_handler);
               fail();
-              return;
             }, ROUTING_PATH_SEGMENT_TIMEOUT * 1000);
             this$._ronion['extend_request'](first_node, route_id, current_node, encryptor_instances[current_node_string]['get_handshake_message']());
           }
@@ -767,7 +766,6 @@
         segment_establishment_timeout = setTimeout(function(){
           this$._ronion['off']('create_response', create_response_handler);
           fail();
-          return;
         }, ROUTING_PATH_SEGMENT_TIMEOUT * 1000);
         route_id = this$._ronion['create_request'](first_node, encryptor_instances[first_node_string]['get_handshake_message']());
         route_id_string = route_id.join(',');
