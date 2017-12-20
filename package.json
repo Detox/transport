@@ -8,7 +8,7 @@
 		"routing",
 		"anonymous"
 	],
-	"version"         : "0.11.4",
+	"version"         : "0.11.5",
 	"homepage"        : "https://github.com/Detox/detox-transport",
 	"author"          : {
 		"name"  : "Nazar Mokrynskyi",
@@ -36,7 +36,7 @@
 	},
 	"dependencies"    : {
 		"@detox/crypto"          : "^0.4.0",
-		"@detox/dht"             : "^0.6.1",
+		"@detox/dht"             : "^0.6.2",
 		"async-eventer"          : "^1.1.4",
 		"fixed-size-multiplexer" : "^0.1.1",
 		"jssha"                  : "^2.3.1",
