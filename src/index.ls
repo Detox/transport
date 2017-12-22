@@ -467,6 +467,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				@'fire'('activity', address, segment_id)
 			)
 			.'on'('create_request', (address, segment_id, command_data) !~>
+				if @_destroyed
+					return
 				source_id	= compute_source_id(address, segment_id)
 				if @_encryptor_instances.has(source_id)
 					# Something wrong is happening, refuse to handle
@@ -498,6 +500,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				@'fire'('send', address, packet)
 			)
 			.'on'('data', (address, segment_id, target_address, command, command_data) !~>
+				if @_destroyed
+					return
 				source_id					= compute_source_id(address, segment_id)
 				last_node_in_routing_path	= @_last_node_in_routing_path.get(source_id)
 				if target_address.join(',') != last_node_in_routing_path.join(',')
@@ -513,6 +517,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 					@'fire'('data', address, segment_id, command, data)
 			)
 			.'on'('encrypt', (data) !~>
+				if @_destroyed
+					return
 				address					= data['address']
 				segment_id				= data['segment_id']
 				target_address			= data['target_address']
@@ -525,6 +531,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				data['ciphertext']	= encryptor_instance['encrypt'](plaintext)
 			)
 			.'on'('decrypt', (data) !~>
+				if @_destroyed
+					return
 				address					= data['address']
 				segment_id				= data['segment_id']
 				target_address			= data['target_address']
@@ -539,6 +547,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 					data['plaintext']	= encryptor_instance['decrypt'](ciphertext)
 			)
 			.'on'('wrap', (data) !~>
+				if @_destroyed
+					return
 				address					= data['address']
 				segment_id				= data['segment_id']
 				target_address			= data['target_address']
@@ -551,6 +561,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				data['wrapped']	= rewrapper_instance['wrap'](unwrapped)
 			)
 			.'on'('unwrap', (data) !~>
+				if @_destroyed
+					return
 				address					= data['address']
 				segment_id				= data['segment_id']
 				target_address			= data['target_address']
@@ -572,6 +584,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * @param {!Uint8Array} packet
 		 */
 		..'process_packet' = (node_id, packet) !->
+			if @_destroyed
+				return
 			@_ronion['process_packet'](node_id, packet)
 		/**
 		 * Construct routing path through specified nodes
@@ -581,6 +595,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * @return {!Promise} Will resolve with ID of the route or will be rejected if path construction fails
 		 */
 		..'construct_routing_path' = (nodes) ->
+			if @_destroyed
+				return Promise.reject()
 			nodes	= nodes.slice() # Do not modify source array
 			new Promise (resolve, reject) !~>
 				last_node_in_routing_path				= nodes[nodes.length - 1]
@@ -692,6 +708,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * @param {!Uint8Array}	data
 		 */
 		..'send_data' = (node_id, route_id, command, data) !->
+			if @_destroyed
+				return
 			if data.length > MAX_DATA_SIZE
 				return
 			source_id		= compute_source_id(node_id, route_id)
@@ -707,6 +725,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * Destroy all of the routing path constructed earlier
 		 */
 		..'destroy' = !->
+			@_destroyed = true
 			@_established_routing_paths.forEach ([address, segment_id]) !~>
 				@_destroy_routing_path(address, segment_id)
 		/**

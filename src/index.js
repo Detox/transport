@@ -550,6 +550,9 @@
         this$['fire']('activity', address, segment_id);
       })['on']('create_request', function(address, segment_id, command_data){
         var source_id, encryptor_instance, e, rewrapper_instance, address_string, encryptor_instances, rewrapper_instances;
+        if (this$._destroyed) {
+          return;
+        }
         source_id = compute_source_id(address, segment_id);
         if (this$._encryptor_instances.has(source_id)) {
           return;
@@ -581,6 +584,9 @@
         this$['fire']('send', address, packet);
       })['on']('data', function(address, segment_id, target_address, command, command_data){
         var source_id, last_node_in_routing_path, demultiplexer, data;
+        if (this$._destroyed) {
+          return;
+        }
         source_id = compute_source_id(address, segment_id);
         last_node_in_routing_path = this$._last_node_in_routing_path.get(source_id);
         if (target_address.join(',') !== last_node_in_routing_path.join(',')) {
@@ -597,6 +603,9 @@
         }
       })['on']('encrypt', function(data){
         var address, segment_id, target_address, plaintext, source_id, target_address_string, encryptor_instance, ref$;
+        if (this$._destroyed) {
+          return;
+        }
         address = data['address'];
         segment_id = data['segment_id'];
         target_address = data['target_address'];
@@ -610,6 +619,9 @@
         data['ciphertext'] = encryptor_instance['encrypt'](plaintext);
       })['on']('decrypt', function(data){
         var address, segment_id, target_address, ciphertext, source_id, target_address_string, encryptor_instance, ref$;
+        if (this$._destroyed) {
+          return;
+        }
         address = data['address'];
         segment_id = data['segment_id'];
         target_address = data['target_address'];
@@ -625,6 +637,9 @@
         } catch (e$) {}
       })['on']('wrap', function(data){
         var address, segment_id, target_address, unwrapped, source_id, target_address_string, rewrapper_instance, ref$, ref1$;
+        if (this$._destroyed) {
+          return;
+        }
         address = data['address'];
         segment_id = data['segment_id'];
         target_address = data['target_address'];
@@ -638,6 +653,9 @@
         data['wrapped'] = rewrapper_instance['wrap'](unwrapped);
       })['on']('unwrap', function(data){
         var address, segment_id, target_address, wrapped, source_id, target_address_string, rewrapper_instance, ref$, ref1$;
+        if (this$._destroyed) {
+          return;
+        }
         address = data['address'];
         segment_id = data['segment_id'];
         target_address = data['target_address'];
@@ -661,6 +679,9 @@
      * @param {!Uint8Array} packet
      */
     z$['process_packet'] = function(node_id, packet){
+      if (this._destroyed) {
+        return;
+      }
       this._ronion['process_packet'](node_id, packet);
     };
     /**
@@ -672,6 +693,9 @@
      */
     z$['construct_routing_path'] = function(nodes){
       var this$ = this;
+      if (this._destroyed) {
+        return Promise.reject();
+      }
       nodes = nodes.slice();
       return new Promise(function(resolve, reject){
         var last_node_in_routing_path, first_node, first_node_string, encryptor_instances, rewrapper_instances, fail, x25519_public_key, segment_establishment_timeout, route_id, route_id_string, source_id;
@@ -802,6 +826,9 @@
      */
     z$['send_data'] = function(node_id, route_id, command, data){
       var source_id, target_address, multiplexer, data_block;
+      if (this._destroyed) {
+        return;
+      }
       if (data.length > MAX_DATA_SIZE) {
         return;
       }
@@ -822,6 +849,7 @@
      */
     z$['destroy'] = function(){
       var this$ = this;
+      this._destroyed = true;
       this._established_routing_paths.forEach(function(arg$){
         var address, segment_id;
         address = arg$[0], segment_id = arg$[1];
