@@ -615,7 +615,7 @@
         source_id = compute_source_id(address, segment_id);
         target_address_string = target_address.join(',');
         encryptor_instance = (ref$ = this$._encryptor_instances.get(source_id)) != null ? ref$[target_address_string] : void 8;
-        if (!encryptor_instance) {
+        if (!encryptor_instance || !encryptor_instance['ready']()) {
           return;
         }
         data['ciphertext'] = encryptor_instance['encrypt'](plaintext);
@@ -631,7 +631,7 @@
         source_id = compute_source_id(address, segment_id);
         target_address_string = target_address.join(',');
         encryptor_instance = (ref$ = this$._encryptor_instances.get(source_id)) != null ? ref$[target_address_string] : void 8;
-        if (!encryptor_instance) {
+        if (!encryptor_instance || !encryptor_instance['ready']()) {
           return;
         }
         try {

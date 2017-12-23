@@ -528,7 +528,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				source_id				= compute_source_id(address, segment_id)
 				target_address_string	= target_address.join(',')
 				encryptor_instance		= @_encryptor_instances.get(source_id)?[target_address_string]
-				if !encryptor_instance
+				if !encryptor_instance || !encryptor_instance['ready']()
 					return
 				data['ciphertext']	= encryptor_instance['encrypt'](plaintext)
 			)
@@ -542,7 +542,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				source_id				= compute_source_id(address, segment_id)
 				target_address_string	= target_address.join(',')
 				encryptor_instance		= @_encryptor_instances.get(source_id)?[target_address_string]
-				if !encryptor_instance
+				if !encryptor_instance || !encryptor_instance['ready']()
 					return
 				# This can legitimately throw exceptions if ciphertext is not targeted at this node
 				try
