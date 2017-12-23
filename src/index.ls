@@ -142,7 +142,9 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				return
 			@_signature_received	= signal['signature']
 			@_sdp_received			= string2array(signal['sdp'])
-			simple-peer::['signal'].call(@, signal)
+			# Connection might be closed already for some reason - catch thrown exception if that is the case
+			try
+				simple-peer::['signal'].call(@, signal)
 		/**
 		 * Data sending method that will be used by DHT
 		 *

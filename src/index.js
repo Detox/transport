@@ -159,7 +159,9 @@
       }
       this._signature_received = signal['signature'];
       this._sdp_received = string2array(signal['sdp']);
-      simplePeer.prototype['signal'].call(this, signal);
+      try {
+        simplePeer.prototype['signal'].call(this, signal);
+      } catch (e$) {}
     };
     /**
      * Data sending method that will be used by DHT
