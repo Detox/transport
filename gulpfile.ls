@@ -17,6 +17,7 @@ gulp
 				jsOutputFile		: 'index.min.js'
 				languageIn			: 'ES5'
 				languageOut			: 'ES5'
+				rewritePolyfills	: false
 				warningLevel		: 'VERBOSE'
 			))
 			.pipe(gulp.dest('src'))
