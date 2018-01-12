@@ -56,7 +56,7 @@
         node_4_instance = lib.Router(node_4.x25519['private'], 20);
         node_5_instance = lib.Router(node_5.x25519['private'], 20);
       }, 'Instance created without errors');
-      t.equal(node_1_instance.get_max_packet_data_size(), 487, 'Max packet data size is correct');
+      t.equal(node_1_instance.get_max_packet_data_size(), 488, 'Max packet data size is correct');
       nodes = (ref$ = {}, ref$[array2hex(node_1.ed25519['public'])] = node_1_instance, ref$[array2hex(node_2.ed25519['public'])] = node_2_instance, ref$[array2hex(node_3.ed25519['public'])] = node_3_instance, ref$[array2hex(node_4.ed25519['public'])] = node_4_instance, ref$[array2hex(node_5.ed25519['public'])] = node_5_instance, ref$);
       node_1_instance._public_key = node_1.ed25519['public'];
       node_2_instance._public_key = node_2.ed25519['public'];

@@ -9,7 +9,6 @@ const COMMAND_TAG				= 1
 const COMMAND_UNTAG				= 2
 const CUSTOM_COMMANDS_OFFSET	= 10 # 3..9 are also reserved for future use, everything above is available for the user
 
-const ROUTING_PROTOCOL_VERSION		= 0
 # Length of Ed25519 public key in bytes
 const PUBLIC_KEY_LENGTH				= 32
 # ChaChaPoly+BLAKE2b
@@ -464,7 +463,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		@_multiplexers				= new Map
 		@_demultiplexers			= new Map
 		@_established_routing_paths	= new Map
-		@_ronion					= ronion(ROUTING_PROTOCOL_VERSION, ROUTER_PACKET_SIZE, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)
+		@_ronion					= ronion(ROUTER_PACKET_SIZE, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)
 			.'on'('activity', (address, segment_id) !~>
 				@'fire'('activity', address, segment_id)
 			)

@@ -50,7 +50,7 @@ test('Router', (t) !->
 		node_5_instance	:= lib.Router(node_5.x25519.private, 20)
 	), 'Instance created without errors'
 
-	t.equal(node_1_instance.get_max_packet_data_size(), 487, 'Max packet data size is correct')
+	t.equal(node_1_instance.get_max_packet_data_size(), 488, 'Max packet data size is correct')
 
 	nodes	=
 		(array2hex(node_1.ed25519.public))	: node_1_instance
