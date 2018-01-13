@@ -72,6 +72,9 @@ Introduction message that contains a list of introduction nodes that can be used
 `dht_public_key` and `dht_private_key` are Ed25519 keypair as in `@detox/crypto` that is typically different from DHT keypair and is used as real long-term keypair.
 `introduction_nodes` is a list of nodes IDs (`dht_public_key` of corresponding nodes).
 
+### detox_transport.DHT.verify_announcement_message(message : Uint8Array) : Uint8Array|null
+Verifies whether announcement message is correct, returns public key of the node being announced if yes or `null` otherwise.
+
 ### detox_transport.DHT.publish_announcement_message(message : Uint8Array)
 Publish message with introduction nodes (typically happens on different node than `generate_announcement_message()`)
 

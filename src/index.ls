@@ -397,18 +397,32 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				)
 			)
 		/**
+		 * @param {!Uint8Array} message
+		 *
+		 * @return {Uint8Array} Public key if signature is correct, `null` otherwise
+		 */
+		..'verify_announcement_message' = (message) ->
+			try
+				message	= bencode['decode'](Buffer.from(message))
+			if !message || !message['k'] || !message['seq'] || !message['sig'] || !message['v']
+				return null
+			signature_data	= encode_signature_data(
+				'seq'	: message['seq']
+				'v'		: message['v']
+			)
+			if detox-crypto['verify'](message['sig'], signature_data, message['k'])
+				Uint8Array.from(message['k'])
+			else
+				null
+		/**
 		 * Publish message with introduction nodes (typically happens on different node than `generate_announcement_message()`)
 		 *
 		 * @param {!Uint8Array} message
 		 */
 		..'publish_announcement_message' = (message) !->
-			if @_destroyed
+			if @_destroyed || !@'verify_announcement_message'(message)
 				return
-			try
-				message	= bencode['decode'](Buffer.from(message))
-			if !message || !message['k'] || !message['seq'] || !message['sig'] || !message['v']
-				return
-			@_dht['put'](message)
+			@_dht['put'](bencode['decode'](Buffer.from(message)))
 		/**
 		 * Find nodes in DHT that are acting as introduction points for specified public key
 		 *

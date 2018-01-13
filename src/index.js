@@ -463,21 +463,38 @@
       }));
     };
     /**
+     * @param {!Uint8Array} message
+     *
+     * @return {Uint8Array} Public key if signature is correct, `null` otherwise
+     */
+    y$['verify_announcement_message'] = function(message){
+      var signature_data;
+      try {
+        message = bencode['decode'](Buffer.from(message));
+      } catch (e$) {}
+      if (!message || !message['k'] || !message['seq'] || !message['sig'] || !message['v']) {
+        return null;
+      }
+      signature_data = encode_signature_data({
+        'seq': message['seq'],
+        'v': message['v']
+      });
+      if (detoxCrypto['verify'](message['sig'], signature_data, message['k'])) {
+        return Uint8Array.from(message['k']);
+      } else {
+        return null;
+      }
+    };
+    /**
      * Publish message with introduction nodes (typically happens on different node than `generate_announcement_message()`)
      *
      * @param {!Uint8Array} message
      */
     y$['publish_announcement_message'] = function(message){
-      if (this._destroyed) {
+      if (this._destroyed || !this['verify_announcement_message'](message)) {
         return;
       }
-      try {
-        message = bencode['decode'](Buffer.from(message));
-      } catch (e$) {}
-      if (!message || !message['k'] || !message['seq'] || !message['sig'] || !message['v']) {
-        return;
-      }
-      this._dht['put'](message);
+      this._dht['put'](bencode['decode'](Buffer.from(message)));
     };
     /**
      * Find nodes in DHT that are acting as introduction points for specified public key

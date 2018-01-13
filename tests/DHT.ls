@@ -34,7 +34,7 @@ function hex2array (string)
 
 <-! lib.ready
 test('DHT', (t) !->
-	t.plan(16)
+	t.plan(17)
 
 	bootstrap_node_dht	= detox-crypto.create_keypair(hex2array('561401dff7921304e6c266639cc6a37a14c1600f9928dbf9afc99a61f0732d43')) # ec63345e65cd1efa50816bf91d79e0e2302be7ddb4412b885cc69efe9a3b9e50
 	node_1_dht			= detox-crypto.create_keypair(hex2array('4b39c9e51f2b644fd0678769cc53069e9c1a93984bbffd7f0fbca2375c08b815')) # ea977ae216d9de56a85a67f6a10cfd9e67d2b4ddb099892e0df937fa31c02ec0
@@ -128,5 +128,6 @@ test('DHT', (t) !->
 				)
 		)
 
+		t.ok(node_2_instance.verify_announcement_message(announcement_message) instanceof Uint8Array, 'Announcement message is correct')
 		node_2_instance.publish_announcement_message(announcement_message)
 )

@@ -43,7 +43,7 @@
   lib.ready(function(){
     test('DHT', function(t){
       var bootstrap_node_dht, node_1_dht, node_1_real, node_2_dht, node_3_dht, bootstrap_node_instance, bootstrap_node_info, node_1_instance, node_2_instance, node_3_instance, wait_for;
-      t.plan(16);
+      t.plan(17);
       bootstrap_node_dht = detoxCrypto.create_keypair(hex2array('561401dff7921304e6c266639cc6a37a14c1600f9928dbf9afc99a61f0732d43'));
       node_1_dht = detoxCrypto.create_keypair(hex2array('4b39c9e51f2b644fd0678769cc53069e9c1a93984bbffd7f0fbca2375c08b815'));
       node_1_real = detoxCrypto.create_keypair(hex2array('cefed82d3c4e04af9c8ca516db37b48a09f602a7f11c565dc6707cfe2fa3373d'));
@@ -120,6 +120,7 @@
             });
           });
         });
+        t.ok(node_2_instance.verify_announcement_message(announcement_message) instanceof Uint8Array, 'Announcement message is correct');
         return node_2_instance.publish_announcement_message(announcement_message);
       }
     });
