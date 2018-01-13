@@ -63,6 +63,33 @@ function string2array (string)
 function is_string_equal_to_array (string, array)
 	string == array.join(',')
 /**
+ * @param {!Array<!Uint8Array>} arrays
+ *
+ * @return {!Uint8Array}
+ */
+function concat_arrays (arrays)
+	total_length	= arrays.reduce(
+		(accumulator, array) ->
+			accumulator + array.length
+		0
+	)
+	current_offset	= 0
+	result			= new Uint8Array(total_length)
+	for array in arrays
+		result.set(array, current_offset)
+		current_offset	+= array.length
+	result
+/**
+ * @param {!Array<!Uint8Array>}	buffer
+ * @param {!Uint8Array}			new_array
+ */
+!function update_dictionary_buffer (buffer, new_array)
+	buffer[0]	= buffer[1]
+	buffer[1]	= buffer[2]
+	buffer[2]	= buffer[3]
+	buffer[3]	= buffer[4]
+	buffer[4]	= new_array
+/**
  * @param {!Uint8Array}	address
  * @param {!Uint8Array}	segment_id
  *
@@ -71,7 +98,7 @@ function is_string_equal_to_array (string, array)
 function compute_source_id (address, segment_id)
 	address.join(',') + segment_id.join(',')
 
-function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplexer, async-eventer)
+function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplexer, async-eventer, pako)
 	bencode			= detox-dht['bencode']
 	simple-peer		= detox-dht['simple-peer']
 	webrtc-socket	= detox-dht['webrtc-socket']
@@ -92,6 +119,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		@_sending				= options['initiator']
 		@_multiplexer			= fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, DHT_PACKET_SIZE)
 		@_demultiplexer			= fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, DHT_PACKET_SIZE)
+		@_send_zlib_buffer		= [new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0)]
+		@_receive_zlib_buffer	= [new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0)]
 		@'once'('connect', !~>
 			@_last_sent	= +(new Date)
 			if @_sending
@@ -124,7 +153,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 							actual_data = @_demultiplexer['get_data']()
 							command		= actual_data[0]
 							if command == COMMAND_DHT
-								simple-peer::['emit'].call(@, 'data', Buffer.from(actual_data.subarray(1)))
+								simple-peer::['emit'].call(@, 'data', Buffer.from(@_zlib_decompress(actual_data.subarray(1))))
 							else
 								simple-peer::['emit'].call(@, 'custom_data', command, actual_data.subarray(1))
 						@_sending	= true
@@ -150,7 +179,7 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * @param {!Uint8Array} data
 		 */
 		..'send' = (data) !->
-			@_send_multiplex(data, COMMAND_DHT)
+			@_send_multiplex(@_zlib_compress(data), COMMAND_DHT)
 		/**
 		 * Data sending method that will be used by anonymous routing
 		 *
@@ -183,6 +212,29 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 				@_sending	= false
 				@_last_sent	= +(new Date)
 			), delay
+		/**
+		 * @param {!Uint8Array} data
+		 *
+		 * @return {!Uint8Array}
+		 */
+		.._zlib_compress = (data) ->
+			result	= pako['deflate'](data, {
+				'dictionary'	: concat_arrays(@_send_zlib_buffer)
+				'level'			: 1
+			})
+			update_dictionary_buffer(@_send_zlib_buffer, data)
+			result
+		/**
+		 * @param {!Uint8Array} data
+		 *
+		 * @return {!Uint8Array}
+		 */
+		.._zlib_decompress = (data) ->
+			result	= pako['inflate'](data, {
+				'dictionary'	: concat_arrays(@_receive_zlib_buffer)
+			})
+			update_dictionary_buffer(@_receive_zlib_buffer, result)
+			result
 
 	Object.defineProperty(simple-peer-detox::, 'constructor', {enumerable: false, value: simple-peer-detox})
 	/**
@@ -770,10 +822,10 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 
 if typeof define == 'function' && define['amd']
 	# AMD
-	define(['@detox/crypto', '@detox/dht', 'ronion', 'jssha/src/sha3', 'fixed-size-multiplexer', 'async-eventer'], Transport)
+	define(['@detox/crypto', '@detox/dht', 'ronion', 'jssha/src/sha3', 'fixed-size-multiplexer', 'async-eventer', 'pako'], Transport)
 else if typeof exports == 'object'
 	# CommonJS
-	module.exports = Transport(require('@detox/crypto'), require('@detox/dht'), require('ronion'), require('jssha/src/sha3'), require('fixed-size-multiplexer'), require('async-eventer'))
+	module.exports = Transport(require('@detox/crypto'), require('@detox/dht'), require('ronion'), require('jssha/src/sha3'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'))
 else
 	# Browser globals
-	@'detox_transport' = Transport(@'detox_crypto', @'detox_dht', @'ronion', @'jsSHA', @'fixed_size_multiplexer', @'async_eventer')
+	@'detox_transport' = Transport(@'detox_crypto', @'detox_dht', @'ronion', @'jsSHA', @'fixed_size_multiplexer', @'async_eventer', @'pako')
