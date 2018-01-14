@@ -8,25 +8,14 @@
 		"routing",
 		"anonymous"
 	],
-	"version"         : "0.15.0",
+	"version"         : "0.15.1",
 	"homepage"        : "https://github.com/Detox/detox-transport",
-	"author"          : {
-		"name"  : "Nazar Mokrynskyi",
-		"email" : "nazar@mokrynskyi.com",
-		"url"   : "https://cleverstyle.org"
-	},
+	"author"          : "Nazar Mokrynskyi <nazar@mokrynskyi.com>",
 	"repository"      : {
 		"type" : "git",
 		"url"  : "git://github.com/Detox/detox-transport.git"
 	},
-	"licenses"        : [
-		{
-			"type" : "MIT",
-			"url"  : "https://github.com/Detox/detox-transport/blob/master/license.txt"
-		}
-	],
-	"bugs"            : "https://github.com/Detox/detox-transport/issues",
-	"docs"            : "https://github.com/Detox/detox-transport",
+	"license"         : "0BSD",
 	"main"            : "src/index.js",
 	"files"           : [
 		"src"
@@ -44,8 +33,7 @@
 		"ronion"                 : "^0.6.0"
 	},
 	"devDependencies" : {
-		"google-closure-compiler-js" : "^20180101.0.0",
-		"gulp"                       : "^3.9.1",
-		"tape"                       : "^4.8.0"
+		"build-gc" : "^0.1.1",
+		"tape"     : "^4.8.0"
 	}
 }
