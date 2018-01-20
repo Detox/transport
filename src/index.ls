@@ -504,6 +504,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * @param {Function} callback
 		 */
 		..'destroy' = (callback) !->
+			if @_destroyed
+				return
 			@_dht['destroy'](callback)
 			delete @_dht
 			@_destroyed	= true
@@ -791,6 +793,8 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 		 * Destroy all of the routing path constructed earlier
 		 */
 		..'destroy' = !->
+			if @_destroyed
+				return
 			@_destroyed = true
 			@_established_routing_paths.forEach ([address, segment_id]) !~>
 				@_destroy_routing_path(address, segment_id)

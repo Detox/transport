@@ -591,6 +591,9 @@
      * @param {Function} callback
      */
     y$['destroy'] = function(callback){
+      if (this._destroyed) {
+        return;
+      }
       this._dht['destroy'](callback);
       delete this._dht;
       this._destroyed = true;
@@ -925,6 +928,9 @@
      */
     z$['destroy'] = function(){
       var this$ = this;
+      if (this._destroyed) {
+        return;
+      }
       this._destroyed = true;
       this._established_routing_paths.forEach(function(arg$){
         var address, segment_id;
