@@ -12,8 +12,6 @@ npm install @detox/transport
 ```
 
 ## How to use
-NOTE: In modern versions of Node.js (4.x and higher) `Buffer` inherits `Uint8Array`, so you can pass `Buffer` directly whenever `Uint8Array` is expected.
-
 Node.js:
 ```javascript
 var detox_transport = require('@detox/transport')
