@@ -18,76 +18,6 @@
   ROUTER_PACKET_SIZE = DHT_PACKET_SIZE - 3;
   PEER_CONNECTION_TIMEOUT = 30;
   /**
-   * @param {!Uint8Array} array
-   *
-   * @return {string}
-   */
-  function array2hex(array){
-    var string, i$, len$, byte;
-    string = '';
-    for (i$ = 0, len$ = array.length; i$ < len$; ++i$) {
-      byte = array[i$];
-      string += byte.toString(16).padStart(2, '0');
-    }
-    return string;
-  }
-  /**
-   * @param {string} string
-   *
-   * @return {!Uint8Array}
-   */
-  function hex2array(string){
-    var array, i$, to$, i;
-    array = new Uint8Array(string.length / 2);
-    for (i$ = 0, to$ = array.length; i$ < to$; ++i$) {
-      i = i$;
-      array[i] = parseInt(string.substring(i * 2, i * 2 + 2), 16);
-    }
-    return array;
-  }
-  /**
-   * @param {string} string
-   *
-   * @return {!Uint8Array}
-   */
-  function string2array(string){
-    var array, i$, to$, i;
-    array = new Uint8Array(string.length);
-    for (i$ = 0, to$ = string.length; i$ < to$; ++i$) {
-      i = i$;
-      array[i] = string.charCodeAt(i);
-    }
-    return array;
-  }
-  /**
-   * @param {string}		string
-   * @param {!Uint8Array}	array
-   *
-   * @return {boolean}
-   */
-  function is_string_equal_to_array(string, array){
-    return string === array.join(',');
-  }
-  /**
-   * @param {!Array<!Uint8Array>} arrays
-   *
-   * @return {!Uint8Array}
-   */
-  function concat_arrays(arrays){
-    var total_length, current_offset, result, i$, len$, array;
-    total_length = arrays.reduce(function(accumulator, array){
-      return accumulator + array.length;
-    }, 0);
-    current_offset = 0;
-    result = new Uint8Array(total_length);
-    for (i$ = 0, len$ = arrays.length; i$ < len$; ++i$) {
-      array = arrays[i$];
-      result.set(array, current_offset);
-      current_offset += array.length;
-    }
-    return result;
-  }
-  /**
    * @param {!Array<!Uint8Array>}	buffer
    * @param {!Uint8Array}			new_array
    */
@@ -98,22 +28,19 @@
     buffer[3] = buffer[4];
     buffer[4] = new_array;
   }
-  /**
-   * @param {!Uint8Array}	address
-   * @param {!Uint8Array}	segment_id
-   *
-   * @return {string}
-   */
-  function compute_source_id(address, segment_id){
-    return address.join(',') + segment_id.join(',');
-  }
-  function Transport(detoxCrypto, detoxDht, ronion, jsSHA, fixedSizeMultiplexer, asyncEventer, pako){
-    var bencode, simplePeer, webrtcSocket, webtorrentDht, Buffer, x$, y$, z$;
+  function Transport(detoxCrypto, detoxDht, detoxUtils, ronion, jsSHA, fixedSizeMultiplexer, asyncEventer, pako){
+    var bencode, simplePeer, webrtcSocket, webtorrentDht, Buffer, array2hex, hex2array, string2array, is_string_equal_to_array, concat_arrays, compute_source_id, x$, y$, z$;
     bencode = detoxDht['bencode'];
     simplePeer = detoxDht['simple-peer'];
     webrtcSocket = detoxDht['webrtc-socket'];
     webtorrentDht = detoxDht['webtorrent-dht'];
     Buffer = detoxDht['Buffer'];
+    array2hex = detoxUtils['array2hex'];
+    hex2array = detoxUtils['hex2array'];
+    string2array = detoxUtils['string2array'];
+    is_string_equal_to_array = detoxUtils['is_string_equal_to_array'];
+    concat_arrays = detoxUtils['concat_arrays'];
+    compute_source_id = detoxUtils['compute_source_id'];
     /**
      * We'll authenticate remove peers by requiring them to sign SDP by their DHT key
      *
@@ -972,10 +899,10 @@
     };
   }
   if (typeof define === 'function' && define['amd']) {
-    define(['@detox/crypto', '@detox/dht', 'ronion', 'jssha/src/sha3', 'fixed-size-multiplexer', 'async-eventer', 'pako'], Transport);
+    define(['@detox/crypto', '@detox/dht', '@detox/utils', 'ronion', 'jssha/src/sha3', 'fixed-size-multiplexer', 'async-eventer', 'pako'], Transport);
   } else if (typeof exports === 'object') {
-    module.exports = Transport(require('@detox/crypto'), require('@detox/dht'), require('ronion'), require('jssha/src/sha3'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'));
+    module.exports = Transport(require('@detox/crypto'), require('@detox/dht'), require('@detox/utils'), require('ronion'), require('jssha/src/sha3'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'));
   } else {
-    this['detox_transport'] = Transport(this['detox_crypto'], this['detox_dht'], this['ronion'], this['jsSHA'], this['fixed_size_multiplexer'], this['async_eventer'], this['pako']);
+    this['detox_transport'] = Transport(this['detox_crypto'], this['detox_dht'], this['detox_utils'], this['ronion'], this['jsSHA'], this['fixed_size_multiplexer'], this['async_eventer'], this['pako']);
   }
 }).call(this);

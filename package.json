@@ -26,6 +26,7 @@
 	"dependencies"    : {
 		"@detox/crypto"          : "^0.4.0",
 		"@detox/dht"             : "^0.7.2",
+		"@detox/utils"           : "^1.1.1",
 		"async-eventer"          : "^1.1.4",
 		"fixed-size-multiplexer" : "^0.1.2",
 		"jssha"                  : "^2.3.1",

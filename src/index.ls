@@ -24,61 +24,6 @@ const ROUTER_PACKET_SIZE			= DHT_PACKET_SIZE - 3
 const PEER_CONNECTION_TIMEOUT		= 30
 
 /**
- * @param {!Uint8Array} array
- *
- * @return {string}
- */
-function array2hex (array)
-	string = ''
-	for byte in array
-		string += byte.toString(16).padStart(2, '0')
-	string
-/**
- * @param {string} string
- *
- * @return {!Uint8Array}
- */
-function hex2array (string)
-	array	= new Uint8Array(string.length / 2)
-	for i from 0 til array.length
-		array[i] = parseInt(string.substring(i * 2, i * 2 + 2), 16)
-	array
-/**
- * @param {string} string
- *
- * @return {!Uint8Array}
- */
-function string2array (string)
-	array = new Uint8Array(string.length)
-	for i from 0 til string.length
-		array[i] = string.charCodeAt(i)
-	array
-/**
- * @param {string}		string
- * @param {!Uint8Array}	array
- *
- * @return {boolean}
- */
-function is_string_equal_to_array (string, array)
-	string == array.join(',')
-/**
- * @param {!Array<!Uint8Array>} arrays
- *
- * @return {!Uint8Array}
- */
-function concat_arrays (arrays)
-	total_length	= arrays.reduce(
-		(accumulator, array) ->
-			accumulator + array.length
-		0
-	)
-	current_offset	= 0
-	result			= new Uint8Array(total_length)
-	for array in arrays
-		result.set(array, current_offset)
-		current_offset	+= array.length
-	result
-/**
  * @param {!Array<!Uint8Array>}	buffer
  * @param {!Uint8Array}			new_array
  */
@@ -88,21 +33,19 @@ function concat_arrays (arrays)
 	buffer[2]	= buffer[3]
 	buffer[3]	= buffer[4]
 	buffer[4]	= new_array
-/**
- * @param {!Uint8Array}	address
- * @param {!Uint8Array}	segment_id
- *
- * @return {string}
- */
-function compute_source_id (address, segment_id)
-	address.join(',') + segment_id.join(',')
 
-function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplexer, async-eventer, pako)
-	bencode			= detox-dht['bencode']
-	simple-peer		= detox-dht['simple-peer']
-	webrtc-socket	= detox-dht['webrtc-socket']
-	webtorrent-dht	= detox-dht['webtorrent-dht']
-	Buffer			= detox-dht['Buffer']
+function Transport (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-size-multiplexer, async-eventer, pako)
+	bencode						= detox-dht['bencode']
+	simple-peer					= detox-dht['simple-peer']
+	webrtc-socket				= detox-dht['webrtc-socket']
+	webtorrent-dht				= detox-dht['webtorrent-dht']
+	Buffer						= detox-dht['Buffer']
+	array2hex					= detox-utils['array2hex']
+	hex2array					= detox-utils['hex2array']
+	string2array				= detox-utils['string2array']
+	is_string_equal_to_array	= detox-utils['is_string_equal_to_array']
+	concat_arrays				= detox-utils['concat_arrays']
+	compute_source_id			= detox-utils['compute_source_id']
 	/**
 	 * We'll authenticate remove peers by requiring them to sign SDP by their DHT key
 	 *
@@ -825,10 +768,10 @@ function Transport (detox-crypto, detox-dht, ronion, jsSHA, fixed-size-multiplex
 
 if typeof define == 'function' && define['amd']
 	# AMD
-	define(['@detox/crypto', '@detox/dht', 'ronion', 'jssha/src/sha3', 'fixed-size-multiplexer', 'async-eventer', 'pako'], Transport)
+	define(['@detox/crypto', '@detox/dht', '@detox/utils', 'ronion', 'jssha/src/sha3', 'fixed-size-multiplexer', 'async-eventer', 'pako'], Transport)
 else if typeof exports == 'object'
 	# CommonJS
-	module.exports = Transport(require('@detox/crypto'), require('@detox/dht'), require('ronion'), require('jssha/src/sha3'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'))
+	module.exports = Transport(require('@detox/crypto'), require('@detox/dht'), require('@detox/utils'), require('ronion'), require('jssha/src/sha3'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'))
 else
 	# Browser globals
-	@'detox_transport' = Transport(@'detox_crypto', @'detox_dht', @'ronion', @'jsSHA', @'fixed_size_multiplexer', @'async_eventer', @'pako')
+	@'detox_transport' = Transport(@'detox_crypto', @'detox_dht', @'detox_utils', @'ronion', @'jsSHA', @'fixed_size_multiplexer', @'async_eventer', @'pako')
