@@ -77,7 +77,7 @@
       var actual_data, command;
       switch (event) {
       case 'signal':
-        data['signature'] = Buffer.from(this._sign(string2array(data['sdp'])));
+        data['signature'] = Buffer['from'](this._sign(string2array(data['sdp'])));
         simplePeer.prototype['emit'].call(this, 'signal', data);
         break;
       case 'data':
@@ -93,7 +93,7 @@
             actual_data = this._demultiplexer['get_data']();
             command = actual_data[0];
             if (command === COMMAND_DHT) {
-              simplePeer.prototype['emit'].call(this, 'data', Buffer.from(this._zlib_decompress(actual_data.subarray(1))));
+              simplePeer.prototype['emit'].call(this, 'data', Buffer['from'](this._zlib_decompress(actual_data.subarray(1))));
             } else {
               simplePeer.prototype['emit'].call(this, 'custom_data', command, actual_data.subarray(1));
             }
@@ -199,13 +199,13 @@
     /**
      * @param {!Uint8Array} data
      *
-     * @return {string}
+     * @return {!Buffer}
      */
     function sha3_256(data){
       var shaObj;
       shaObj = new jsSHA('SHA3-256', 'ARRAYBUFFER');
       shaObj['update'](data);
-      return Buffer.from(shaObj['getHash']('ARRAYBUFFER'));
+      return Buffer['from'](shaObj['getHash']('ARRAYBUFFER'));
     }
     /**
      * @param {!Object} message
@@ -303,7 +303,7 @@
         'bootstrap': bootstrap_nodes,
         'hash': sha3_256,
         'k': bucket_size,
-        'nodeId': Buffer.from(dht_public_key),
+        'nodeId': Buffer['from'](dht_public_key),
         'socket': this._socket,
         'timeout': PEER_CONNECTION_TIMEOUT * 1000,
         'verify': detoxCrypto['verify']
@@ -363,7 +363,7 @@
       if (this._destroyed) {
         return;
       }
-      this._dht['lookup'](Buffer.from(id));
+      this._dht['lookup'](Buffer['from'](id));
     };
     /**
      * Tag connection to specified node ID as used, so that it is not disconnected when not used by DHT itself
@@ -437,14 +437,14 @@
       }
       signature_data = encode_signature_data({
         'seq': time,
-        'v': Buffer.from(value)
+        'v': Buffer['from'](value)
       });
       signature = detoxCrypto['sign'](signature_data, real_public_key, real_private_key);
       return Uint8Array.from(bencode['encode']({
-        'k': Buffer.from(real_public_key),
+        'k': Buffer['from'](real_public_key),
         'seq': time,
-        'sig': Buffer.from(signature),
-        'v': Buffer.from(value)
+        'sig': Buffer['from'](signature),
+        'v': Buffer['from'](value)
       }));
     };
     /**
@@ -455,7 +455,7 @@
     y$['verify_announcement_message'] = function(message){
       var signature_data;
       try {
-        message = bencode['decode'](Buffer.from(message));
+        message = bencode['decode'](Buffer['from'](message));
       } catch (e$) {}
       if (!message || !message['k'] || !message['seq'] || !message['sig'] || !message['v']) {
         return null;
@@ -479,7 +479,7 @@
       if (this._destroyed || !this['verify_announcement_message'](message)) {
         return;
       }
-      this._dht['put'](bencode['decode'](Buffer.from(message)));
+      this._dht['put'](bencode['decode'](Buffer['from'](message)));
     };
     /**
      * Find nodes in DHT that are acting as introduction points for specified public key
