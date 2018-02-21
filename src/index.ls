@@ -43,7 +43,7 @@ function Transport (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-s
 	array2hex					= detox-utils['array2hex']
 	hex2array					= detox-utils['hex2array']
 	string2array				= detox-utils['string2array']
-	is_string_equal_to_array	= detox-utils['is_string_equal_to_array']
+	are_arrays_equal			= detox-utils['are_arrays_equal']
 	concat_arrays				= detox-utils['concat_arrays']
 	ArrayMap					= detox-utils['ArrayMap']
 	/**
@@ -482,7 +482,7 @@ function Transport (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-s
 			.'on'('create_request', (address, segment_id, command_data) !~>
 				if @_destroyed
 					return
-				source_id	= concat_arrays(address, segment_id)
+				source_id	= concat_arrays([address, segment_id])
 				if @_encryptor_instances.has(source_id)
 					# Something wrong is happening, refuse to handle
 					return
@@ -514,9 +514,9 @@ function Transport (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-s
 			.'on'('data', (address, segment_id, target_address, command, command_data) !~>
 				if @_destroyed
 					return
-				source_id					= concat_arrays(address, segment_id)
+				source_id					= concat_arrays([address, segment_id])
 				last_node_in_routing_path	= @_last_node_in_routing_path.get(source_id)
-				if target_address.join(',') != last_node_in_routing_path.join(',')
+				if !are_arrays_equal(target_address, last_node_in_routing_path)
 					# We only accept data back from responder
 					return
 				demultiplexer				= @_demultiplexers.get(source_id)
@@ -535,7 +535,7 @@ function Transport (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-s
 				segment_id				= data['segment_id']
 				target_address			= data['target_address']
 				plaintext				= data['plaintext']
-				source_id				= concat_arrays(address, segment_id)
+				source_id				= concat_arrays([address, segment_id])
 				encryptor_instance		= @_encryptor_instances.get(source_id)?.get(target_address)
 				if !encryptor_instance || !encryptor_instance['ready']()
 					return
@@ -548,7 +548,7 @@ function Transport (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-s
 				segment_id				= data['segment_id']
 				target_address			= data['target_address']
 				ciphertext				= data['ciphertext']
-				source_id				= concat_arrays(address, segment_id)
+				source_id				= concat_arrays([address, segment_id])
 				encryptor_instance		= @_encryptor_instances.get(source_id)?.get(target_address)
 				if !encryptor_instance || !encryptor_instance['ready']()
 					return
@@ -563,7 +563,7 @@ function Transport (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-s
 				segment_id				= data['segment_id']
 				target_address			= data['target_address']
 				unwrapped				= data['unwrapped']
-				source_id				= concat_arrays(address, segment_id)
+				source_id				= concat_arrays([address, segment_id])
 				rewrapper_instance		= @_rewrapper_instances.get(source_id)?.get(target_address)?[0]
 				if !rewrapper_instance
 					return
@@ -576,7 +576,7 @@ function Transport (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-s
 				segment_id				= data['segment_id']
 				target_address			= data['target_address']
 				wrapped					= data['wrapped']
-				source_id				= concat_arrays(address, segment_id)
+				source_id				= concat_arrays([address, segment_id])
 				rewrapper_instance		= @_rewrapper_instances.get(source_id)?.get(target_address)?[1]
 				if !rewrapper_instance
 					return
@@ -609,7 +609,6 @@ function Transport (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-s
 			new Promise (resolve, reject) !~>
 				last_node_in_routing_path				= nodes[nodes.length - 1]
 				first_node								= nodes.shift()
-				first_node_string						= first_node.join(',')
 				encryptor_instances						= new ArrayMap
 				rewrapper_instances						= new ArrayMap
 				fail									= !~>
@@ -623,7 +622,7 @@ function Transport (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-s
 				first_node_encryptor_instance			= detox-crypto['Encryptor'](true, x25519_public_key)
 				encryptor_instances.set(first_node, first_node_encryptor_instance)
 				!~function create_response_handler (address, segment_id, command_data)
-					if !is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)
+					if !are_arrays_equal(first_node, address) || !are_arrays_equal(route_id, segment_id)
 						return
 					clearTimeout(segment_establishment_timeout)
 					@_ronion['off']('create_response', create_response_handler)
@@ -644,14 +643,14 @@ function Transport (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-s
 					@_multiplexers.set(source_id, fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, @_max_packet_data_size))
 					@_demultiplexers.set(source_id, fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, @_max_packet_data_size))
 					# Successfully established first segment, extending routing path further
-					var current_node, current_node_encryptor_instance, current_node_string, segment_extension_timeout
+					var current_node, current_node_encryptor_instance, segment_extension_timeout
 					!~function extend_request
 						if !nodes.length
 							@_established_routing_paths.set(source_id, [first_node, route_id])
 							resolve(route_id)
 							return
 						!~function extend_response_handler (address, segment_id, command_data)
-							if !is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)
+							if !are_arrays_equal(first_node, address) || !are_arrays_equal(route_id, segment_id)
 								return
 							@_ronion['off']('extend_response', extend_response_handler)
 							clearTimeout(segment_extension_timeout)
@@ -675,15 +674,14 @@ function Transport (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-s
 							# Successfully extended routing path by one more segment, continue extending routing path further
 							extend_request()
 						@_ronion['on']('extend_response', extend_response_handler)
-						current_node								:= nodes.shift()
-						current_node_string							:= current_node.join(',')
-						x25519_public_key							= detox-crypto['convert_public_key'](current_node)
+						current_node					:= nodes.shift()
+						x25519_public_key				= detox-crypto['convert_public_key'](current_node)
 						if !x25519_public_key
 							fail()
 							return
-						current_node_encryptor_instance				= detox-crypto['Encryptor'](true, x25519_public_key)
+						current_node_encryptor_instance	:= detox-crypto['Encryptor'](true, x25519_public_key)
 						encryptor_instances.set(current_node, current_node_encryptor_instance)
-						segment_extension_timeout					:= setTimeout (!~>
+						segment_extension_timeout		:= setTimeout (!~>
 							@_ronion['off']('extend_response', extend_response_handler)
 							fail()
 						), ROUTING_PATH_SEGMENT_TIMEOUT * 1000
@@ -695,8 +693,7 @@ function Transport (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-s
 					fail()
 				), ROUTING_PATH_SEGMENT_TIMEOUT * 1000
 				route_id						= @_ronion['create_request'](first_node, first_node_encryptor_instance['get_handshake_message']())
-				route_id_string					= route_id.join(',')
-				source_id						= concat_arrays(first_node, route_id)
+				source_id						= concat_arrays([first_node, route_id])
 				@_encryptor_instances.set(source_id, encryptor_instances)
 				@_rewrapper_instances.set(source_id, rewrapper_instances)
 				@_last_node_in_routing_path.set(source_id, last_node_in_routing_path)
@@ -728,7 +725,7 @@ function Transport (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-s
 				return
 			if data.length > MAX_DATA_SIZE
 				return
-			source_id		= concat_arrays(node_id, route_id)
+			source_id		= concat_arrays([node_id, route_id])
 			target_address	= @_last_node_in_routing_path.get(source_id)
 			multiplexer		= @_multiplexers.get(source_id)
 			if !multiplexer
@@ -751,11 +748,11 @@ function Transport (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-s
 		 * @param {!Uint8Array} segment_id
 		 */
 		.._destroy_routing_path = (address, segment_id) !->
-			source_id			= concat_arrays(address, segment_id)
+			source_id			= concat_arrays([address, segment_id])
 			encryptor_instances	= @_encryptor_instances.get(source_id)
 			if !encryptor_instances
 				return
-			encryptor_instances.forEach (, encryptor_instance) !->
+			encryptor_instances.forEach (encryptor_instance) !->
 				encryptor_instance['destroy']()
 			@_encryptor_instances.delete(source_id)
 			@_rewrapper_instances.delete(source_id)

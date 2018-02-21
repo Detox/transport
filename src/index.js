@@ -29,7 +29,7 @@
     buffer[4] = new_array;
   }
   function Transport(detoxCrypto, detoxDht, detoxUtils, ronion, jsSHA, fixedSizeMultiplexer, asyncEventer, pako){
-    var bencode, simplePeer, webrtcSocket, webtorrentDht, Buffer, array2hex, hex2array, string2array, is_string_equal_to_array, concat_arrays, ArrayMap, x$, y$, z$;
+    var bencode, simplePeer, webrtcSocket, webtorrentDht, Buffer, array2hex, hex2array, string2array, are_arrays_equal, concat_arrays, ArrayMap, x$, y$, z$;
     bencode = detoxDht['bencode'];
     simplePeer = detoxDht['simple-peer'];
     webrtcSocket = detoxDht['webrtc-socket'];
@@ -38,7 +38,7 @@
     array2hex = detoxUtils['array2hex'];
     hex2array = detoxUtils['hex2array'];
     string2array = detoxUtils['string2array'];
-    is_string_equal_to_array = detoxUtils['is_string_equal_to_array'];
+    are_arrays_equal = detoxUtils['are_arrays_equal'];
     concat_arrays = detoxUtils['concat_arrays'];
     ArrayMap = detoxUtils['ArrayMap'];
     /**
@@ -559,7 +559,7 @@
         if (this$._destroyed) {
           return;
         }
-        source_id = concat_arrays(address, segment_id);
+        source_id = concat_arrays([address, segment_id]);
         if (this$._encryptor_instances.has(source_id)) {
           return;
         }
@@ -592,9 +592,9 @@
         if (this$._destroyed) {
           return;
         }
-        source_id = concat_arrays(address, segment_id);
+        source_id = concat_arrays([address, segment_id]);
         last_node_in_routing_path = this$._last_node_in_routing_path.get(source_id);
-        if (target_address.join(',') !== last_node_in_routing_path.join(',')) {
+        if (!are_arrays_equal(target_address, last_node_in_routing_path)) {
           return;
         }
         demultiplexer = this$._demultiplexers.get(source_id);
@@ -615,7 +615,7 @@
         segment_id = data['segment_id'];
         target_address = data['target_address'];
         plaintext = data['plaintext'];
-        source_id = concat_arrays(address, segment_id);
+        source_id = concat_arrays([address, segment_id]);
         encryptor_instance = (ref$ = this$._encryptor_instances.get(source_id)) != null ? ref$.get(target_address) : void 8;
         if (!encryptor_instance || !encryptor_instance['ready']()) {
           return;
@@ -630,7 +630,7 @@
         segment_id = data['segment_id'];
         target_address = data['target_address'];
         ciphertext = data['ciphertext'];
-        source_id = concat_arrays(address, segment_id);
+        source_id = concat_arrays([address, segment_id]);
         encryptor_instance = (ref$ = this$._encryptor_instances.get(source_id)) != null ? ref$.get(target_address) : void 8;
         if (!encryptor_instance || !encryptor_instance['ready']()) {
           return;
@@ -647,7 +647,7 @@
         segment_id = data['segment_id'];
         target_address = data['target_address'];
         unwrapped = data['unwrapped'];
-        source_id = concat_arrays(address, segment_id);
+        source_id = concat_arrays([address, segment_id]);
         rewrapper_instance = (ref$ = this$._rewrapper_instances.get(source_id)) != null ? (ref1$ = ref$.get(target_address)) != null ? ref1$[0] : void 8 : void 8;
         if (!rewrapper_instance) {
           return;
@@ -662,7 +662,7 @@
         segment_id = data['segment_id'];
         target_address = data['target_address'];
         wrapped = data['wrapped'];
-        source_id = concat_arrays(address, segment_id);
+        source_id = concat_arrays([address, segment_id]);
         rewrapper_instance = (ref$ = this$._rewrapper_instances.get(source_id)) != null ? (ref1$ = ref$.get(target_address)) != null ? ref1$[1] : void 8 : void 8;
         if (!rewrapper_instance) {
           return;
@@ -699,10 +699,9 @@
       }
       nodes = nodes.slice();
       return new Promise(function(resolve, reject){
-        var last_node_in_routing_path, first_node, first_node_string, encryptor_instances, rewrapper_instances, fail, x25519_public_key, first_node_encryptor_instance, segment_establishment_timeout, route_id, route_id_string, source_id;
+        var last_node_in_routing_path, first_node, encryptor_instances, rewrapper_instances, fail, x25519_public_key, first_node_encryptor_instance, segment_establishment_timeout, route_id, source_id;
         last_node_in_routing_path = nodes[nodes.length - 1];
         first_node = nodes.shift();
-        first_node_string = first_node.join(',');
         encryptor_instances = new ArrayMap;
         rewrapper_instances = new ArrayMap;
         fail = function(){
@@ -717,8 +716,8 @@
         first_node_encryptor_instance = detoxCrypto['Encryptor'](true, x25519_public_key);
         encryptor_instances.set(first_node, first_node_encryptor_instance);
         function create_response_handler(address, segment_id, command_data){
-          var e, current_node, current_node_encryptor_instance, current_node_string, segment_extension_timeout;
-          if (!is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)) {
+          var e, current_node, current_node_encryptor_instance, segment_extension_timeout;
+          if (!are_arrays_equal(first_node, address) || !are_arrays_equal(route_id, segment_id)) {
             return;
           }
           clearTimeout(segment_establishment_timeout);
@@ -739,7 +738,7 @@
           this$._multiplexers.set(source_id, fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
           this$._demultiplexers.set(source_id, fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
           function extend_request(){
-            var x25519_public_key, current_node_encryptor_instance;
+            var x25519_public_key;
             if (!nodes.length) {
               this$._established_routing_paths.set(source_id, [first_node, route_id]);
               resolve(route_id);
@@ -747,7 +746,7 @@
             }
             function extend_response_handler(address, segment_id, command_data){
               var e;
-              if (!is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)) {
+              if (!are_arrays_equal(first_node, address) || !are_arrays_equal(route_id, segment_id)) {
                 return;
               }
               this$._ronion['off']('extend_response', extend_response_handler);
@@ -773,7 +772,6 @@
             }
             this$._ronion['on']('extend_response', extend_response_handler);
             current_node = nodes.shift();
-            current_node_string = current_node.join(',');
             x25519_public_key = detoxCrypto['convert_public_key'](current_node);
             if (!x25519_public_key) {
               fail();
@@ -795,8 +793,7 @@
           fail();
         }, ROUTING_PATH_SEGMENT_TIMEOUT * 1000);
         route_id = this$._ronion['create_request'](first_node, first_node_encryptor_instance['get_handshake_message']());
-        route_id_string = route_id.join(',');
-        source_id = concat_arrays(first_node, route_id);
+        source_id = concat_arrays([first_node, route_id]);
         this$._encryptor_instances.set(source_id, encryptor_instances);
         this$._rewrapper_instances.set(source_id, rewrapper_instances);
         this$._last_node_in_routing_path.set(source_id, last_node_in_routing_path);
@@ -835,7 +832,7 @@
       if (data.length > MAX_DATA_SIZE) {
         return;
       }
-      source_id = concat_arrays(node_id, route_id);
+      source_id = concat_arrays([node_id, route_id]);
       target_address = this._last_node_in_routing_path.get(source_id);
       multiplexer = this._multiplexers.get(source_id);
       if (!multiplexer) {
@@ -868,12 +865,12 @@
      */
     z$._destroy_routing_path = function(address, segment_id){
       var source_id, encryptor_instances;
-      source_id = concat_arrays(address, segment_id);
+      source_id = concat_arrays([address, segment_id]);
       encryptor_instances = this._encryptor_instances.get(source_id);
       if (!encryptor_instances) {
         return;
       }
-      encryptor_instances.forEach(function(arg$, encryptor_instance){
+      encryptor_instances.forEach(function(encryptor_instance){
         encryptor_instance['destroy']();
       });
       this._encryptor_instances['delete'](source_id);
