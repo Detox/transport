@@ -546,12 +546,12 @@
         return new Router(dht_private_key, max_pending_segments);
       }
       asyncEventer.call(this);
-      this._encryptor_instances = new ArrayMap;
-      this._rewrapper_instances = new ArrayMap;
-      this._last_node_in_routing_path = new ArrayMap;
-      this._multiplexers = new ArrayMap;
-      this._demultiplexers = new ArrayMap;
-      this._established_routing_paths = new ArrayMap;
+      this._encryptor_instances = ArrayMap();
+      this._rewrapper_instances = ArrayMap();
+      this._last_node_in_routing_path = ArrayMap();
+      this._multiplexers = ArrayMap();
+      this._demultiplexers = ArrayMap();
+      this._established_routing_paths = ArrayMap();
       this._ronion = ronion(ROUTER_PACKET_SIZE, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)['on']('activity', function(address, segment_id){
         this$['fire']('activity', address, segment_id);
       })['on']('create_request', function(address, segment_id, command_data){
@@ -578,9 +578,9 @@
           return;
         }
         rewrapper_instance = encryptor_instance['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
-        encryptor_instances = new ArrayMap;
+        encryptor_instances = ArrayMap();
         encryptor_instances.set(address, encryptor_instance);
-        rewrapper_instances = new ArrayMap;
+        rewrapper_instances = ArrayMap();
         rewrapper_instances.set(address, rewrapper_instance);
         this$._encryptor_instances.set(source_id, encryptor_instances);
         this$._rewrapper_instances.set(source_id, rewrapper_instances);
@@ -702,8 +702,8 @@
         var last_node_in_routing_path, first_node, encryptor_instances, rewrapper_instances, fail, x25519_public_key, first_node_encryptor_instance, segment_establishment_timeout, route_id, source_id;
         last_node_in_routing_path = nodes[nodes.length - 1];
         first_node = nodes.shift();
-        encryptor_instances = new ArrayMap;
-        rewrapper_instances = new ArrayMap;
+        encryptor_instances = ArrayMap();
+        rewrapper_instances = ArrayMap();
         fail = function(){
           this$._destroy_routing_path(first_node, route_id);
           reject('Routing path creation failed');

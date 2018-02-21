@@ -469,12 +469,12 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 			return new Router(dht_private_key, max_pending_segments)
 		async-eventer.call(@)
 
-		@_encryptor_instances		= new ArrayMap
-		@_rewrapper_instances		= new ArrayMap
-		@_last_node_in_routing_path	= new ArrayMap
-		@_multiplexers				= new ArrayMap
-		@_demultiplexers			= new ArrayMap
-		@_established_routing_paths	= new ArrayMap
+		@_encryptor_instances		= ArrayMap()
+		@_rewrapper_instances		= ArrayMap()
+		@_last_node_in_routing_path	= ArrayMap()
+		@_multiplexers				= ArrayMap()
+		@_demultiplexers			= ArrayMap()
+		@_established_routing_paths	= ArrayMap()
 		@_ronion					= ronion(ROUTER_PACKET_SIZE, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)
 			.'on'('activity', (address, segment_id) !~>
 				@'fire'('activity', address, segment_id)
@@ -500,9 +500,9 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 				if !encryptor_instance['ready']()
 					return
 				rewrapper_instance					= encryptor_instance['get_rewrapper_keys']().map(detox-crypto['Rewrapper'])
-				encryptor_instances					= new ArrayMap
+				encryptor_instances					= ArrayMap()
 				encryptor_instances.set(address, encryptor_instance)
-				rewrapper_instances					= new ArrayMap
+				rewrapper_instances					= ArrayMap()
 				rewrapper_instances.set(address, rewrapper_instance)
 				@_encryptor_instances.set(source_id, encryptor_instances)
 				@_rewrapper_instances.set(source_id, rewrapper_instances)
@@ -609,8 +609,8 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 			new Promise (resolve, reject) !~>
 				last_node_in_routing_path				= nodes[nodes.length - 1]
 				first_node								= nodes.shift()
-				encryptor_instances						= new ArrayMap
-				rewrapper_instances						= new ArrayMap
+				encryptor_instances						= ArrayMap()
+				rewrapper_instances						= ArrayMap()
 				fail									= !~>
 					@_destroy_routing_path(first_node, route_id)
 					reject('Routing path creation failed')
