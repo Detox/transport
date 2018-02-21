@@ -555,7 +555,7 @@
       this._ronion = ronion(ROUTER_PACKET_SIZE, PUBLIC_KEY_LENGTH, MAC_LENGTH, max_pending_segments)['on']('activity', function(address, segment_id){
         this$['fire']('activity', address, segment_id);
       })['on']('create_request', function(address, segment_id, command_data){
-        var source_id, encryptor_instance, e, rewrapper_instance, address_string, encryptor_instances, rewrapper_instances;
+        var source_id, encryptor_instance, e, rewrapper_instance, encryptor_instances, rewrapper_instances;
         if (this$._destroyed) {
           return;
         }
@@ -578,11 +578,10 @@
           return;
         }
         rewrapper_instance = encryptor_instance['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
-        address_string = address.join(',');
-        encryptor_instances = Object.create(null);
-        encryptor_instances[address_string] = encryptor_instance;
-        rewrapper_instances = Object.create(null);
-        rewrapper_instances[address_string] = rewrapper_instance;
+        encryptor_instances = new ArrayMap;
+        encryptor_instances.set(address, encryptor_instance);
+        rewrapper_instances = new ArrayMap;
+        rewrapper_instances.set(address, rewrapper_instance);
         this$._encryptor_instances.set(source_id, encryptor_instances);
         this$._rewrapper_instances.set(source_id, rewrapper_instances);
         this$._last_node_in_routing_path.set(source_id, address);
@@ -608,7 +607,7 @@
           this$['fire']('data', address, segment_id, command, data);
         }
       })['on']('encrypt', function(data){
-        var address, segment_id, target_address, plaintext, source_id, target_address_string, encryptor_instance, ref$;
+        var address, segment_id, target_address, plaintext, source_id, encryptor_instance, ref$;
         if (this$._destroyed) {
           return;
         }
@@ -617,14 +616,13 @@
         target_address = data['target_address'];
         plaintext = data['plaintext'];
         source_id = concat_arrays(address, segment_id);
-        target_address_string = target_address.join(',');
-        encryptor_instance = (ref$ = this$._encryptor_instances.get(source_id)) != null ? ref$[target_address_string] : void 8;
+        encryptor_instance = (ref$ = this$._encryptor_instances.get(source_id)) != null ? ref$.get(target_address) : void 8;
         if (!encryptor_instance || !encryptor_instance['ready']()) {
           return;
         }
         data['ciphertext'] = encryptor_instance['encrypt'](plaintext);
       })['on']('decrypt', function(data){
-        var address, segment_id, target_address, ciphertext, source_id, target_address_string, encryptor_instance, ref$;
+        var address, segment_id, target_address, ciphertext, source_id, encryptor_instance, ref$;
         if (this$._destroyed) {
           return;
         }
@@ -633,8 +631,7 @@
         target_address = data['target_address'];
         ciphertext = data['ciphertext'];
         source_id = concat_arrays(address, segment_id);
-        target_address_string = target_address.join(',');
-        encryptor_instance = (ref$ = this$._encryptor_instances.get(source_id)) != null ? ref$[target_address_string] : void 8;
+        encryptor_instance = (ref$ = this$._encryptor_instances.get(source_id)) != null ? ref$.get(target_address) : void 8;
         if (!encryptor_instance || !encryptor_instance['ready']()) {
           return;
         }
@@ -642,7 +639,7 @@
           data['plaintext'] = encryptor_instance['decrypt'](ciphertext);
         } catch (e$) {}
       })['on']('wrap', function(data){
-        var address, segment_id, target_address, unwrapped, source_id, target_address_string, rewrapper_instance, ref$, ref1$;
+        var address, segment_id, target_address, unwrapped, source_id, rewrapper_instance, ref$, ref1$;
         if (this$._destroyed) {
           return;
         }
@@ -651,14 +648,13 @@
         target_address = data['target_address'];
         unwrapped = data['unwrapped'];
         source_id = concat_arrays(address, segment_id);
-        target_address_string = target_address.join(',');
-        rewrapper_instance = (ref$ = this$._rewrapper_instances.get(source_id)) != null ? (ref1$ = ref$[target_address_string]) != null ? ref1$[0] : void 8 : void 8;
+        rewrapper_instance = (ref$ = this$._rewrapper_instances.get(source_id)) != null ? (ref1$ = ref$.get(target_address)) != null ? ref1$[0] : void 8 : void 8;
         if (!rewrapper_instance) {
           return;
         }
         data['wrapped'] = rewrapper_instance['wrap'](unwrapped);
       })['on']('unwrap', function(data){
-        var address, segment_id, target_address, wrapped, source_id, target_address_string, rewrapper_instance, ref$, ref1$;
+        var address, segment_id, target_address, wrapped, source_id, rewrapper_instance, ref$, ref1$;
         if (this$._destroyed) {
           return;
         }
@@ -667,8 +663,7 @@
         target_address = data['target_address'];
         wrapped = data['wrapped'];
         source_id = concat_arrays(address, segment_id);
-        target_address_string = target_address.join(',');
-        rewrapper_instance = (ref$ = this$._rewrapper_instances.get(source_id)) != null ? (ref1$ = ref$[target_address_string]) != null ? ref1$[1] : void 8 : void 8;
+        rewrapper_instance = (ref$ = this$._rewrapper_instances.get(source_id)) != null ? (ref1$ = ref$.get(target_address)) != null ? ref1$[1] : void 8 : void 8;
         if (!rewrapper_instance) {
           return;
         }
@@ -704,12 +699,12 @@
       }
       nodes = nodes.slice();
       return new Promise(function(resolve, reject){
-        var last_node_in_routing_path, first_node, first_node_string, encryptor_instances, rewrapper_instances, fail, x25519_public_key, segment_establishment_timeout, route_id, route_id_string, source_id;
+        var last_node_in_routing_path, first_node, first_node_string, encryptor_instances, rewrapper_instances, fail, x25519_public_key, first_node_encryptor_instance, segment_establishment_timeout, route_id, route_id_string, source_id;
         last_node_in_routing_path = nodes[nodes.length - 1];
         first_node = nodes.shift();
         first_node_string = first_node.join(',');
-        encryptor_instances = Object.create(null);
-        rewrapper_instances = Object.create(null);
+        encryptor_instances = new ArrayMap;
+        rewrapper_instances = new ArrayMap;
         fail = function(){
           this$._destroy_routing_path(first_node, route_id);
           reject('Routing path creation failed');
@@ -719,31 +714,32 @@
           fail();
           return;
         }
-        encryptor_instances[first_node_string] = detoxCrypto['Encryptor'](true, x25519_public_key);
+        first_node_encryptor_instance = detoxCrypto['Encryptor'](true, x25519_public_key);
+        encryptor_instances.set(first_node, first_node_encryptor_instance);
         function create_response_handler(address, segment_id, command_data){
-          var e, current_node, current_node_string, segment_extension_timeout;
+          var e, current_node, current_node_encryptor_instance, current_node_string, segment_extension_timeout;
           if (!is_string_equal_to_array(first_node_string, address) || !is_string_equal_to_array(route_id_string, segment_id)) {
             return;
           }
           clearTimeout(segment_establishment_timeout);
           this$._ronion['off']('create_response', create_response_handler);
           try {
-            encryptor_instances[first_node_string]['put_handshake_message'](command_data);
+            first_node_encryptor_instance['put_handshake_message'](command_data);
           } catch (e$) {
             e = e$;
             fail();
             return;
           }
-          if (!encryptor_instances[first_node_string]['ready']()) {
+          if (!first_node_encryptor_instance['ready']()) {
             fail();
             return;
           }
-          rewrapper_instances[first_node_string] = encryptor_instances[first_node_string]['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
+          rewrapper_instances.set(first_node, first_node_encryptor_instance['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']));
           this$._ronion['confirm_outgoing_segment_established'](first_node, route_id);
           this$._multiplexers.set(source_id, fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
           this$._demultiplexers.set(source_id, fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, this$._max_packet_data_size));
           function extend_request(){
-            var x25519_public_key;
+            var x25519_public_key, current_node_encryptor_instance;
             if (!nodes.length) {
               this$._established_routing_paths.set(source_id, [first_node, route_id]);
               resolve(route_id);
@@ -761,17 +757,17 @@
                 return;
               }
               try {
-                encryptor_instances[current_node_string]['put_handshake_message'](command_data);
+                current_node_encryptor_instance['put_handshake_message'](command_data);
               } catch (e$) {
                 e = e$;
                 fail();
                 return;
               }
-              if (!encryptor_instances[current_node_string]['ready']()) {
+              if (!current_node_encryptor_instance['ready']()) {
                 fail();
                 return;
               }
-              rewrapper_instances[current_node_string] = encryptor_instances[current_node_string]['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']);
+              rewrapper_instances.set(current_node, current_node_encryptor_instance['get_rewrapper_keys']().map(detoxCrypto['Rewrapper']));
               this$._ronion['confirm_extended_path'](first_node, route_id);
               extend_request();
             }
@@ -783,12 +779,13 @@
               fail();
               return;
             }
-            encryptor_instances[current_node_string] = detoxCrypto['Encryptor'](true, x25519_public_key);
+            current_node_encryptor_instance = detoxCrypto['Encryptor'](true, x25519_public_key);
+            encryptor_instances.set(current_node, current_node_encryptor_instance);
             segment_extension_timeout = setTimeout(function(){
               this$._ronion['off']('extend_response', extend_response_handler);
               fail();
             }, ROUTING_PATH_SEGMENT_TIMEOUT * 1000);
-            this$._ronion['extend_request'](first_node, route_id, current_node, encryptor_instances[current_node_string]['get_handshake_message']());
+            this$._ronion['extend_request'](first_node, route_id, current_node, current_node_encryptor_instance['get_handshake_message']());
           }
           extend_request();
         }
@@ -797,7 +794,7 @@
           this$._ronion['off']('create_response', create_response_handler);
           fail();
         }, ROUTING_PATH_SEGMENT_TIMEOUT * 1000);
-        route_id = this$._ronion['create_request'](first_node, encryptor_instances[first_node_string]['get_handshake_message']());
+        route_id = this$._ronion['create_request'](first_node, first_node_encryptor_instance['get_handshake_message']());
         route_id_string = route_id.join(',');
         source_id = concat_arrays(first_node, route_id);
         this$._encryptor_instances.set(source_id, encryptor_instances);
@@ -870,16 +867,15 @@
      * @param {!Uint8Array} segment_id
      */
     z$._destroy_routing_path = function(address, segment_id){
-      var source_id, encryptor_instances, i$, encryptor_instance;
+      var source_id, encryptor_instances;
       source_id = concat_arrays(address, segment_id);
       encryptor_instances = this._encryptor_instances.get(source_id);
       if (!encryptor_instances) {
         return;
       }
-      for (i$ in encryptor_instances) {
-        encryptor_instance = encryptor_instances[i$];
+      encryptor_instances.forEach(function(arg$, encryptor_instance){
         encryptor_instance['destroy']();
-      }
+      });
       this._encryptor_instances['delete'](source_id);
       this._rewrapper_instances['delete'](source_id);
       this._last_node_in_routing_path['delete'](source_id);
