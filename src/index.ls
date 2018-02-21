@@ -34,18 +34,18 @@ const PEER_CONNECTION_TIMEOUT		= 30
 	buffer[3]	= buffer[4]
 	buffer[4]	= new_array
 
-function Transport (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-size-multiplexer, async-eventer, pako)
-	bencode						= detox-dht['bencode']
-	simple-peer					= detox-dht['simple-peer']
-	webrtc-socket				= detox-dht['webrtc-socket']
-	webtorrent-dht				= detox-dht['webtorrent-dht']
-	Buffer						= detox-dht['Buffer']
-	array2hex					= detox-utils['array2hex']
-	hex2array					= detox-utils['hex2array']
-	string2array				= detox-utils['string2array']
-	are_arrays_equal			= detox-utils['are_arrays_equal']
-	concat_arrays				= detox-utils['concat_arrays']
-	ArrayMap					= detox-utils['ArrayMap']
+function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-size-multiplexer, async-eventer, pako)
+	bencode				= detox-dht['bencode']
+	simple-peer			= detox-dht['simple-peer']
+	webrtc-socket		= detox-dht['webrtc-socket']
+	webtorrent-dht		= detox-dht['webtorrent-dht']
+	Buffer				= detox-dht['Buffer']
+	array2hex			= detox-utils['array2hex']
+	hex2array			= detox-utils['hex2array']
+	string2array		= detox-utils['string2array']
+	are_arrays_equal	= detox-utils['are_arrays_equal']
+	concat_arrays		= detox-utils['concat_arrays']
+	ArrayMap			= detox-utils['ArrayMap']
 	/**
 	 * We'll authenticate remove peers by requiring them to sign SDP by their DHT key
 	 *
@@ -770,10 +770,10 @@ function Transport (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-s
 
 if typeof define == 'function' && define['amd']
 	# AMD
-	define(['@detox/crypto', '@detox/dht', '@detox/utils', 'ronion', 'jssha/src/sha3', 'fixed-size-multiplexer', 'async-eventer', 'pako'], Transport)
+	define(['@detox/crypto', '@detox/dht', '@detox/utils', 'ronion', 'jssha/src/sha3', 'fixed-size-multiplexer', 'async-eventer', 'pako'], Wrapper)
 else if typeof exports == 'object'
 	# CommonJS
-	module.exports = Transport(require('@detox/crypto'), require('@detox/dht'), require('@detox/utils'), require('ronion'), require('jssha/src/sha3'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'))
+	module.exports = Wrapper(require('@detox/crypto'), require('@detox/dht'), require('@detox/utils'), require('ronion'), require('jssha/src/sha3'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'))
 else
 	# Browser globals
-	@'detox_transport' = Transport(@'detox_crypto', @'detox_dht', @'detox_utils', @'ronion', @'jsSHA', @'fixed_size_multiplexer', @'async_eventer', @'pako')
+	@'detox_transport' = Wrapper(@'detox_crypto', @'detox_dht', @'detox_utils', @'ronion', @'jsSHA', @'fixed_size_multiplexer', @'async_eventer', @'pako')
