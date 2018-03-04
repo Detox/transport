@@ -622,7 +622,7 @@
         }
         data['ciphertext'] = encryptor_instance['encrypt'](plaintext);
       })['on']('decrypt', function(data){
-        var address, segment_id, target_address, ciphertext, source_id, encryptor_instance, ref$;
+        var address, segment_id, target_address, ciphertext, source_id, encryptor_instance, ref$, e;
         if (this$._destroyed) {
           return;
         }
@@ -637,7 +637,15 @@
         }
         try {
           data['plaintext'] = encryptor_instance['decrypt'](ciphertext);
-        } catch (e$) {}
+        } catch (e$) {
+          e = e$;
+          /**
+           * Since we don't use all of Ronion features and only send data between initiator and responder, we can destroy unnecessary encryptor
+           * instances and don't even try to decrypt anything, which makes data forwarding less CPU intensive
+           */
+          encryptor_instance['destroy']();
+          this$._encryptor_instances.get(source_id)['delete'](target_address);
+        }
       })['on']('wrap', function(data){
         var address, segment_id, target_address, unwrapped, source_id, rewrapper_instance, ref$, ref1$;
         if (this$._destroyed) {

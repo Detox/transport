@@ -531,12 +531,12 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 			.'on'('encrypt', (data) !~>
 				if @_destroyed
 					return
-				address					= data['address']
-				segment_id				= data['segment_id']
-				target_address			= data['target_address']
-				plaintext				= data['plaintext']
-				source_id				= concat_arrays([address, segment_id])
-				encryptor_instance		= @_encryptor_instances.get(source_id)?.get(target_address)
+				address				= data['address']
+				segment_id			= data['segment_id']
+				target_address		= data['target_address']
+				plaintext			= data['plaintext']
+				source_id			= concat_arrays([address, segment_id])
+				encryptor_instance	= @_encryptor_instances.get(source_id)?.get(target_address)
 				if !encryptor_instance || !encryptor_instance['ready']()
 					return
 				data['ciphertext']	= encryptor_instance['encrypt'](plaintext)
@@ -544,27 +544,34 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 			.'on'('decrypt', (data) !~>
 				if @_destroyed
 					return
-				address					= data['address']
-				segment_id				= data['segment_id']
-				target_address			= data['target_address']
-				ciphertext				= data['ciphertext']
-				source_id				= concat_arrays([address, segment_id])
-				encryptor_instance		= @_encryptor_instances.get(source_id)?.get(target_address)
+				address				= data['address']
+				segment_id			= data['segment_id']
+				target_address		= data['target_address']
+				ciphertext			= data['ciphertext']
+				source_id			= concat_arrays([address, segment_id])
+				encryptor_instance	= @_encryptor_instances.get(source_id)?.get(target_address)
 				if !encryptor_instance || !encryptor_instance['ready']()
 					return
 				# This can legitimately throw exceptions if ciphertext is not targeted at this node
 				try
 					data['plaintext']	= encryptor_instance['decrypt'](ciphertext)
+				catch
+					/**
+					 * Since we don't use all of Ronion features and only send data between initiator and responder, we can destroy unnecessary encryptor
+					 * instances and don't even try to decrypt anything, which makes data forwarding less CPU intensive
+					 */
+					encryptor_instance['destroy']()
+					@_encryptor_instances.get(source_id).delete(target_address)
 			)
 			.'on'('wrap', (data) !~>
 				if @_destroyed
 					return
-				address					= data['address']
-				segment_id				= data['segment_id']
-				target_address			= data['target_address']
-				unwrapped				= data['unwrapped']
-				source_id				= concat_arrays([address, segment_id])
-				rewrapper_instance		= @_rewrapper_instances.get(source_id)?.get(target_address)?[0]
+				address				= data['address']
+				segment_id			= data['segment_id']
+				target_address		= data['target_address']
+				unwrapped			= data['unwrapped']
+				source_id			= concat_arrays([address, segment_id])
+				rewrapper_instance	= @_rewrapper_instances.get(source_id)?.get(target_address)?[0]
 				if !rewrapper_instance
 					return
 				data['wrapped']	= rewrapper_instance['wrap'](unwrapped)
@@ -572,12 +579,12 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 			.'on'('unwrap', (data) !~>
 				if @_destroyed
 					return
-				address					= data['address']
-				segment_id				= data['segment_id']
-				target_address			= data['target_address']
-				wrapped					= data['wrapped']
-				source_id				= concat_arrays([address, segment_id])
-				rewrapper_instance		= @_rewrapper_instances.get(source_id)?.get(target_address)?[1]
+				address				= data['address']
+				segment_id			= data['segment_id']
+				target_address		= data['target_address']
+				wrapped				= data['wrapped']
+				source_id			= concat_arrays([address, segment_id])
+				rewrapper_instance	= @_rewrapper_instances.get(source_id)?.get(target_address)?[1]
 				if !rewrapper_instance
 					return
 				data['unwrapped']	= rewrapper_instance['unwrap'](wrapped)
