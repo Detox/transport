@@ -78,7 +78,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 		..'emit' = (event, data) !->
 			switch event
 				case 'signal'
-					data['signature']	= Buffer['from'](@_sign(string2array(data['sdp'])))
+					data['signature']	= @_sign(string2array(data['sdp']))
 					simple-peer::['emit'].call(@, 'signal', data)
 				case 'data'
 					if @_sending
@@ -95,7 +95,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 							actual_data = @_demultiplexer['get_data']()
 							command		= actual_data[0]
 							if command == COMMAND_DHT
-								simple-peer::['emit'].call(@, 'data', Buffer['from'](@_zlib_decompress(actual_data.subarray(1))))
+								simple-peer::['emit'].call(@, 'data', @_zlib_decompress(actual_data.subarray(1)))
 							else
 								simple-peer::['emit'].call(@, 'custom_data', command, actual_data.subarray(1))
 						@_sending	= true
@@ -377,17 +377,17 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 				value.set(introduction_point, index * PUBLIC_KEY_LENGTH)
 			signature_data	= encode_signature_data(
 				'seq'	: time
-				'v'		: Buffer['from'](value)
+				'v'		: value
 			)
 			signature		= detox-crypto['sign'](signature_data, real_public_key, real_private_key)
 			# This message has signature, so it can be now sent from any node in DHT
 			Uint8Array.from(
 				bencode['encode'](
 					{
-						'k'		: Buffer['from'](real_public_key)
+						'k'		: real_public_key
 						'seq'	: time
-						'sig'	: Buffer['from'](signature)
-						'v'		: Buffer['from'](value)
+						'sig'	: signature
+						'v'		: value
 					}
 				)
 			)
@@ -398,7 +398,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 		 */
 		..'verify_announcement_message' = (message) ->
 			try
-				message	= bencode['decode'](Buffer['from'](message))
+				message	= bencode['decode'](message)
 			if !message || !message['k'] || !message['seq'] || !message['sig'] || !message['v']
 				return null
 			signature_data	= encode_signature_data(
@@ -417,7 +417,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 		..'publish_announcement_message' = (message) !->
 			if @_destroyed || !@'verify_announcement_message'(message)
 				return
-			@_dht['put'](bencode['decode'](Buffer['from'](message)))
+			@_dht['put'](bencode['decode'](message))
 		/**
 		 * Find nodes in DHT that are acting as introduction points for specified public key
 		 *

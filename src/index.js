@@ -77,7 +77,7 @@
       var actual_data, command;
       switch (event) {
       case 'signal':
-        data['signature'] = Buffer['from'](this._sign(string2array(data['sdp'])));
+        data['signature'] = this._sign(string2array(data['sdp']));
         simplePeer.prototype['emit'].call(this, 'signal', data);
         break;
       case 'data':
@@ -93,7 +93,7 @@
             actual_data = this._demultiplexer['get_data']();
             command = actual_data[0];
             if (command === COMMAND_DHT) {
-              simplePeer.prototype['emit'].call(this, 'data', Buffer['from'](this._zlib_decompress(actual_data.subarray(1))));
+              simplePeer.prototype['emit'].call(this, 'data', this._zlib_decompress(actual_data.subarray(1)));
             } else {
               simplePeer.prototype['emit'].call(this, 'custom_data', command, actual_data.subarray(1));
             }
@@ -437,14 +437,14 @@
       }
       signature_data = encode_signature_data({
         'seq': time,
-        'v': Buffer['from'](value)
+        'v': value
       });
       signature = detoxCrypto['sign'](signature_data, real_public_key, real_private_key);
       return Uint8Array.from(bencode['encode']({
-        'k': Buffer['from'](real_public_key),
+        'k': real_public_key,
         'seq': time,
-        'sig': Buffer['from'](signature),
-        'v': Buffer['from'](value)
+        'sig': signature,
+        'v': value
       }));
     };
     /**
@@ -455,7 +455,7 @@
     y$['verify_announcement_message'] = function(message){
       var signature_data;
       try {
-        message = bencode['decode'](Buffer['from'](message));
+        message = bencode['decode'](message);
       } catch (e$) {}
       if (!message || !message['k'] || !message['seq'] || !message['sig'] || !message['v']) {
         return null;
@@ -479,7 +479,7 @@
       if (this._destroyed || !this['verify_announcement_message'](message)) {
         return;
       }
-      this._dht['put'](bencode['decode'](Buffer['from'](message)));
+      this._dht['put'](bencode['decode'](message));
     };
     /**
      * Find nodes in DHT that are acting as introduction points for specified public key
