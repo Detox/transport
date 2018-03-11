@@ -39,7 +39,6 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 	simple-peer			= detox-dht['simple-peer']
 	webrtc-socket		= detox-dht['webrtc-socket']
 	webtorrent-dht		= detox-dht['webtorrent-dht']
-	Buffer				= detox-dht['Buffer']
 	array2hex			= detox-utils['array2hex']
 	hex2array			= detox-utils['hex2array']
 	string2array		= detox-utils['string2array']
@@ -182,16 +181,20 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 	/**
 	 * @param {!Uint8Array} data
 	 *
-	 * @return {!Buffer}
+	 * @return {!Uint8Array} Sometimes returns `Buffer` (depending on input type), but let's make Closure Compiler happy and specify `Uint8Array` for now
 	 */
 	function sha3_256 (data)
-		shaObj = new jsSHA('SHA3-256', 'ARRAYBUFFER');
+		shaObj	= new jsSHA('SHA3-256', 'ARRAYBUFFER');
 		shaObj['update'](data)
-		Buffer['from'](shaObj['getHash']('ARRAYBUFFER'))
+		# Hack: allows us to avoid using `Buffer` explicitly, but still return expected `Buffer`; `Uint8Array.from` doesn't support `ArrayBuffer`, let's use
+		# `Uint8Array`'s constructor first for consistency
+		data.constructor['from'](
+			new Uint8Array(shaObj['getHash']('ARRAYBUFFER'))
+		)
 	/**
 	 * @param {!Object} message
 	 *
-	 * @return {!Buffer}
+	 * @return {!Uint8Array} Actually returns `Buffer`, but let's make Closure Compiler happy and specify `Uint8Array` for now
 	 */
 	function encode_signature_data (message)
 		bencode['encode'](message).slice(1, -1)
@@ -270,7 +273,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 			'bootstrap'		: bootstrap_nodes
 			'hash'			: sha3_256
 			'k'				: bucket_size
-			'nodeId'		: Buffer['from'](dht_public_key)
+			'nodeId'		: dht_public_key
 			'socket'		: @_socket
 			'timeout'		: PEER_CONNECTION_TIMEOUT * 1000
 			'verify'		: detox-crypto['verify']
@@ -320,7 +323,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 		..'lookup' = (id) !->
 			if @_destroyed
 				return
-			@_dht['lookup'](Buffer['from'](id))
+			@_dht['lookup'](id)
 		/**
 		 * Tag connection to specified node ID as used, so that it is not disconnected when not used by DHT itself
 		 *
@@ -432,7 +435,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 			@_dht['get'](hash, (, result) !->
 				if !result || !result['v']
 					# Nothing was found
-					failure_callback()
+					failure_callback?()
 					return
 				introduction_nodes_bulk	= Uint8Array.from(result['v'])
 				introduction_nodes		= []

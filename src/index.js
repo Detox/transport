@@ -29,12 +29,11 @@
     buffer[4] = new_array;
   }
   function Wrapper(detoxCrypto, detoxDht, detoxUtils, ronion, jsSHA, fixedSizeMultiplexer, asyncEventer, pako){
-    var bencode, simplePeer, webrtcSocket, webtorrentDht, Buffer, array2hex, hex2array, string2array, are_arrays_equal, concat_arrays, ArrayMap, x$, y$, z$;
+    var bencode, simplePeer, webrtcSocket, webtorrentDht, array2hex, hex2array, string2array, are_arrays_equal, concat_arrays, ArrayMap, x$, y$, z$;
     bencode = detoxDht['bencode'];
     simplePeer = detoxDht['simple-peer'];
     webrtcSocket = detoxDht['webrtc-socket'];
     webtorrentDht = detoxDht['webtorrent-dht'];
-    Buffer = detoxDht['Buffer'];
     array2hex = detoxUtils['array2hex'];
     hex2array = detoxUtils['hex2array'];
     string2array = detoxUtils['string2array'];
@@ -199,18 +198,18 @@
     /**
      * @param {!Uint8Array} data
      *
-     * @return {!Buffer}
+     * @return {!Uint8Array} Sometimes returns `Buffer` (depending on input type), but let's make Closure Compiler happy and specify `Uint8Array` for now
      */
     function sha3_256(data){
       var shaObj;
       shaObj = new jsSHA('SHA3-256', 'ARRAYBUFFER');
       shaObj['update'](data);
-      return Buffer['from'](shaObj['getHash']('ARRAYBUFFER'));
+      return data.constructor['from'](new Uint8Array(shaObj['getHash']('ARRAYBUFFER')));
     }
     /**
      * @param {!Object} message
      *
-     * @return {!Buffer}
+     * @return {!Uint8Array} Actually returns `Buffer`, but let's make Closure Compiler happy and specify `Uint8Array` for now
      */
     function encode_signature_data(message){
       return bencode['encode'](message).slice(1, -1);
@@ -303,7 +302,7 @@
         'bootstrap': bootstrap_nodes,
         'hash': sha3_256,
         'k': bucket_size,
-        'nodeId': Buffer['from'](dht_public_key),
+        'nodeId': dht_public_key,
         'socket': this._socket,
         'timeout': PEER_CONNECTION_TIMEOUT * 1000,
         'verify': detoxCrypto['verify']
@@ -363,7 +362,7 @@
       if (this._destroyed) {
         return;
       }
-      this._dht['lookup'](Buffer['from'](id));
+      this._dht['lookup'](id);
     };
     /**
      * Tag connection to specified node ID as used, so that it is not disconnected when not used by DHT itself
@@ -497,7 +496,9 @@
       this._dht['get'](hash, function(arg$, result){
         var introduction_nodes_bulk, introduction_nodes, i$, to$, i;
         if (!result || !result['v']) {
-          failure_callback();
+          if (typeof failure_callback == 'function') {
+            failure_callback();
+          }
           return;
         }
         introduction_nodes_bulk = Uint8Array.from(result['v']);
