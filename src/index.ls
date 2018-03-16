@@ -614,7 +614,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 				return Promise.reject()
 			nodes	= nodes.slice() # Do not modify source array
 			new Promise (resolve, reject) !~>
-				last_node_in_routing_path				= nodes[nodes.length - 1]
+				last_node_in_routing_path				= nodes[* - 1]
 				first_node								= nodes.shift()
 				encryptor_instances						= ArrayMap()
 				rewrapper_instances						= ArrayMap()
