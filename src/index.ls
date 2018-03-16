@@ -177,7 +177,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 			update_dictionary_buffer(@_receive_zlib_buffer, result)
 			result
 
-	Object.defineProperty(simple-peer-detox::, 'constructor', {enumerable: false, value: simple-peer-detox})
+	Object.defineProperty(simple-peer-detox::, 'constructor', {value: simple-peer-detox})
 	/**
 	 * @param {!Uint8Array} data
 	 *
@@ -456,7 +456,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 			@_dht['destroy'](callback)
 			delete @_dht
 			@_destroyed	= true
-	Object.defineProperty(DHT::, 'constructor', {enumerable: false, value: DHT})
+	Object.defineProperty(DHT::, 'constructor', {value: DHT})
 	/**
 	 * @constructor
 	 *
@@ -770,7 +770,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 			@_multiplexers.delete(source_id)
 			@_demultiplexers.delete(source_id)
 			@_established_routing_paths.delete(source_id)
-	Object.defineProperty(Router::, 'constructor', {enumerable: false, value: Router})
+	Object.defineProperty(Router::, 'constructor', {value: Router})
 	{
 		'ready'			: detox-crypto['ready']
 		'DHT'			: DHT

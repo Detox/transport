@@ -192,7 +192,6 @@
       return result;
     };
     Object.defineProperty(simplePeerDetox.prototype, 'constructor', {
-      enumerable: false,
       value: simplePeerDetox
     });
     /**
@@ -527,7 +526,6 @@
       this._destroyed = true;
     };
     Object.defineProperty(DHT.prototype, 'constructor', {
-      enumerable: false,
       value: DHT
     });
     /**
@@ -890,7 +888,6 @@
       this._established_routing_paths['delete'](source_id);
     };
     Object.defineProperty(Router.prototype, 'constructor', {
-      enumerable: false,
       value: Router
     });
     return {
