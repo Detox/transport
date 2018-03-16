@@ -34,7 +34,7 @@ const PEER_CONNECTION_TIMEOUT		= 30
 	buffer[3]	= buffer[4]
 	buffer[4]	= new_array
 
-function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-size-multiplexer, async-eventer, pako)
+function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multiplexer, async-eventer, pako)
 	bencode				= detox-dht['bencode']
 	simple-peer			= detox-dht['simple-peer']
 	webrtc-socket		= detox-dht['webrtc-socket']
@@ -184,12 +184,9 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 	 * @return {!Uint8Array} Sometimes returns `Buffer` (depending on input type), but let's make Closure Compiler happy and specify `Uint8Array` for now
 	 */
 	function sha3_256 (data)
-		shaObj	= new jsSHA('SHA3-256', 'ARRAYBUFFER');
-		shaObj['update'](data)
-		# Hack: allows us to avoid using `Buffer` explicitly, but still return expected `Buffer`; `Uint8Array.from` doesn't support `ArrayBuffer`, let's use
-		# `Uint8Array`'s constructor first for consistency
+		# Hack: allows us to avoid using `Buffer` explicitly, but still return expected `Buffer`
 		data.constructor['from'](
-			new Uint8Array(shaObj['getHash']('ARRAYBUFFER'))
+			detox-crypto['sha3_256'](data)
 		)
 	/**
 	 * @param {!Object} message
@@ -780,10 +777,10 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, jsSHA, fixed-siz
 
 if typeof define == 'function' && define['amd']
 	# AMD
-	define(['@detox/crypto', '@detox/dht', '@detox/utils', 'ronion', 'jssha/src/sha3', 'fixed-size-multiplexer', 'async-eventer', 'pako'], Wrapper)
+	define(['@detox/crypto', '@detox/dht', '@detox/utils', 'ronion', 'fixed-size-multiplexer', 'async-eventer', 'pako'], Wrapper)
 else if typeof exports == 'object'
 	# CommonJS
-	module.exports = Wrapper(require('@detox/crypto'), require('@detox/dht'), require('@detox/utils'), require('ronion'), require('jssha/src/sha3'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'))
+	module.exports = Wrapper(require('@detox/crypto'), require('@detox/dht'), require('@detox/utils'), require('ronion'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'))
 else
 	# Browser globals
-	@'detox_transport' = Wrapper(@'detox_crypto', @'detox_dht', @'detox_utils', @'ronion', @'jsSHA', @'fixed_size_multiplexer', @'async_eventer', @'pako')
+	@'detox_transport' = Wrapper(@'detox_crypto', @'detox_dht', @'detox_utils', @'ronion', @'fixed_size_multiplexer', @'async_eventer', @'pako')

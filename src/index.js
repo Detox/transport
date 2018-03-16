@@ -28,7 +28,7 @@
     buffer[3] = buffer[4];
     buffer[4] = new_array;
   }
-  function Wrapper(detoxCrypto, detoxDht, detoxUtils, ronion, jsSHA, fixedSizeMultiplexer, asyncEventer, pako){
+  function Wrapper(detoxCrypto, detoxDht, detoxUtils, ronion, fixedSizeMultiplexer, asyncEventer, pako){
     var bencode, simplePeer, webrtcSocket, webtorrentDht, array2hex, hex2array, string2array, are_arrays_equal, concat_arrays, ArrayMap, x$, y$, z$;
     bencode = detoxDht['bencode'];
     simplePeer = detoxDht['simple-peer'];
@@ -200,10 +200,7 @@
      * @return {!Uint8Array} Sometimes returns `Buffer` (depending on input type), but let's make Closure Compiler happy and specify `Uint8Array` for now
      */
     function sha3_256(data){
-      var shaObj;
-      shaObj = new jsSHA('SHA3-256', 'ARRAYBUFFER');
-      shaObj['update'](data);
-      return data.constructor['from'](new Uint8Array(shaObj['getHash']('ARRAYBUFFER')));
+      return data.constructor['from'](detoxCrypto['sha3_256'](data));
     }
     /**
      * @param {!Object} message
@@ -898,10 +895,10 @@
     };
   }
   if (typeof define === 'function' && define['amd']) {
-    define(['@detox/crypto', '@detox/dht', '@detox/utils', 'ronion', 'jssha/src/sha3', 'fixed-size-multiplexer', 'async-eventer', 'pako'], Wrapper);
+    define(['@detox/crypto', '@detox/dht', '@detox/utils', 'ronion', 'fixed-size-multiplexer', 'async-eventer', 'pako'], Wrapper);
   } else if (typeof exports === 'object') {
-    module.exports = Wrapper(require('@detox/crypto'), require('@detox/dht'), require('@detox/utils'), require('ronion'), require('jssha/src/sha3'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'));
+    module.exports = Wrapper(require('@detox/crypto'), require('@detox/dht'), require('@detox/utils'), require('ronion'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'));
   } else {
-    this['detox_transport'] = Wrapper(this['detox_crypto'], this['detox_dht'], this['detox_utils'], this['ronion'], this['jsSHA'], this['fixed_size_multiplexer'], this['async_eventer'], this['pako']);
+    this['detox_transport'] = Wrapper(this['detox_crypto'], this['detox_dht'], this['detox_utils'], this['ronion'], this['fixed_size_multiplexer'], this['async_eventer'], this['pako']);
   }
 }).call(this);
