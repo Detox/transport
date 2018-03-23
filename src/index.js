@@ -233,6 +233,7 @@
         packets_per_second = 1;
       }
       this._pending_websocket_ids = new Map;
+      this._ws_address = {};
       x$ = this._socket = webrtcSocket({
         'simple_peer_constructor': simplePeerDetox,
         'simple_peer_opts': {
@@ -243,7 +244,8 @@
           'sign': function(data){
             return detoxCrypto['sign'](data, dht_public_key, dht_private_key);
           }
-        }
+        },
+        'ws_address': this._ws_address
       });
       x$['on']('websocket_peer_connection_alias', function(websocket_host, websocket_port, peer_connection){
         bootstrap_nodes.forEach(function(bootstrap_node){
@@ -317,11 +319,17 @@
      *
      * @param {string}	ip
      * @param {number}	port
+     * @param {string}	address	Publicly available address that will be returned to other node, typically domain name (instead of using IP)
      */
-    y$['start_bootstrap_node'] = function(ip, port){
+    y$['start_bootstrap_node'] = function(ip, port, address){
+      address == null && (address = ip);
       if (this._destroyed) {
         return;
       }
+      Object.assign(this._ws_address, {
+        'address': address,
+        'port': port
+      });
       this._dht['listen'](port, ip);
     };
     /**

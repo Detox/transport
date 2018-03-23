@@ -42,8 +42,8 @@ Constructor for DHT object, offers BitTorrent-like DHT based on [WebTorrent DHT]
 * `packets_per_second` - packets are sent at constant rate (which together with fixed packet size of 512 bytes can be used to identify bandwidth requirements for specific connection), `1` is minimal supported rate, actual rate is negotiated between 2 sides on connection
 * `bucket_size` - size of the bucket used in DHT internals (directly affects number of active WebRTC connections)
 
-### detox_transport.DHT.start_bootstrap_node(ip : string, port : number)
-Start bootstrap server (WebSocket) listening on specified IP and port.
+### detox_transport.DHT.start_bootstrap_node(ip : string, port : number, address = ip : string)
+Start bootstrap server (WebSocket) listening on specified IP and port, optionally referred externally by specified address (like domain name).
 
 ### detox_transport.DHT.get_bootstrap_nodes() : Object
 Returns array of collected bootstrap nodes obtained during DHT operation in the same format as `bootstrap_nodes` argument in constructor.

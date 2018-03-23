@@ -5,11 +5,12 @@
  * @license 0BSD
  */
 (function(){
-  var detoxCrypto, lib, test, bootstrap_ip, bootstrap_port;
+  var detoxCrypto, lib, test, bootstrap_ip, bootstrap_address, bootstrap_port;
   detoxCrypto = require('@detox/crypto');
   lib = require('..');
   test = require('tape');
   bootstrap_ip = '127.0.0.1';
+  bootstrap_address = 'localhost';
   bootstrap_port = 16882;
   /**
    * @param {!Uint8Array} array
@@ -49,10 +50,10 @@
       node_2_dht = detoxCrypto.create_keypair(hex2array('910e5d834e32835d427ca4507c4a6a6c1715fd7cbd290cda8d4c1aa90d0f251d'));
       node_3_dht = detoxCrypto.create_keypair(hex2array('7be95d9a4aecf3d353a5a9264b0c76497d977393d2b549f3cec51837f3b528e0'));
       bootstrap_node_instance = lib.DHT(bootstrap_node_dht.ed25519['public'], bootstrap_node_dht.ed25519['private'], [], [], 5, 2);
-      bootstrap_node_instance.start_bootstrap_node(bootstrap_ip, bootstrap_port);
+      bootstrap_node_instance.start_bootstrap_node(bootstrap_ip, bootstrap_port, bootstrap_address);
       bootstrap_node_info = {
         node_id: array2hex(bootstrap_node_dht.ed25519['public']),
-        host: bootstrap_ip,
+        host: bootstrap_address,
         port: bootstrap_port
       };
       node_1_instance = lib.DHT(node_1_dht.ed25519['public'], node_1_dht.ed25519['private'], [bootstrap_node_info], [], 5, 2);

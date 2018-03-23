@@ -215,14 +215,17 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		if packets_per_second < 1
 			packets_per_second	= 1
 		@_pending_websocket_ids	= new Map
+		# This object is stored here, so that it can be updated if/when bootstrap node is started
+		@_ws_address			= {}
 		@_socket				= webrtc-socket(
 			'simple_peer_constructor'	: simple-peer-detox
-			'simple_peer_opts'		:
+			'simple_peer_opts'			:
 				'config'				:
 					'iceServers'	: ice_servers
 				'packets_per_second'	: packets_per_second
 				'sign'					: (data) ->
 					detox-crypto['sign'](data, dht_public_key, dht_private_key)
+			'ws_address'				: @_ws_address
 		)
 			..'on'('websocket_peer_connection_alias', (websocket_host, websocket_port, peer_connection) !~>
 				bootstrap_nodes.forEach (bootstrap_node) ~>
@@ -289,10 +292,15 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		 *
 		 * @param {string}	ip
 		 * @param {number}	port
+		 * @param {string}	address	Publicly available address that will be returned to other node, typically domain name (instead of using IP)
 		 */
-		..'start_bootstrap_node' = (ip, port) !->
+		..'start_bootstrap_node' = (ip, port, address = ip) !->
 			if @_destroyed
 				return
+			Object.assign(@_ws_address, {
+				'address'	: address
+				'port'		: port
+			})
 			@_dht['listen'](port, ip)
 		/**
 		 * Get an array of bootstrap nodes obtained during DHT operation in the same format as `bootstrap_nodes` argument in constructor
