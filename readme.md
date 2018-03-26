@@ -33,7 +33,7 @@ requirejs(['@detox/transport'], function (detox_transport) {
 ### detox_transport.ready(callback)
 * `callback` - Callback function that is called when library is ready for use
 
-### detox_transport.DHT(dht_public_key : Uint8Array, dht_private_key : Uint8Array, bootstrap_nodes : Object[], ice_servers : Object[], packets_per_second : number, bucket_size = 2 : number) : detox_transport.DHT
+### detox_transport.DHT(dht_public_key : Uint8Array, dht_private_key : Uint8Array, bootstrap_nodes : Object[], ice_servers : Object[], packets_per_second : number, bucket_size = 2 : number, other_dht_options : {} : Object) : detox_transport.DHT
 Constructor for DHT object, offers BitTorrent-like DHT based on [WebTorrent DHT](https://github.com/nazar-pc/webtorrent-dht) with just a few high-level APIs available for the user.
 
 * `dht_public_key` and `dht_private_key` - are Ed25519 keypair as in `@detox/crypto` used to represent node itself in DHT network, typically temporary
@@ -41,6 +41,7 @@ Constructor for DHT object, offers BitTorrent-like DHT based on [WebTorrent DHT]
 * `ice_servers` - array of objects as `config.iceServers` in [simple-peer constructor](https://github.com/feross/simple-peer#peer--new-simplepeeropts)
 * `packets_per_second` - packets are sent at constant rate (which together with fixed packet size of 512 bytes can be used to identify bandwidth requirements for specific connection), `1` is minimal supported rate, actual rate is negotiated between 2 sides on connection
 * `bucket_size` - size of the bucket used in DHT internals (directly affects number of active WebRTC connections)
+* `other_dht_options` - Other internal options supported by underlying DHT implementation `webtorrent-dht`
 
 ### detox_transport.DHT.start_bootstrap_node(ip : string, port : number, address = ip : string)
 Start bootstrap server (WebSocket) listening on specified IP and port, optionally referred externally by specified address (like domain name).

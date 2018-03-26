@@ -204,12 +204,13 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 	 * @param {!Array<!Object>}	ice_servers
 	 * @param {number}			packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
 	 * @param {number}			bucket_size
+	 * @param {!Object}			other_dht_options	Other internal options supported by underlying DHT implementation `webtorrent-dht`
 	 *
 	 * @return {!DHT}
 	 */
-	!function DHT (dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packets_per_second, bucket_size = 2)
+	!function DHT (dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packets_per_second, bucket_size = 2, other_dht_options = {})
 		if !(@ instanceof DHT)
-			return new DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packets_per_second, bucket_size)
+			return new DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packets_per_second, bucket_size, other_dht_options)
 		async-eventer.call(@)
 
 		if packets_per_second < 1
@@ -269,7 +270,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 			..'on'('node_disconnected', (string_id) !~>
 				@'fire'('node_disconnected', hex2array(string_id))
 			)
-		@_dht					= new webtorrent-dht(
+		dht_options				=
 			'bootstrap'		: bootstrap_nodes
 			'hash'			: sha3_256
 			'k'				: bucket_size
@@ -277,7 +278,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 			'socket'		: @_socket
 			'timeout'		: PEER_CONNECTION_TIMEOUT * 1000
 			'verify'		: detox-crypto['verify']
-		)
+		@_dht					= new webtorrent-dht(Object.assign(dht_options, other_dht_options))
 			..'on'('error', (error) !~>
 				@'fire'('error', error)
 			)

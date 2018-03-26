@@ -219,14 +219,16 @@
      * @param {!Array<!Object>}	ice_servers
      * @param {number}			packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
      * @param {number}			bucket_size
+     * @param {!Object}			other_dht_options	Other internal options supported by underlying DHT implementation `webtorrent-dht`
      *
      * @return {!DHT}
      */
-    function DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packets_per_second, bucket_size){
-      var x$, y$, this$ = this;
+    function DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packets_per_second, bucket_size, other_dht_options){
+      var x$, dht_options, y$, this$ = this;
       bucket_size == null && (bucket_size = 2);
+      other_dht_options == null && (other_dht_options = {});
       if (!(this instanceof DHT)) {
-        return new DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packets_per_second, bucket_size);
+        return new DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packets_per_second, bucket_size, other_dht_options);
       }
       asyncEventer.call(this);
       if (packets_per_second < 1) {
@@ -296,7 +298,7 @@
       x$['on']('node_disconnected', function(string_id){
         this$['fire']('node_disconnected', hex2array(string_id));
       });
-      y$ = this._dht = new webtorrentDht({
+      dht_options = {
         'bootstrap': bootstrap_nodes,
         'hash': sha3_256,
         'k': bucket_size,
@@ -304,7 +306,8 @@
         'socket': this._socket,
         'timeout': PEER_CONNECTION_TIMEOUT * 1000,
         'verify': detoxCrypto['verify']
-      });
+      };
+      y$ = this._dht = new webtorrentDht(Object.assign(dht_options, other_dht_options));
       y$['on']('error', function(error){
         this$['fire']('error', error);
       });
