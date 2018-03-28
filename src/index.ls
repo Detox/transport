@@ -3,6 +3,9 @@
  * @author  Nazar Mokrynskyi <nazar@mokrynskyi.com>
  * @license 0BSD
  */
+/*
+ * Implements version 0.2.0 of the specification
+ */
 const COMMAND_DHT				= 0
 const COMMAND_TAG				= 1
 const COMMAND_UNTAG				= 2
@@ -253,6 +256,9 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 					peer_connection['destroy']()
 					return
 				peer_connection['on']('custom_data', (command, data) !~>
+					# According to specification, ignore all commands except COMMAND_DHT
+					if @_bootstrap_node
+						return
 					switch command
 						case COMMAND_TAG
 							@_socket['add_tag'](string_id, 'detox-responder')
@@ -303,6 +309,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 				'port'		: port
 			})
 			@_dht['listen'](port, ip)
+			@_bootstrap_node	= true
 		/**
 		 * Get an array of bootstrap nodes obtained during DHT operation in the same format as `bootstrap_nodes` argument in constructor
 		 *

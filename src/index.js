@@ -5,6 +5,9 @@
  * @license 0BSD
  */
 (function(){
+  /*
+   * Implements version 0.2.0 of the specification
+   */
   var COMMAND_DHT, COMMAND_TAG, COMMAND_UNTAG, CUSTOM_COMMANDS_OFFSET, PUBLIC_KEY_LENGTH, MAC_LENGTH, ROUTING_PATH_SEGMENT_TIMEOUT, MAX_DATA_SIZE, DHT_PACKET_SIZE, ROUTER_PACKET_SIZE, PEER_CONNECTION_TIMEOUT;
   COMMAND_DHT = 0;
   COMMAND_TAG = 1;
@@ -277,6 +280,9 @@
           return;
         }
         peer_connection['on']('custom_data', function(command, data){
+          if (this$._bootstrap_node) {
+            return;
+          }
           switch (command) {
           case COMMAND_TAG:
             this$._socket['add_tag'](string_id, 'detox-responder');
@@ -334,6 +340,7 @@
         'port': port
       });
       this._dht['listen'](port, ip);
+      this._bootstrap_node = true;
     };
     /**
      * Get an array of bootstrap nodes obtained during DHT operation in the same format as `bootstrap_nodes` argument in constructor
