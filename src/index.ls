@@ -37,9 +37,8 @@ const PEER_CONNECTION_TIMEOUT		= 30
 	buffer[3]	= buffer[4]
 	buffer[4]	= new_array
 
-function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multiplexer, async-eventer, pako)
+function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multiplexer, async-eventer, pako, simple-peer)
 	bencode				= detox-dht['bencode']
-	simple-peer			= detox-dht['simple-peer']
 	webrtc-socket		= detox-dht['webrtc-socket']
 	webtorrent-dht		= detox-dht['webtorrent-dht']
 	array2hex			= detox-utils['array2hex']
@@ -793,10 +792,10 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 
 if typeof define == 'function' && define['amd']
 	# AMD
-	define(['@detox/crypto', '@detox/dht', '@detox/utils', 'ronion', 'fixed-size-multiplexer', 'async-eventer', 'pako'], Wrapper)
+	define(['@detox/crypto', '@detox/dht', '@detox/utils', 'ronion', 'fixed-size-multiplexer', 'async-eventer', 'pako', 'simple-peer'], Wrapper)
 else if typeof exports == 'object'
 	# CommonJS
-	module.exports = Wrapper(require('@detox/crypto'), require('@detox/dht'), require('@detox/utils'), require('ronion'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'))
+	module.exports = Wrapper(require('@detox/crypto'), require('@detox/dht'), require('@detox/utils'), require('ronion'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'), require('simple-peer'))
 else
 	# Browser globals
-	@'detox_transport' = Wrapper(@'detox_crypto', @'detox_dht', @'detox_utils', @'ronion', @'fixed_size_multiplexer', @'async_eventer', @'pako')
+	@'detox_transport' = Wrapper(@'detox_crypto', @'detox_dht', @'detox_utils', @'ronion', @'fixed_size_multiplexer', @'async_eventer', @'pako', @'SimplePeer')

@@ -31,10 +31,9 @@
     buffer[3] = buffer[4];
     buffer[4] = new_array;
   }
-  function Wrapper(detoxCrypto, detoxDht, detoxUtils, ronion, fixedSizeMultiplexer, asyncEventer, pako){
-    var bencode, simplePeer, webrtcSocket, webtorrentDht, array2hex, hex2array, string2array, are_arrays_equal, concat_arrays, ArrayMap, x$, y$, z$;
+  function Wrapper(detoxCrypto, detoxDht, detoxUtils, ronion, fixedSizeMultiplexer, asyncEventer, pako, simplePeer){
+    var bencode, webrtcSocket, webtorrentDht, array2hex, hex2array, string2array, are_arrays_equal, concat_arrays, ArrayMap, x$, y$, z$;
     bencode = detoxDht['bencode'];
-    simplePeer = detoxDht['simple-peer'];
     webrtcSocket = detoxDht['webrtc-socket'];
     webtorrentDht = detoxDht['webtorrent-dht'];
     array2hex = detoxUtils['array2hex'];
@@ -913,10 +912,10 @@
     };
   }
   if (typeof define === 'function' && define['amd']) {
-    define(['@detox/crypto', '@detox/dht', '@detox/utils', 'ronion', 'fixed-size-multiplexer', 'async-eventer', 'pako'], Wrapper);
+    define(['@detox/crypto', '@detox/dht', '@detox/utils', 'ronion', 'fixed-size-multiplexer', 'async-eventer', 'pako', 'simple-peer'], Wrapper);
   } else if (typeof exports === 'object') {
-    module.exports = Wrapper(require('@detox/crypto'), require('@detox/dht'), require('@detox/utils'), require('ronion'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'));
+    module.exports = Wrapper(require('@detox/crypto'), require('@detox/dht'), require('@detox/utils'), require('ronion'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'), require('simple-peer'));
   } else {
-    this['detox_transport'] = Wrapper(this['detox_crypto'], this['detox_dht'], this['detox_utils'], this['ronion'], this['fixed_size_multiplexer'], this['async_eventer'], this['pako']);
+    this['detox_transport'] = Wrapper(this['detox_crypto'], this['detox_dht'], this['detox_utils'], this['ronion'], this['fixed_size_multiplexer'], this['async_eventer'], this['pako'], this['SimplePeer']);
   }
 }).call(this);
