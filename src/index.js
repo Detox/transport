@@ -327,16 +327,18 @@
      *
      * @param {string}	ip
      * @param {number}	port
-     * @param {string}	address	Publicly available address that will be returned to other node, typically domain name (instead of using IP)
+     * @param {string}	address		Publicly available address that will be returned to other node, typically domain name (instead of using IP)
+     * @param {number}	public_port	Publicly available port on `address`
      */
-    y$['start_bootstrap_node'] = function(ip, port, address){
+    y$['start_bootstrap_node'] = function(ip, port, address, public_port){
       address == null && (address = ip);
+      public_port == null && (public_port = port);
       if (this._destroyed) {
         return;
       }
       Object.assign(this._ws_address, {
         'address': address,
-        'port': port
+        'port': public_port
       });
       this._dht['listen'](port, ip);
       this._bootstrap_node = true;

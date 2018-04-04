@@ -298,14 +298,15 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		 *
 		 * @param {string}	ip
 		 * @param {number}	port
-		 * @param {string}	address	Publicly available address that will be returned to other node, typically domain name (instead of using IP)
+		 * @param {string}	address		Publicly available address that will be returned to other node, typically domain name (instead of using IP)
+		 * @param {number}	public_port	Publicly available port on `address`
 		 */
-		..'start_bootstrap_node' = (ip, port, address = ip) !->
+		..'start_bootstrap_node' = (ip, port, address = ip, public_port = port) !->
 			if @_destroyed
 				return
 			Object.assign(@_ws_address, {
 				'address'	: address
-				'port'		: port
+				'port'		: public_port
 			})
 			@_dht['listen'](port, ip)
 			@_bootstrap_node	= true
