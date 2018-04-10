@@ -78,7 +78,7 @@
       var actual_data, command;
       switch (event) {
       case 'signal':
-        data['signature'] = this._sign(string2array(data['sdp']));
+        data['signature'] = Array.from(this._sign(string2array(data['sdp'])));
         simplePeer.prototype['emit'].call(this, 'signal', data);
         break;
       case 'data':
@@ -115,7 +115,7 @@
         this['destroy']();
         return;
       }
-      this._signature_received = signal['signature'];
+      this._signature_received = Uint8Array.from(signal['signature']);
       this._sdp_received = string2array(signal['sdp']);
       try {
         simplePeer.prototype['signal'].call(this, signal);
@@ -236,8 +236,8 @@
       if (packets_per_second < 1) {
         packets_per_second = 1;
       }
-      this._pending_websocket_ids = new Map;
-      this._ws_address = {};
+      this._pending_http_ids = new Map;
+      this._http_address = {};
       x$ = this._socket = webrtcSocket({
         'simple_peer_constructor': simplePeerDetox,
         'simple_peer_opts': {
@@ -249,16 +249,16 @@
             return detoxCrypto['sign'](data, dht_public_key, dht_private_key);
           }
         },
-        'ws_address': this._ws_address
+        'http_address': this._http_address
       });
-      x$['on']('websocket_peer_connection_alias', function(websocket_host, websocket_port, peer_connection){
+      x$['on']('http_peer_connection_alias', function(http_host, http_port, peer_connection){
         bootstrap_nodes.forEach(function(bootstrap_node){
-          if (bootstrap_node.host !== websocket_host || bootstrap_node.port !== websocket_port) {
+          if (bootstrap_node.host !== http_host || bootstrap_node.port !== http_port) {
             return;
           }
-          this$._pending_websocket_ids.set(peer_connection, bootstrap_node['node_id']);
+          this$._pending_http_ids.set(peer_connection, bootstrap_node['node_id']);
           return peer_connection['on']('close', function(){
-            this$._pending_websocket_ids['delete'](peer_connection);
+            this$._pending_http_ids['delete'](peer_connection);
           });
         });
       });
@@ -266,9 +266,9 @@
         var id, peer_connection, expected_id;
         id = hex2array(string_id);
         peer_connection = this$._socket['get_id_mapping'](string_id);
-        if (this$._pending_websocket_ids.has(peer_connection)) {
-          expected_id = this$._pending_websocket_ids.get(peer_connection);
-          this$._pending_websocket_ids['delete'](peer_connection);
+        if (this$._pending_http_ids.has(peer_connection)) {
+          expected_id = this$._pending_http_ids.get(peer_connection);
+          this$._pending_http_ids['delete'](peer_connection);
           if (expected_id !== string_id) {
             peer_connection['destroy']();
             return;
@@ -323,7 +323,7 @@
     DHT.prototype = Object.create(asyncEventer.prototype);
     y$ = DHT.prototype;
     /**
-     * Start WebSocket server listening on specified ip:port, so that current node will be capable of acting as bootstrap node for other users
+     * Start HTTP server listening on specified ip:port, so that current node will be capable of acting as bootstrap node for other users
      *
      * @param {string}	ip
      * @param {number}	port
@@ -336,7 +336,7 @@
       if (this._destroyed) {
         return;
       }
-      Object.assign(this._ws_address, {
+      Object.assign(this._http_address, {
         'address': address,
         'port': public_port
       });
@@ -357,11 +357,11 @@
         var i$, ref$, results$ = [];
         for (i$ in ref$ = this._dht['_rpc']['socket']['socket']['_peer_connections']) {
           peer_connection = ref$[i$];
-          if (peer_connection['ws_server'] && peer_connection['id']) {
+          if (peer_connection['http_server'] && peer_connection['id']) {
             results$.push({
               'node_id': peer_connection['id'],
-              'host': peer_connection['ws_server']['host'],
-              'port': peer_connection['ws_server']['port']
+              'host': peer_connection['http_server']['host'],
+              'port': peer_connection['http_server']['port']
             });
           }
         }
@@ -529,7 +529,7 @@
       });
     };
     /**
-     * Stop WebSocket server if running, close all active WebRTC connections
+     * Stop HTTP server if running, close all active WebRTC connections
      *
      * @param {Function} callback
      */

@@ -44,7 +44,7 @@ Constructor for DHT object, offers BitTorrent-like DHT based on [WebTorrent DHT]
 * `other_dht_options` - Other internal options supported by underlying DHT implementation `webtorrent-dht`
 
 ### detox_transport.DHT.start_bootstrap_node(ip : string, port : number, address = ip : string, public_port = port : number)
-Start bootstrap server (WebSocket) listening on specified IP and port, optionally referred externally by specified address (like domain name) and port.
+Start bootstrap server (HTTP) listening on specified IP and port, optionally referred externally by specified address (like domain name) and port.
 
 ### detox_transport.DHT.get_bootstrap_nodes() : Object
 Returns array of collected bootstrap nodes obtained during DHT operation in the same format as `bootstrap_nodes` argument in constructor.
@@ -81,7 +81,7 @@ Publish message with introduction nodes (typically happens on different node tha
 Find nodes in DHT that are acting as introduction points for specified public key.
 
 ### detox_transport.DHT.destroy(callback : Function)
-Stop WebSocket server if running, close all active WebRTC connections.
+Stop HTTP server if running, close all active WebRTC connections.
 
 ### detox_transport.DHT.on(event: string, callback: Function) : detox_transport.DHT
 Register event handler.

@@ -79,7 +79,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		..'emit' = (event, data) !->
 			switch event
 				case 'signal'
-					data['signature']	= @_sign(string2array(data['sdp']))
+					data['signature']	= Array.from(@_sign(string2array(data['sdp'])))
 					simple-peer::['emit'].call(@, 'signal', data)
 				case 'data'
 					if @_sending
@@ -111,7 +111,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 				# Drop connection if signature not specified
 				@'destroy'()
 				return
-			@_signature_received	= signal['signature']
+			@_signature_received	= Uint8Array.from(signal['signature'])
 			@_sdp_received			= string2array(signal['sdp'])
 			# Connection might be closed already for some reason - catch thrown exception if that is the case
 			try
@@ -217,9 +217,9 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 
 		if packets_per_second < 1
 			packets_per_second	= 1
-		@_pending_websocket_ids	= new Map
+		@_pending_http_ids		= new Map
 		# This object is stored here, so that it can be updated if/when bootstrap node is started
-		@_ws_address			= {}
+		@_http_address			= {}
 		@_socket				= webrtc-socket(
 			'simple_peer_constructor'	: simple-peer-detox
 			'simple_peer_opts'			:
@@ -228,24 +228,24 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 				'packets_per_second'	: packets_per_second
 				'sign'					: (data) ->
 					detox-crypto['sign'](data, dht_public_key, dht_private_key)
-			'ws_address'				: @_ws_address
+			'http_address'				: @_http_address
 		)
-			..'on'('websocket_peer_connection_alias', (websocket_host, websocket_port, peer_connection) !~>
+			..'on'('http_peer_connection_alias', (http_host, http_port, peer_connection) !~>
 				bootstrap_nodes.forEach (bootstrap_node) ~>
-					if bootstrap_node.host != websocket_host || bootstrap_node.port != websocket_port
+					if bootstrap_node.host != http_host || bootstrap_node.port != http_port
 						return
-					@_pending_websocket_ids.set(peer_connection, bootstrap_node['node_id'])
+					@_pending_http_ids.set(peer_connection, bootstrap_node['node_id'])
 					peer_connection['on']('close', !~>
-						@_pending_websocket_ids.delete(peer_connection)
+						@_pending_http_ids.delete(peer_connection)
 					)
 			)
 			..'on'('node_connected', (string_id) !~>
 				id				= hex2array(string_id)
 				peer_connection	= @_socket['get_id_mapping'](string_id)
-				# If connection was started from WebSocket (bootstrap node, insecure ws://), we need to confirm that WebRTC uses the same node ID as WebSocket
-				if @_pending_websocket_ids.has(peer_connection)
-					expected_id	= @_pending_websocket_ids.get(peer_connection)
-					@_pending_websocket_ids.delete(peer_connection)
+				# If connection was started from HTTP (bootstrap node), we need to confirm that WebRTC uses the same node ID as HTTP
+				if @_pending_http_ids.has(peer_connection)
+					expected_id	= @_pending_http_ids.get(peer_connection)
+					@_pending_http_ids.delete(peer_connection)
 					if expected_id != string_id
 						peer_connection['destroy']()
 						return
@@ -294,7 +294,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 	DHT:: = Object.create(async-eventer::)
 	DHT::
 		/**
-		 * Start WebSocket server listening on specified ip:port, so that current node will be capable of acting as bootstrap node for other users
+		 * Start HTTP server listening on specified ip:port, so that current node will be capable of acting as bootstrap node for other users
 		 *
 		 * @param {string}	ip
 		 * @param {number}	port
@@ -304,7 +304,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		..'start_bootstrap_node' = (ip, port, address = ip, public_port = port) !->
 			if @_destroyed
 				return
-			Object.assign(@_ws_address, {
+			Object.assign(@_http_address, {
 				'address'	: address
 				'port'		: public_port
 			})
@@ -320,11 +320,11 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 				return []
 			(
 				for , peer_connection of @_dht['_rpc']['socket']['socket']['_peer_connections']
-					if peer_connection['ws_server'] && peer_connection['id']
+					if peer_connection['http_server'] && peer_connection['id']
 						{
 							'node_id'	: peer_connection['id']
-							'host'		: peer_connection['ws_server']['host']
-							'port'		: peer_connection['ws_server']['port']
+							'host'		: peer_connection['http_server']['host']
+							'port'		: peer_connection['http_server']['port']
 						}
 			)
 			.filter(Boolean)
@@ -459,7 +459,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 				success_callback(introduction_nodes)
 			)
 		/**
-		 * Stop WebSocket server if running, close all active WebRTC connections
+		 * Stop HTTP server if running, close all active WebRTC connections
 		 *
 		 * @param {Function} callback
 		 */

@@ -76,7 +76,7 @@ test('DHT', (t) !->
 
 	function all_ready
 		t.pass('Nodes are ready')
-
+		debugger
 		t.deepEqual(node_1_instance.get_bootstrap_nodes()[0], bootstrap_node_info, 'Bootstrap nodes are returned correctly #1')
 		t.deepEqual(node_2_instance.get_bootstrap_nodes()[0], bootstrap_node_info, 'Bootstrap nodes are returned correctly #2')
 		t.deepEqual(node_3_instance.get_bootstrap_nodes()[0], bootstrap_node_info, 'Bootstrap nodes are returned correctly #3')
