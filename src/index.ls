@@ -178,6 +178,10 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 			})
 			update_dictionary_buffer(@_receive_zlib_buffer, result)
 			result
+		/**
+		 * Stub, since we use a custom version that is not based on streams
+		 */
+		..'setMaxListeners' = ->
 
 	Object.defineProperty(simple-peer-detox::, 'constructor', {value: simple-peer-detox})
 	/**
@@ -793,10 +797,10 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 
 if typeof define == 'function' && define['amd']
 	# AMD
-	define(['@detox/crypto', '@detox/dht', '@detox/utils', 'ronion', 'fixed-size-multiplexer', 'async-eventer', 'pako', 'simple-peer'], Wrapper)
+	define(['@detox/crypto', '@detox/dht', '@detox/utils', 'ronion', 'fixed-size-multiplexer', 'async-eventer', 'pako', '@detox/simple-peer'], Wrapper)
 else if typeof exports == 'object'
 	# CommonJS
-	module.exports = Wrapper(require('@detox/crypto'), require('@detox/dht'), require('@detox/utils'), require('ronion'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'), require('simple-peer'))
+	module.exports = Wrapper(require('@detox/crypto'), require('@detox/dht'), require('@detox/utils'), require('ronion'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'), require('@detox/simple-peer'))
 else
 	# Browser globals
 	@'detox_transport' = Wrapper(@'detox_crypto', @'detox_dht', @'detox_utils', @'ronion', @'fixed_size_multiplexer', @'async_eventer', @'pako', @'SimplePeer')

@@ -193,6 +193,10 @@
       update_dictionary_buffer(this._receive_zlib_buffer, result);
       return result;
     };
+    /**
+     * Stub, since we use a custom version that is not based on streams
+     */
+    x$['setMaxListeners'] = function(){};
     Object.defineProperty(simplePeerDetox.prototype, 'constructor', {
       value: simplePeerDetox
     });
@@ -914,9 +918,9 @@
     };
   }
   if (typeof define === 'function' && define['amd']) {
-    define(['@detox/crypto', '@detox/dht', '@detox/utils', 'ronion', 'fixed-size-multiplexer', 'async-eventer', 'pako', 'simple-peer'], Wrapper);
+    define(['@detox/crypto', '@detox/dht', '@detox/utils', 'ronion', 'fixed-size-multiplexer', 'async-eventer', 'pako', '@detox/simple-peer'], Wrapper);
   } else if (typeof exports === 'object') {
-    module.exports = Wrapper(require('@detox/crypto'), require('@detox/dht'), require('@detox/utils'), require('ronion'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'), require('simple-peer'));
+    module.exports = Wrapper(require('@detox/crypto'), require('@detox/dht'), require('@detox/utils'), require('ronion'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'), require('@detox/simple-peer'));
   } else {
     this['detox_transport'] = Wrapper(this['detox_crypto'], this['detox_dht'], this['detox_utils'], this['ronion'], this['fixed_size_multiplexer'], this['async_eventer'], this['pako'], this['SimplePeer']);
   }
