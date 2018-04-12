@@ -189,10 +189,10 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 	 *
 	 * @return {!Uint8Array} Sometimes returns `Buffer` (depending on input type), but let's make Closure Compiler happy and specify `Uint8Array` for now
 	 */
-	function sha3_256 (data)
+	function blake2b_256 (data)
 		# Hack: allows us to avoid using `Buffer` explicitly, but still return expected `Buffer`
 		data.constructor['from'](
-			detox-crypto['sha3_256'](data)
+			detox-crypto['blake2b_256'](data)
 		)
 	/**
 	 * @param {!Object} message
@@ -281,7 +281,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 			)
 		dht_options				=
 			'bootstrap'		: bootstrap_nodes
-			'hash'			: sha3_256
+			'hash'			: blake2b_256
 			'k'				: bucket_size
 			'nodeId'		: dht_public_key
 			'socket'		: @_socket
@@ -448,7 +448,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		..'find_introduction_nodes' = (target_public_key, success_callback, failure_callback) !->
 			if @_destroyed
 				return
-			hash	= sha3_256(target_public_key)
+			hash	= blake2b_256(target_public_key)
 			@_dht['get'](hash, (, result) !->
 				if !result || !result['v']
 					# Nothing was found

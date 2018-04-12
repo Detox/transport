@@ -205,8 +205,8 @@
      *
      * @return {!Uint8Array} Sometimes returns `Buffer` (depending on input type), but let's make Closure Compiler happy and specify `Uint8Array` for now
      */
-    function sha3_256(data){
-      return data.constructor['from'](detoxCrypto['sha3_256'](data));
+    function blake2b_256(data){
+      return data.constructor['from'](detoxCrypto['blake2b_256'](data));
     }
     /**
      * @param {!Object} message
@@ -309,7 +309,7 @@
       });
       dht_options = {
         'bootstrap': bootstrap_nodes,
-        'hash': sha3_256,
+        'hash': blake2b_256,
         'k': bucket_size,
         'nodeId': dht_public_key,
         'socket': this._socket,
@@ -511,7 +511,7 @@
       if (this._destroyed) {
         return;
       }
-      hash = sha3_256(target_public_key);
+      hash = blake2b_256(target_public_key);
       this._dht['get'](hash, function(arg$, result){
         var introduction_nodes_bulk, introduction_nodes, i$, to$, i;
         if (!result || !result['v']) {
