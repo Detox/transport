@@ -151,9 +151,13 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 			setTimeout (!~>
 				if @'destroyed'
 					return
-				simple-peer::['send'].call(@, @_multiplexer['get_block']())
-				@_sending	= false
-				@_last_sent	= +(new Date)
+				# In rare cases we might get exceptions like `InvalidStateError`, don't let the whole thing crash because of this
+				try
+					simple-peer::['send'].call(@, @_multiplexer['get_block']())
+					@_sending	= false
+					@_last_sent	= +(new Date)
+				catch e
+					@'emit'('error', e)
 			), delay
 		/**
 		 * @param {!Uint8Array} data
