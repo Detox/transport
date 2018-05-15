@@ -31,7 +31,8 @@
 		"async-eventer"          : "^1.1.5",
 		"fixed-size-multiplexer" : "^1.0.2",
 		"pako"                   : "^1.0.6",
-		"ronion"                 : "^0.7.0"
+		"ronion"                 : "^0.7.0",
+		"wrtc"                   : "^0.1.4"
 	},
 	"devDependencies" : {
 		"build-gc" : "^0.1.1",
