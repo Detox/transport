@@ -32,7 +32,6 @@ const PEER_CONNECTION_TIMEOUT		= 30
 	buffer[4]	= new_array
 
 function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multiplexer, async-eventer, pako, simple-peer, wrtc)
-	bencode				= detox-dht['bencode']
 	array2hex			= detox-utils['array2hex']
 	array2string		= detox-utils['array2string']
 	hex2array			= detox-utils['hex2array']
@@ -188,13 +187,6 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		data.constructor['from'](
 			detox-crypto['blake2b_256'](data)
 		)
-	/**
-	 * @param {!Object} message
-	 *
-	 * @return {!Uint8Array} Actually returns `Buffer`, but let's make Closure Compiler happy and specify `Uint8Array` for now
-	 */
-	function encode_signature_data (message)
-		bencode['encode'](message).slice(1, -1)
 	/**
 	 * @constructor
 	 *

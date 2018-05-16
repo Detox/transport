@@ -26,8 +26,7 @@
     buffer[4] = new_array;
   }
   function Wrapper(detoxCrypto, detoxDht, detoxUtils, ronion, fixedSizeMultiplexer, asyncEventer, pako, simplePeer, wrtc){
-    var bencode, array2hex, array2string, hex2array, string2array, are_arrays_equal, concat_arrays, ArrayMap, x$;
-    bencode = detoxDht['bencode'];
+    var array2hex, array2string, hex2array, string2array, are_arrays_equal, concat_arrays, ArrayMap, x$;
     array2hex = detoxUtils['array2hex'];
     array2string = detoxUtils['array2string'];
     hex2array = detoxUtils['hex2array'];
@@ -193,14 +192,6 @@
      */
     function blake2b_256(data){
       return data.constructor['from'](detoxCrypto['blake2b_256'](data));
-    }
-    /**
-     * @param {!Object} message
-     *
-     * @return {!Uint8Array} Actually returns `Buffer`, but let's make Closure Compiler happy and specify `Uint8Array` for now
-     */
-    function encode_signature_data(message){
-      return bencode['encode'](message).slice(1, -1);
     }
     /**
      * @constructor
