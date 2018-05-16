@@ -5,9 +5,8 @@
  * @license 0BSD
  */
 (function(){
-  var ROUTING_COMMANDS_OFFSET, CUSTOM_COMMANDS_OFFSET, PUBLIC_KEY_LENGTH, MAC_LENGTH, ROUTING_PATH_SEGMENT_TIMEOUT, MAX_DATA_SIZE, PACKET_SIZE, ROUTER_PACKET_SIZE, PEER_CONNECTION_TIMEOUT;
+  var ROUTING_COMMANDS_OFFSET, PUBLIC_KEY_LENGTH, MAC_LENGTH, ROUTING_PATH_SEGMENT_TIMEOUT, MAX_DATA_SIZE, PACKET_SIZE, ROUTER_PACKET_SIZE, PEER_CONNECTION_TIMEOUT;
   ROUTING_COMMANDS_OFFSET = 10;
-  CUSTOM_COMMANDS_OFFSET = 20;
   PUBLIC_KEY_LENGTH = 32;
   MAC_LENGTH = 16;
   ROUTING_PATH_SEGMENT_TIMEOUT = 10;
@@ -27,10 +26,8 @@
     buffer[4] = new_array;
   }
   function Wrapper(detoxCrypto, detoxDht, detoxUtils, ronion, fixedSizeMultiplexer, asyncEventer, pako, simplePeer, wrtc){
-    var bencode, webrtcSocket, webtorrentDht, array2hex, array2string, hex2array, string2array, are_arrays_equal, concat_arrays, ArrayMap, x$;
+    var bencode, array2hex, array2string, hex2array, string2array, are_arrays_equal, concat_arrays, ArrayMap, x$;
     bencode = detoxDht['bencode'];
-    webrtcSocket = detoxDht['webrtc-socket'];
-    webtorrentDht = detoxDht['webtorrent-dht'];
     array2hex = detoxUtils['array2hex'];
     array2string = detoxUtils['array2string'];
     hex2array = detoxUtils['hex2array'];
@@ -62,12 +59,6 @@
         'trickle': false,
         'wrtc': wrtc
       });
-      this._peer['once']('connect', function(){
-        this$['fire']('connected');
-      })['once']('close', function(){
-        this$['fire']('disconnected');
-      });
-      this._connected['catch'](function(){});
       this._signal = new Promise(function(resolve, reject){
         this$._peer['once']('signal', function(signal){
           resolve(string2array(signal['sdp']));
@@ -80,13 +71,15 @@
       this._demultiplexer = fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, PACKET_SIZE);
       this._send_zlib_buffer = [new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0)];
       this._receive_zlib_buffer = [new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0)];
-      this._connected.then(function(){
+      this._peer['once']('connect', function(){
+        this$['fire']('connected');
         this$._last_sent = +new Date;
         if (this$._sending) {
           this$._real_send();
         }
-      });
-      this._peer['on']('data', function(data){
+      })['once']('close', function(){
+        this$['fire']('disconnected');
+      })['on']('data', function(data){
         var demultiplexed_data, command, command_data;
         if (this$._sending || data.length !== PACKET_SIZE) {
           this$['destroy']();
@@ -212,159 +205,24 @@
     /**
      * @constructor
      *
-     * @param {!Uint8Array}		dht_public_key		Ed25519 public key, temporary one, just for DHT operation
-     * @param {!Uint8Array}		dht_private_key		Corresponding Ed25519 private key
-     * @param {!Array<!Object>}	bootstrap_nodes
-     * @param {!Array<!Object>}	ice_servers
-     * @param {number}			packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
-     * @param {number}			bucket_size
-     * @param {!Object}			other_dht_options	Other internal options supported by underlying DHT implementation `webtorrent-dht`
+     * @param {!Uint8Array}	dht_public_key						Own ID (Ed25519 public key)
+     * @param {number}		bucket_size							Size of a bucket from Kademlia design
+     * @param {number}		state_history_size					How many versions of local history will be kept
+     * @param {number}		values_cache_size					How many values will be kept in cache
+     * @param {number}		fraction_of_nodes_from_same_peer	Max fraction of nodes originated from single peer allowed on lookup start
      *
      * @return {!DHT}
      */
-    function DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packets_per_second, bucket_size, other_dht_options){
-      var x$, dht_options, y$, this$ = this;
-      bucket_size == null && (bucket_size = 2);
-      other_dht_options == null && (other_dht_options = {});
+    function DHT(dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer){
+      fraction_of_nodes_from_same_peer == null && (fraction_of_nodes_from_same_peer = 0.2);
       if (!(this instanceof DHT)) {
-        return new DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packets_per_second, bucket_size, other_dht_options);
+        return new DHT(dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer);
       }
       asyncEventer.call(this);
-      if (packets_per_second < 1) {
-        packets_per_second = 1;
-      }
-      this._pending_http_ids = new Map;
-      this._http_address = {};
-      x$ = this._socket = webrtcSocket({
-        'simple_peer_constructor': simplePeerDetox,
-        'simple_peer_opts': {
-          'config': {
-            'iceServers': ice_servers
-          },
-          'packets_per_second': packets_per_second,
-          'sign': function(data){
-            return detoxCrypto['sign'](data, dht_public_key, dht_private_key);
-          }
-        },
-        'http_address': this._http_address
-      });
-      x$['on']('http_peer_connection_alias', function(http_host, http_port, peer_connection){
-        bootstrap_nodes.forEach(function(bootstrap_node){
-          if (bootstrap_node.host !== http_host || bootstrap_node.port !== http_port) {
-            return;
-          }
-          this$._pending_http_ids.set(peer_connection, bootstrap_node['node_id']);
-          return peer_connection['on']('close', function(){
-            this$._pending_http_ids['delete'](peer_connection);
-          });
-        });
-      });
-      x$['on']('node_connected', function(string_id){
-        var id, peer_connection, expected_id;
-        id = hex2array(string_id);
-        peer_connection = this$._socket['get_id_mapping'](string_id);
-        if (this$._pending_http_ids.has(peer_connection)) {
-          expected_id = this$._pending_http_ids.get(peer_connection);
-          this$._pending_http_ids['delete'](peer_connection);
-          if (expected_id !== string_id) {
-            peer_connection['destroy']();
-            return;
-          }
-        }
-        if (!detoxCrypto['verify'](peer_connection._signature_received, peer_connection._sdp_received, id)) {
-          peer_connection['destroy']();
-          return;
-        }
-        peer_connection['on']('custom_data', function(command, data){
-          if (this$._bootstrap_node) {
-            return;
-          }
-          switch (command) {
-          case COMMAND_TAG:
-            this$._socket['add_tag'](string_id, 'detox-responder');
-            this$['fire']('node_tagged', id);
-            break;
-          case COMMAND_UNTAG:
-            this$._socket['del_tag'](string_id, 'detox-responder');
-            this$['fire']('node_untagged', id);
-            break;
-          default:
-            if (command < CUSTOM_COMMANDS_OFFSET) {
-              return;
-            }
-            this$['fire']('data', id, command - CUSTOM_COMMANDS_OFFSET, data);
-          }
-        });
-        this$['fire']('node_connected', id);
-      });
-      x$['on']('node_disconnected', function(string_id){
-        this$['fire']('node_disconnected', hex2array(string_id));
-      });
-      dht_options = {
-        'bootstrap': bootstrap_nodes,
-        'hash': blake2b_256,
-        'k': bucket_size,
-        'nodeId': dht_public_key,
-        'socket': this._socket,
-        'timeout': PEER_CONNECTION_TIMEOUT * 1000,
-        'verify': detoxCrypto['verify']
-      };
-      y$ = this._dht = new webtorrentDht(Object.assign(dht_options, other_dht_options));
-      y$['on']('error', function(error){
-        this$['fire']('error', error);
-      });
-      y$['once']('ready', function(){
-        this$['fire']('ready');
-      });
+      this._dht = detoxDht['DHT'](dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer);
     }
     DHT.prototype = Object.create(asyncEventer.prototype);
     x$ = DHT.prototype;
-    /**
-     * Start HTTP server listening on specified ip:port, so that current node will be capable of acting as bootstrap node for other users
-     *
-     * @param {string}	ip
-     * @param {number}	port
-     * @param {string}	address		Publicly available address that will be returned to other node, typically domain name (instead of using IP)
-     * @param {number}	public_port	Publicly available port on `address`
-     */
-    x$['start_bootstrap_node'] = function(ip, port, address, public_port){
-      address == null && (address = ip);
-      public_port == null && (public_port = port);
-      if (this._destroyed) {
-        return;
-      }
-      Object.assign(this._http_address, {
-        'address': address,
-        'port': public_port
-      });
-      this._dht['listen'](port, ip);
-      this._bootstrap_node = true;
-    };
-    /**
-     * Get an array of bootstrap nodes obtained during DHT operation in the same format as `bootstrap_nodes` argument in constructor
-     *
-     * @return {!Array<!Object>} Each element is an object with keys `host`, `port` and `node_id`
-     */
-    x$['get_bootstrap_nodes'] = function(){
-      var peer_connection;
-      if (this._destroyed) {
-        return [];
-      }
-      return (function(){
-        var i$, ref$, results$ = [];
-        for (i$ in ref$ = this._dht['_rpc']['socket']['socket']['_peer_connections']) {
-          peer_connection = ref$[i$];
-          if (peer_connection['http_server'] && peer_connection['id']) {
-            results$.push({
-              'node_id': peer_connection['id'],
-              'host': peer_connection['http_server']['host'],
-              'port': peer_connection['http_server']['port']
-            });
-          }
-        }
-        return results$;
-      }.call(this)).filter(Boolean);
-    };
     /**
      * Start lookup for specified node ID (listen for `node_connected` in order to know when interested node was connected)
      *
@@ -375,58 +233,6 @@
         return;
       }
       this._dht['lookup'](id);
-    };
-    /**
-     * Tag connection to specified node ID as used, so that it is not disconnected when not used by DHT itself
-     *
-     * @param {!Uint8Array} id
-     */
-    x$['add_used_tag'] = function(id){
-      var string_id, peer_connection;
-      if (this._destroyed) {
-        return;
-      }
-      string_id = array2hex(id);
-      peer_connection = this._socket['get_id_mapping'](string_id);
-      if (peer_connection) {
-        peer_connection._send_routing_data(new Uint8Array(0), COMMAND_TAG);
-        this._socket['add_tag'](string_id, 'detox-initiator');
-      }
-    };
-    /**
-     * Remove tag from connection, so that it can be disconnected if not needed by DHT anymore
-     *
-     * @param {!Uint8Array} id
-     */
-    x$['del_used_tag'] = function(id){
-      var string_id, peer_connection;
-      if (this._destroyed) {
-        return;
-      }
-      string_id = array2hex(id);
-      peer_connection = this._socket['get_id_mapping'](string_id);
-      if (peer_connection) {
-        peer_connection._send_routing_data(new Uint8Array(0), COMMAND_UNTAG);
-        this._socket['del_tag'](string_id, 'detox-initiator');
-      }
-    };
-    /**
-     * Send data to specified node ID
-     *
-     * @param {!Uint8Array}	id
-     * @param {number}		command	0..245
-     * @param {!Uint8Array}	data
-     */
-    x$['send_data'] = function(id, command, data){
-      var string_id, peer_connection;
-      if (this._destroyed || data.length > MAX_DATA_SIZE) {
-        return;
-      }
-      string_id = array2hex(id);
-      peer_connection = this._socket['get_id_mapping'](string_id);
-      if (peer_connection) {
-        peer_connection._send_routing_data(data, command + CUSTOM_COMMANDS_OFFSET);
-      }
     };
     /**
      * Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity)

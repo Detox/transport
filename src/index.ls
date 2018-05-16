@@ -3,8 +3,7 @@
  * @author  Nazar Mokrynskyi <nazar@mokrynskyi.com>
  * @license 0BSD
  */
-const ROUTING_COMMANDS_OFFSET	= 10
-const CUSTOM_COMMANDS_OFFSET	= 20 # Everything starting from 20 is available for the user
+const ROUTING_COMMANDS_OFFSET	= 10 # 0..9 are reserved as DHT commands
 
 # Length of Ed25519 public key in bytes
 const PUBLIC_KEY_LENGTH				= 32
@@ -18,7 +17,7 @@ const MAX_DATA_SIZE					= 2 ** 16 - 1
 const PACKET_SIZE					= 512
 # 3 bytes (2 for multiplexer and 1 for command) smaller than packet size in DHT in order to avoid fragmentation when sending over peer connection
 const ROUTER_PACKET_SIZE			= PACKET_SIZE - 3
-# Same as in webtorrent-dht
+# If connection was not established during this time (seconds) then assume connection failure
 const PEER_CONNECTION_TIMEOUT		= 30
 
 /**
@@ -34,8 +33,6 @@ const PEER_CONNECTION_TIMEOUT		= 30
 
 function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multiplexer, async-eventer, pako, simple-peer, wrtc)
 	bencode				= detox-dht['bencode']
-	webrtc-socket		= detox-dht['webrtc-socket']
-	webtorrent-dht		= detox-dht['webtorrent-dht']
 	array2hex			= detox-utils['array2hex']
 	array2string		= detox-utils['array2string']
 	hex2array			= detox-utils['hex2array']
@@ -58,6 +55,8 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		async-eventer.call(@)
 
 		@_initiator	= initiator
+		# TODO: Timeouts (PEER_CONNECTION_TIMEOUT)?
+		# TODO: Signatures here?
 		@_peer		= simple-peer(
 			'config'	:
 				'iceServers'	: ice_servers
@@ -65,14 +64,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 			'trickle'	: false
 			'wrtc'		: wrtc
 		)
-		@_peer
-			.'once'('connect', !~>
-				@'fire'('connected')
-			)
-			.'once'('close', !~>
-				@'fire'('disconnected')
-			)
-		@_connected.catch(->)
+
 		@_signal	= new Promise (resolve, reject) !~>
 			@_peer
 				.'once'('signal', (signal) !~>
@@ -87,11 +79,16 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		@_demultiplexer			= fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, PACKET_SIZE)
 		@_send_zlib_buffer		= [new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0)]
 		@_receive_zlib_buffer	= [new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0)]
-		@_connected.then !~>
-			@_last_sent	= +(new Date)
-			if @_sending
-				@_real_send()
 		@_peer
+			.'once'('connect', !~>
+				@'fire'('connected')
+				@_last_sent	= +(new Date)
+				if @_sending
+					@_real_send()
+			)
+			.'once'('close', !~>
+				@'fire'('disconnected')
+			)
 			.'on'('data', (data) !~>
 				# Data are sent in alternating order, sending data when receiving is expected violates the protocol
 				# Data size must be exactly one packet size
@@ -201,134 +198,24 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 	/**
 	 * @constructor
 	 *
-	 * @param {!Uint8Array}		dht_public_key		Ed25519 public key, temporary one, just for DHT operation
-	 * @param {!Uint8Array}		dht_private_key		Corresponding Ed25519 private key
-	 * @param {!Array<!Object>}	bootstrap_nodes
-	 * @param {!Array<!Object>}	ice_servers
-	 * @param {number}			packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
-	 * @param {number}			bucket_size
-	 * @param {!Object}			other_dht_options	Other internal options supported by underlying DHT implementation `webtorrent-dht`
+	 * @param {!Uint8Array}	dht_public_key						Own ID (Ed25519 public key)
+	 * @param {number}		bucket_size							Size of a bucket from Kademlia design
+	 * @param {number}		state_history_size					How many versions of local history will be kept
+	 * @param {number}		values_cache_size					How many values will be kept in cache
+	 * @param {number}		fraction_of_nodes_from_same_peer	Max fraction of nodes originated from single peer allowed on lookup start
 	 *
 	 * @return {!DHT}
 	 */
-	!function DHT (dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packets_per_second, bucket_size = 2, other_dht_options = {})
+	!function DHT (dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer = 0.2)
 		if !(@ instanceof DHT)
-			return new DHT(dht_public_key, dht_private_key, bootstrap_nodes, ice_servers, packets_per_second, bucket_size, other_dht_options)
+			return new DHT(dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer)
 		async-eventer.call(@)
 
-		if packets_per_second < 1
-			packets_per_second	= 1
-		@_pending_http_ids		= new Map
-		# This object is stored here, so that it can be updated if/when bootstrap node is started
-		@_http_address			= {}
-		@_socket				= webrtc-socket(
-			'simple_peer_constructor'	: simple-peer-detox
-			'simple_peer_opts'			:
-				'config'				:
-					'iceServers'	: ice_servers
-				'packets_per_second'	: packets_per_second
-				'sign'					: (data) ->
-					detox-crypto['sign'](data, dht_public_key, dht_private_key)
-			'http_address'				: @_http_address
-		)
-			..'on'('http_peer_connection_alias', (http_host, http_port, peer_connection) !~>
-				bootstrap_nodes.forEach (bootstrap_node) ~>
-					if bootstrap_node.host != http_host || bootstrap_node.port != http_port
-						return
-					@_pending_http_ids.set(peer_connection, bootstrap_node['node_id'])
-					peer_connection['on']('close', !~>
-						@_pending_http_ids.delete(peer_connection)
-					)
-			)
-			..'on'('node_connected', (string_id) !~>
-				id				= hex2array(string_id)
-				peer_connection	= @_socket['get_id_mapping'](string_id)
-				# If connection was started from HTTP (bootstrap node), we need to confirm that WebRTC uses the same node ID as HTTP
-				if @_pending_http_ids.has(peer_connection)
-					expected_id	= @_pending_http_ids.get(peer_connection)
-					@_pending_http_ids.delete(peer_connection)
-					if expected_id != string_id
-						peer_connection['destroy']()
-						return
-				# Already Uint8Array, no need to convert SDP to array
-				if !detox-crypto['verify'](peer_connection._signature_received, peer_connection._sdp_received, id)
-					# Drop connection if node failed to sign SDP with its public message
-					peer_connection['destroy']()
-					return
-				peer_connection['on']('custom_data', (command, data) !~>
-					# According to specification, ignore all commands except COMMAND_DHT
-					if @_bootstrap_node
-						return
-					switch command
-						case COMMAND_TAG
-							@_socket['add_tag'](string_id, 'detox-responder')
-							@'fire'('node_tagged', id)
-						case COMMAND_UNTAG
-							@_socket['del_tag'](string_id, 'detox-responder')
-							@'fire'('node_untagged', id)
-						else
-							if command < CUSTOM_COMMANDS_OFFSET
-								return
-							@'fire'('data', id, command - CUSTOM_COMMANDS_OFFSET, data)
-				)
-				@'fire'('node_connected', id)
-			)
-			..'on'('node_disconnected', (string_id) !~>
-				@'fire'('node_disconnected', hex2array(string_id))
-			)
-		dht_options				=
-			'bootstrap'		: bootstrap_nodes
-			'hash'			: blake2b_256
-			'k'				: bucket_size
-			'nodeId'		: dht_public_key
-			'socket'		: @_socket
-			'timeout'		: PEER_CONNECTION_TIMEOUT * 1000
-			'verify'		: detox-crypto['verify']
-		@_dht					= new webtorrent-dht(Object.assign(dht_options, other_dht_options))
-			..'on'('error', (error) !~>
-				@'fire'('error', error)
-			)
-			..'once'('ready', !~>
-				@'fire'('ready')
-			)
+		@_dht	= detox-dht['DHT'](dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer)
+		#TODO
 
 	DHT:: = Object.create(async-eventer::)
 	DHT::
-		/**
-		 * Start HTTP server listening on specified ip:port, so that current node will be capable of acting as bootstrap node for other users
-		 *
-		 * @param {string}	ip
-		 * @param {number}	port
-		 * @param {string}	address		Publicly available address that will be returned to other node, typically domain name (instead of using IP)
-		 * @param {number}	public_port	Publicly available port on `address`
-		 */
-		..'start_bootstrap_node' = (ip, port, address = ip, public_port = port) !->
-			if @_destroyed
-				return
-			Object.assign(@_http_address, {
-				'address'	: address
-				'port'		: public_port
-			})
-			@_dht['listen'](port, ip)
-			@_bootstrap_node	= true
-		/**
-		 * Get an array of bootstrap nodes obtained during DHT operation in the same format as `bootstrap_nodes` argument in constructor
-		 *
-		 * @return {!Array<!Object>} Each element is an object with keys `host`, `port` and `node_id`
-		 */
-		..'get_bootstrap_nodes' = ->
-			if @_destroyed
-				return []
-			(
-				for , peer_connection of @_dht['_rpc']['socket']['socket']['_peer_connections']
-					if peer_connection['http_server'] && peer_connection['id']
-						{
-							'node_id'	: peer_connection['id']
-							'host'		: peer_connection['http_server']['host']
-							'port'		: peer_connection['http_server']['port']
-						}
-			)
-			.filter(Boolean)
 		/**
 		 * Start lookup for specified node ID (listen for `node_connected` in order to know when interested node was connected)
 		 *
@@ -338,46 +225,6 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 			if @_destroyed
 				return
 			@_dht['lookup'](id)
-		/**
-		 * Tag connection to specified node ID as used, so that it is not disconnected when not used by DHT itself
-		 *
-		 * @param {!Uint8Array} id
-		 */
-		..'add_used_tag' = (id) !->
-			if @_destroyed
-				return
-			string_id	= array2hex(id)
-			peer_connection	= @_socket['get_id_mapping'](string_id)
-			if peer_connection
-				peer_connection._send_routing_data(new Uint8Array(0), COMMAND_TAG)
-				@_socket['add_tag'](string_id, 'detox-initiator')
-		/**
-		 * Remove tag from connection, so that it can be disconnected if not needed by DHT anymore
-		 *
-		 * @param {!Uint8Array} id
-		 */
-		..'del_used_tag' = (id) !->
-			if @_destroyed
-				return
-			string_id	= array2hex(id)
-			peer_connection	= @_socket['get_id_mapping'](string_id)
-			if peer_connection
-				peer_connection._send_routing_data(new Uint8Array(0), COMMAND_UNTAG)
-				@_socket['del_tag'](string_id, 'detox-initiator')
-		/**
-		 * Send data to specified node ID
-		 *
-		 * @param {!Uint8Array}	id
-		 * @param {number}		command	0..245
-		 * @param {!Uint8Array}	data
-		 */
-		..'send_data' = (id, command, data) !->
-			if @_destroyed || data.length > MAX_DATA_SIZE
-				return
-			string_id		= array2hex(id)
-			peer_connection	= @_socket['get_id_mapping'](string_id)
-			if peer_connection
-				peer_connection._send_routing_data(data, command + CUSTOM_COMMANDS_OFFSET)
 		/**
 		 * Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity)
 		 *
