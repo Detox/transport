@@ -52,9 +52,9 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 	 *
 	 * @return {!DHT}
 	 */
-	!function P2P (initiator, ice_servers, packets_per_second)
-		if !(@ instanceof P2P)
-			return new P2P(ice_servers, packets_per_second)
+	!function P2P_transport (initiator, ice_servers, packets_per_second)
+		if !(@ instanceof P2P_transport)
+			return new P2P_transport(ice_servers, packets_per_second)
 		async-eventer.call(@)
 
 		@_initiator	= initiator
@@ -110,7 +110,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 					@_real_send()
 			)
 
-	P2P:: =
+	P2P_transport:: =
 		/**
 		 * @return {!Promise} Resolves with `Uint8Array` signaling data
 		 */
@@ -179,8 +179,8 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 			})
 			update_dictionary_buffer(@_receive_zlib_buffer, result)
 			result
-	P2P:: = Object.assign(Object.create(async-eventer::), P2P::)
-	Object.defineProperty(P2P::, 'constructor', {value: P2P})
+	P2P_transport:: = Object.assign(Object.create(async-eventer::), P2P_transport::)
+	Object.defineProperty(P2P_transport::, 'constructor', {value: P2P_transport})
 	/**
 	 * @param {!Uint8Array} data
 	 *
@@ -607,15 +607,15 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 				data['unwrapped']	= rewrapper_instance['unwrap'](wrapped)
 			)
 		@_max_packet_data_size	= @_ronion['get_max_command_data_length']()
-	Router:: = Object.create(async-eventer::)
-	Router::
+
+	Router:: =
 		/**
 		 * Process routing packet coming from node with specified ID
 		 *
 		 * @param {!Uint8Array} node_id
 		 * @param {!Uint8Array} packet
 		 */
-		..'process_packet' = (node_id, packet) !->
+		'process_packet' : (node_id, packet) !->
 			if @_destroyed
 				return
 			@_ronion['process_packet'](node_id, packet)
@@ -626,7 +626,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		 *
 		 * @return {!Promise} Will resolve with ID of the route or will be rejected if path construction fails
 		 */
-		..'construct_routing_path' = (nodes) ->
+		'construct_routing_path' : (nodes) ->
 			if @_destroyed
 				return Promise.reject()
 			nodes	= nodes.slice() # Do not modify source array
@@ -727,14 +727,14 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		 * @param {!Uint8Array} node_id		First node in routing path
 		 * @param {!Uint8Array} route_id	Identifier returned during routing path construction
 		 */
-		..'destroy_routing_path' = (node_id, route_id) !->
+		'destroy_routing_path' : (node_id, route_id) !->
 			@_destroy_routing_path(node_id, route_id)
 		/**
 		 * Max data size that will fit into single packet without fragmentation
 		 *
 		 * @return {number}
 		 */
-		..'get_max_packet_data_size' = ->
+		'get_max_packet_data_size' : ->
 			@_max_packet_data_size
 		/**
 		 * Send data to the responder on specified routing path
@@ -744,7 +744,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		 * @param {number}		command		Command from range `0..245`
 		 * @param {!Uint8Array}	data
 		 */
-		..'send_data' = (node_id, route_id, command, data) !->
+		'send_data' : (node_id, route_id, command, data) !->
 			if @_destroyed
 				return
 			if data.length > MAX_DATA_SIZE
@@ -761,7 +761,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		/**
 		 * Destroy all of the routing path constructed earlier
 		 */
-		..'destroy' = !->
+		'destroy' : !->
 			if @_destroyed
 				return
 			@_destroyed = true
@@ -771,7 +771,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		 * @param {!Uint8Array} address
 		 * @param {!Uint8Array} segment_id
 		 */
-		.._destroy_routing_path = (address, segment_id) !->
+		_destroy_routing_path : (address, segment_id) !->
 			source_id			= concat_arrays([address, segment_id])
 			encryptor_instances	= @_encryptor_instances.get(source_id)
 			if !encryptor_instances
@@ -784,10 +784,12 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 			@_multiplexers.delete(source_id)
 			@_demultiplexers.delete(source_id)
 			@_established_routing_paths.delete(source_id)
+	Router:: = Object.assign(Object.create(async-eventer::), Router::)
 	Object.defineProperty(Router::, 'constructor', {value: Router})
 	{
 		'ready'			: detox-crypto['ready']
 		'DHT'			: DHT
+		'P2P_transport'	: P2P_transport
 		'Router'		: Router
 		'MAX_DATA_SIZE'	: MAX_DATA_SIZE
 	}
