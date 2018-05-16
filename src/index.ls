@@ -212,19 +212,26 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		async-eventer.call(@)
 
 		@_dht	= detox-dht['DHT'](dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer)
-		#TODO
+			.'on'('peer_error', (peer_id) !~>
+			)
+			.'on'('peer_warning', (peer_id) !~>
+			)
+			.'on'('connect_to', (peer_peer_id, peer_id) !~>
+			)
+			.'on'('send', (peer_id, command, payload) !~>
+			)
 
 	DHT:: = Object.create(async-eventer::)
 	DHT::
 		/**
-		 * Start lookup for specified node ID (listen for `node_connected` in order to know when interested node was connected)
+		 * @param {!Uint8Array} node_id
 		 *
-		 * @param {!Uint8Array} id
+		 * @return {!Promise} Resolves with `!Array<!Uint8Array>`
 		 */
-		..'lookup' = (id) !->
+		..'lookup' = (node_id) ->
 			if @_destroyed
 				return
-			@_dht['lookup'](id)
+			@_dht['lookup'](node_id)
 		/**
 		 * Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity)
 		 *
@@ -235,53 +242,33 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		 * @return {!Uint8Array}
 		 */
 		..'generate_announcement_message' = (real_public_key, real_private_key, introduction_nodes) ->
-			time	= +(new Date)
-			value	= new Uint8Array(introduction_nodes.length * PUBLIC_KEY_LENGTH)
-			for introduction_point, index in introduction_nodes
-				value.set(introduction_point, index * PUBLIC_KEY_LENGTH)
-			signature_data	= encode_signature_data(
-				'seq'	: time
-				'v'		: value
-			)
-			signature		= detox-crypto['sign'](signature_data, real_public_key, real_private_key)
-			# This message has signature, so it can be now sent from any node in DHT
-			Uint8Array.from(
-				bencode['encode'](
-					{
-						'k'		: real_public_key
-						'seq'	: time
-						'sig'	: signature
-						'v'		: value
-					}
-				)
-			)
+			time	= parseInt(+(new Date) / 1000) # In seconds, should be enough if kept as unsigned 32-bit integer which we actually do
+			concat_arrays(@_dht['make_mutable_value'](real_public_key, real_private_key, time, concat_arrays(introduction_nodes)))
 		/**
 		 * @param {!Uint8Array} message
 		 *
 		 * @return {Uint8Array} Public key if signature is correct, `null` otherwise
 		 */
 		..'verify_announcement_message' = (message) ->
-			try
-				message	= bencode['decode'](message)
-			if !message || !message['k'] || !message['seq'] || !message['sig'] || !message['v']
-				return null
-			signature_data	= encode_signature_data(
-				'seq'	: message['seq']
-				'v'		: message['v']
-			)
-			if detox-crypto['verify'](message['sig'], signature_data, message['k'])
-				Uint8Array.from(message['k'])
-			else
+			real_public_key	= message.subarray(0, PUBLIC_KEY_LENGTH)
+			data			= message.subarray(PUBLIC_KEY_LENGTH)
+			payload			= @_dht['verify_value'](real_public_key, data)
+			# If value is not valid or length doesn't fit certain number of introduction nodes exactly
+			if !payload || (payload[1].length % PUBLIC_KEY_LENGTH)
 				null
+			else
+				real_public_key
 		/**
 		 * Publish message with introduction nodes (typically happens on different node than `generate_announcement_message()`)
 		 *
 		 * @param {!Uint8Array} message
 		 */
 		..'publish_announcement_message' = (message) !->
-			if @_destroyed || !@'verify_announcement_message'(message)
+			if @_destroyed
 				return
-			@_dht['put'](bencode['decode'](message))
+			real_public_key	= message.subarray(0, PUBLIC_KEY_LENGTH)
+			data			= message.subarray(PUBLIC_KEY_LENGTH)
+			@_dht['put_value'](real_public_key, data)
 		/**
 		 * Find nodes in DHT that are acting as introduction points for specified public key
 		 *
@@ -292,6 +279,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		..'find_introduction_nodes' = (target_public_key, success_callback, failure_callback) !->
 			if @_destroyed
 				return
+			# TODO: Update this
 			hash	= blake2b_256(target_public_key)
 			@_dht['get'](hash, (, result) !->
 				if !result || !result['v']
@@ -306,17 +294,11 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 					introduction_nodes.push(introduction_nodes_bulk.subarray(i * PUBLIC_KEY_LENGTH, (i + 1) * PUBLIC_KEY_LENGTH))
 				success_callback(introduction_nodes)
 			)
-		/**
-		 * Stop HTTP server if running, close all active WebRTC connections
-		 *
-		 * @param {Function} callback
-		 */
 		..'destroy' = (callback) !->
 			if @_destroyed
 				return
-			@_dht['destroy'](callback)
-			delete @_dht
 			@_destroyed	= true
+			@_dht['destroy']()
 	Object.defineProperty(DHT::, 'constructor', {value: DHT})
 	/**
 	 * @constructor

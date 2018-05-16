@@ -214,25 +214,26 @@
      * @return {!DHT}
      */
     function DHT(dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer){
+      var this$ = this;
       fraction_of_nodes_from_same_peer == null && (fraction_of_nodes_from_same_peer = 0.2);
       if (!(this instanceof DHT)) {
         return new DHT(dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer);
       }
       asyncEventer.call(this);
-      this._dht = detoxDht['DHT'](dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer);
+      this._dht = detoxDht['DHT'](dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer)['on']('peer_error', function(peer_id){})['on']('peer_warning', function(peer_id){})['on']('connect_to', function(peer_peer_id, peer_id){})['on']('send', function(peer_id, command, payload){});
     }
     DHT.prototype = Object.create(asyncEventer.prototype);
     x$ = DHT.prototype;
     /**
-     * Start lookup for specified node ID (listen for `node_connected` in order to know when interested node was connected)
+     * @param {!Uint8Array} node_id
      *
-     * @param {!Uint8Array} id
+     * @return {!Promise} Resolves with `!Array<!Uint8Array>`
      */
-    x$['lookup'] = function(id){
+    x$['lookup'] = function(node_id){
       if (this._destroyed) {
         return;
       }
-      this._dht['lookup'](id);
+      return this._dht['lookup'](node_id);
     };
     /**
      * Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity)
@@ -244,25 +245,9 @@
      * @return {!Uint8Array}
      */
     x$['generate_announcement_message'] = function(real_public_key, real_private_key, introduction_nodes){
-      var time, value, i$, len$, index, introduction_point, signature_data, signature;
-      time = +new Date;
-      value = new Uint8Array(introduction_nodes.length * PUBLIC_KEY_LENGTH);
-      for (i$ = 0, len$ = introduction_nodes.length; i$ < len$; ++i$) {
-        index = i$;
-        introduction_point = introduction_nodes[i$];
-        value.set(introduction_point, index * PUBLIC_KEY_LENGTH);
-      }
-      signature_data = encode_signature_data({
-        'seq': time,
-        'v': value
-      });
-      signature = detoxCrypto['sign'](signature_data, real_public_key, real_private_key);
-      return Uint8Array.from(bencode['encode']({
-        'k': real_public_key,
-        'seq': time,
-        'sig': signature,
-        'v': value
-      }));
+      var time;
+      time = parseInt(+new Date / 1000);
+      return concat_arrays(this._dht['make_mutable_value'](real_public_key, real_private_key, time, concat_arrays(introduction_nodes)));
     };
     /**
      * @param {!Uint8Array} message
@@ -270,21 +255,14 @@
      * @return {Uint8Array} Public key if signature is correct, `null` otherwise
      */
     x$['verify_announcement_message'] = function(message){
-      var signature_data;
-      try {
-        message = bencode['decode'](message);
-      } catch (e$) {}
-      if (!message || !message['k'] || !message['seq'] || !message['sig'] || !message['v']) {
+      var real_public_key, data, payload;
+      real_public_key = message.subarray(0, PUBLIC_KEY_LENGTH);
+      data = message.subarray(PUBLIC_KEY_LENGTH);
+      payload = this._dht['verify_value'](real_public_key, data);
+      if (!payload || payload[1].length % PUBLIC_KEY_LENGTH) {
         return null;
-      }
-      signature_data = encode_signature_data({
-        'seq': message['seq'],
-        'v': message['v']
-      });
-      if (detoxCrypto['verify'](message['sig'], signature_data, message['k'])) {
-        return Uint8Array.from(message['k']);
       } else {
-        return null;
+        return real_public_key;
       }
     };
     /**
@@ -293,10 +271,13 @@
      * @param {!Uint8Array} message
      */
     x$['publish_announcement_message'] = function(message){
-      if (this._destroyed || !this['verify_announcement_message'](message)) {
+      var real_public_key, data;
+      if (this._destroyed) {
         return;
       }
-      this._dht['put'](bencode['decode'](message));
+      real_public_key = message.subarray(0, PUBLIC_KEY_LENGTH);
+      data = message.subarray(PUBLIC_KEY_LENGTH);
+      this._dht['put_value'](real_public_key, data);
     };
     /**
      * Find nodes in DHT that are acting as introduction points for specified public key
@@ -331,18 +312,12 @@
         success_callback(introduction_nodes);
       });
     };
-    /**
-     * Stop HTTP server if running, close all active WebRTC connections
-     *
-     * @param {Function} callback
-     */
     x$['destroy'] = function(callback){
       if (this._destroyed) {
         return;
       }
-      this._dht['destroy'](callback);
-      delete this._dht;
       this._destroyed = true;
+      this._dht['destroy']();
     };
     Object.defineProperty(DHT.prototype, 'constructor', {
       value: DHT
