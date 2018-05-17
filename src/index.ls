@@ -32,9 +32,7 @@ const PEER_CONNECTION_TIMEOUT		= 30
 	buffer[4]	= new_array
 
 function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multiplexer, async-eventer, pako, simple-peer, wrtc)
-	array2hex			= detox-utils['array2hex']
 	array2string		= detox-utils['array2string']
-	hex2array			= detox-utils['hex2array']
 	string2array		= detox-utils['string2array']
 	are_arrays_equal	= detox-utils['are_arrays_equal']
 	concat_arrays		= detox-utils['concat_arrays']
@@ -178,16 +176,6 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 	P2P_transport:: = Object.assign(Object.create(async-eventer::), P2P_transport::)
 	Object.defineProperty(P2P_transport::, 'constructor', {value: P2P_transport})
 	/**
-	 * @param {!Uint8Array} data
-	 *
-	 * @return {!Uint8Array} Sometimes returns `Buffer` (depending on input type), but let's make Closure Compiler happy and specify `Uint8Array` for now
-	 */
-	function blake2b_256 (data)
-		# Hack: allows us to avoid using `Buffer` explicitly, but still return expected `Buffer`
-		data.constructor['from'](
-			detox-crypto['blake2b_256'](data)
-		)
-	/**
 	 * @constructor
 	 *
 	 * @param {!Uint8Array}	dht_public_key						Own ID (Ed25519 public key)
@@ -213,14 +201,13 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 			.'on'('send', (peer_id, command, payload) !~>
 			)
 
-	DHT:: = Object.create(async-eventer::)
-	DHT::
+	DHT:: =
 		/**
 		 * @param {!Uint8Array} node_id
 		 *
 		 * @return {!Promise} Resolves with `!Array<!Uint8Array>`
 		 */
-		..'lookup' = (node_id) ->
+		'lookup' : (node_id) ->
 			if @_destroyed
 				return
 			@_dht['lookup'](node_id)
@@ -233,7 +220,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		 *
 		 * @return {!Uint8Array}
 		 */
-		..'generate_announcement_message' = (real_public_key, real_private_key, introduction_nodes) ->
+		'generate_announcement_message' : (real_public_key, real_private_key, introduction_nodes) ->
 			time	= parseInt(+(new Date) / 1000) # In seconds, should be enough if kept as unsigned 32-bit integer which we actually do
 			concat_arrays(@_dht['make_mutable_value'](real_public_key, real_private_key, time, concat_arrays(introduction_nodes)))
 		/**
@@ -241,7 +228,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		 *
 		 * @return {Uint8Array} Public key if signature is correct, `null` otherwise
 		 */
-		..'verify_announcement_message' = (message) ->
+		'verify_announcement_message' : (message) ->
 			real_public_key	= message.subarray(0, PUBLIC_KEY_LENGTH)
 			data			= message.subarray(PUBLIC_KEY_LENGTH)
 			payload			= @_dht['verify_value'](real_public_key, data)
@@ -255,7 +242,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		 *
 		 * @param {!Uint8Array} message
 		 */
-		..'publish_announcement_message' = (message) !->
+		'publish_announcement_message' : (message) !->
 			if @_destroyed
 				return
 			real_public_key	= message.subarray(0, PUBLIC_KEY_LENGTH)
@@ -265,32 +252,25 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		 * Find nodes in DHT that are acting as introduction points for specified public key
 		 *
 		 * @param {!Uint8Array}	target_public_key
-		 * @param {!Function}	success_callback
-		 * @param {!Function}	failure_callback
+		 *
+		 * @return {!Promise} Resolves with `!Array<!Uint8Array>`
 		 */
-		..'find_introduction_nodes' = (target_public_key, success_callback, failure_callback) !->
+		'find_introduction_nodes' : (target_public_key) ->
 			if @_destroyed
 				return
-			# TODO: Update this
-			hash	= blake2b_256(target_public_key)
-			@_dht['get'](hash, (, result) !->
-				if !result || !result['v']
-					# Nothing was found
-					failure_callback?()
-					return
-				introduction_nodes_bulk	= Uint8Array.from(result['v'])
-				introduction_nodes		= []
+			@_dht['get_value'](target_public_key).then (introduction_nodes_bulk) ->
 				if introduction_nodes_bulk.length % PUBLIC_KEY_LENGTH != 0
-					return
+					throw ''
+				introduction_nodes	= []
 				for i from 0 til introduction_nodes_bulk.length / PUBLIC_KEY_LENGTH
 					introduction_nodes.push(introduction_nodes_bulk.subarray(i * PUBLIC_KEY_LENGTH, (i + 1) * PUBLIC_KEY_LENGTH))
-				success_callback(introduction_nodes)
-			)
-		..'destroy' = (callback) !->
+				introduction_nodes
+		'destroy' : !->
 			if @_destroyed
 				return
 			@_destroyed	= true
 			@_dht['destroy']()
+	DHT:: = Object.assign(Object.create(async-eventer::), DHT::)
 	Object.defineProperty(DHT::, 'constructor', {value: DHT})
 	/**
 	 * @constructor

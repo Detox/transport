@@ -26,10 +26,8 @@
     buffer[4] = new_array;
   }
   function Wrapper(detoxCrypto, detoxDht, detoxUtils, ronion, fixedSizeMultiplexer, asyncEventer, pako, simplePeer, wrtc){
-    var array2hex, array2string, hex2array, string2array, are_arrays_equal, concat_arrays, ArrayMap, x$;
-    array2hex = detoxUtils['array2hex'];
+    var array2string, string2array, are_arrays_equal, concat_arrays, ArrayMap;
     array2string = detoxUtils['array2string'];
-    hex2array = detoxUtils['hex2array'];
     string2array = detoxUtils['string2array'];
     are_arrays_equal = detoxUtils['are_arrays_equal'];
     concat_arrays = detoxUtils['concat_arrays'];
@@ -186,14 +184,6 @@
       value: P2P_transport
     });
     /**
-     * @param {!Uint8Array} data
-     *
-     * @return {!Uint8Array} Sometimes returns `Buffer` (depending on input type), but let's make Closure Compiler happy and specify `Uint8Array` for now
-     */
-    function blake2b_256(data){
-      return data.constructor['from'](detoxCrypto['blake2b_256'](data));
-    }
-    /**
      * @constructor
      *
      * @param {!Uint8Array}	dht_public_key						Own ID (Ed25519 public key)
@@ -213,103 +203,95 @@
       asyncEventer.call(this);
       this._dht = detoxDht['DHT'](dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer)['on']('peer_error', function(peer_id){})['on']('peer_warning', function(peer_id){})['on']('connect_to', function(peer_peer_id, peer_id){})['on']('send', function(peer_id, command, payload){});
     }
-    DHT.prototype = Object.create(asyncEventer.prototype);
-    x$ = DHT.prototype;
-    /**
-     * @param {!Uint8Array} node_id
-     *
-     * @return {!Promise} Resolves with `!Array<!Uint8Array>`
-     */
-    x$['lookup'] = function(node_id){
-      if (this._destroyed) {
-        return;
+    DHT.prototype = {
+      /**
+       * @param {!Uint8Array} node_id
+       *
+       * @return {!Promise} Resolves with `!Array<!Uint8Array>`
+       */
+      'lookup': function(node_id){
+        if (this._destroyed) {
+          return;
+        }
+        return this._dht['lookup'](node_id);
       }
-      return this._dht['lookup'](node_id);
-    };
-    /**
-     * Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity)
-     *
-     * @param {!Uint8Array}			real_public_key		Ed25519 public key (real one, different from supplied in DHT constructor)
-     * @param {!Uint8Array}			real_private_key	Corresponding Ed25519 private key
-     * @param {!Array<!Uint8Array>}	introduction_nodes	Array of public keys of introduction points
-     *
-     * @return {!Uint8Array}
-     */
-    x$['generate_announcement_message'] = function(real_public_key, real_private_key, introduction_nodes){
-      var time;
-      time = parseInt(+new Date / 1000);
-      return concat_arrays(this._dht['make_mutable_value'](real_public_key, real_private_key, time, concat_arrays(introduction_nodes)));
-    };
-    /**
-     * @param {!Uint8Array} message
-     *
-     * @return {Uint8Array} Public key if signature is correct, `null` otherwise
-     */
-    x$['verify_announcement_message'] = function(message){
-      var real_public_key, data, payload;
-      real_public_key = message.subarray(0, PUBLIC_KEY_LENGTH);
-      data = message.subarray(PUBLIC_KEY_LENGTH);
-      payload = this._dht['verify_value'](real_public_key, data);
-      if (!payload || payload[1].length % PUBLIC_KEY_LENGTH) {
-        return null;
-      } else {
-        return real_public_key;
+      /**
+       * Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity)
+       *
+       * @param {!Uint8Array}			real_public_key		Ed25519 public key (real one, different from supplied in DHT constructor)
+       * @param {!Uint8Array}			real_private_key	Corresponding Ed25519 private key
+       * @param {!Array<!Uint8Array>}	introduction_nodes	Array of public keys of introduction points
+       *
+       * @return {!Uint8Array}
+       */,
+      'generate_announcement_message': function(real_public_key, real_private_key, introduction_nodes){
+        var time;
+        time = parseInt(+new Date / 1000);
+        return concat_arrays(this._dht['make_mutable_value'](real_public_key, real_private_key, time, concat_arrays(introduction_nodes)));
       }
-    };
-    /**
-     * Publish message with introduction nodes (typically happens on different node than `generate_announcement_message()`)
-     *
-     * @param {!Uint8Array} message
-     */
-    x$['publish_announcement_message'] = function(message){
-      var real_public_key, data;
-      if (this._destroyed) {
-        return;
+      /**
+       * @param {!Uint8Array} message
+       *
+       * @return {Uint8Array} Public key if signature is correct, `null` otherwise
+       */,
+      'verify_announcement_message': function(message){
+        var real_public_key, data, payload;
+        real_public_key = message.subarray(0, PUBLIC_KEY_LENGTH);
+        data = message.subarray(PUBLIC_KEY_LENGTH);
+        payload = this._dht['verify_value'](real_public_key, data);
+        if (!payload || payload[1].length % PUBLIC_KEY_LENGTH) {
+          return null;
+        } else {
+          return real_public_key;
+        }
       }
-      real_public_key = message.subarray(0, PUBLIC_KEY_LENGTH);
-      data = message.subarray(PUBLIC_KEY_LENGTH);
-      this._dht['put_value'](real_public_key, data);
-    };
-    /**
-     * Find nodes in DHT that are acting as introduction points for specified public key
-     *
-     * @param {!Uint8Array}	target_public_key
-     * @param {!Function}	success_callback
-     * @param {!Function}	failure_callback
-     */
-    x$['find_introduction_nodes'] = function(target_public_key, success_callback, failure_callback){
-      var hash;
-      if (this._destroyed) {
-        return;
+      /**
+       * Publish message with introduction nodes (typically happens on different node than `generate_announcement_message()`)
+       *
+       * @param {!Uint8Array} message
+       */,
+      'publish_announcement_message': function(message){
+        var real_public_key, data;
+        if (this._destroyed) {
+          return;
+        }
+        real_public_key = message.subarray(0, PUBLIC_KEY_LENGTH);
+        data = message.subarray(PUBLIC_KEY_LENGTH);
+        this._dht['put_value'](real_public_key, data);
       }
-      hash = blake2b_256(target_public_key);
-      this._dht['get'](hash, function(arg$, result){
-        var introduction_nodes_bulk, introduction_nodes, i$, to$, i;
-        if (!result || !result['v']) {
-          if (typeof failure_callback == 'function') {
-            failure_callback();
+      /**
+       * Find nodes in DHT that are acting as introduction points for specified public key
+       *
+       * @param {!Uint8Array}	target_public_key
+       *
+       * @return {!Promise} Resolves with `!Array<!Uint8Array>`
+       */,
+      'find_introduction_nodes': function(target_public_key){
+        if (this._destroyed) {
+          return;
+        }
+        return this._dht['get_value'](target_public_key).then(function(introduction_nodes_bulk){
+          var introduction_nodes, i$, to$, i;
+          if (introduction_nodes_bulk.length % PUBLIC_KEY_LENGTH !== 0) {
+            throw '';
           }
+          introduction_nodes = [];
+          for (i$ = 0, to$ = introduction_nodes_bulk.length / PUBLIC_KEY_LENGTH; i$ < to$; ++i$) {
+            i = i$;
+            introduction_nodes.push(introduction_nodes_bulk.subarray(i * PUBLIC_KEY_LENGTH, (i + 1) * PUBLIC_KEY_LENGTH));
+          }
+          return introduction_nodes;
+        });
+      },
+      'destroy': function(){
+        if (this._destroyed) {
           return;
         }
-        introduction_nodes_bulk = Uint8Array.from(result['v']);
-        introduction_nodes = [];
-        if (introduction_nodes_bulk.length % PUBLIC_KEY_LENGTH !== 0) {
-          return;
-        }
-        for (i$ = 0, to$ = introduction_nodes_bulk.length / PUBLIC_KEY_LENGTH; i$ < to$; ++i$) {
-          i = i$;
-          introduction_nodes.push(introduction_nodes_bulk.subarray(i * PUBLIC_KEY_LENGTH, (i + 1) * PUBLIC_KEY_LENGTH));
-        }
-        success_callback(introduction_nodes);
-      });
-    };
-    x$['destroy'] = function(callback){
-      if (this._destroyed) {
-        return;
+        this._destroyed = true;
+        this._dht['destroy']();
       }
-      this._destroyed = true;
-      this._dht['destroy']();
     };
+    DHT.prototype = Object.assign(Object.create(asyncEventer.prototype), DHT.prototype);
     Object.defineProperty(DHT.prototype, 'constructor', {
       value: DHT
     });
