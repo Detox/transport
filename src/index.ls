@@ -193,15 +193,26 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 
 		@_dht	= detox-dht['DHT'](dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer)
 			.'on'('peer_error', (peer_id) !~>
+				@'fire'('peer_error', peer_id)
 			)
 			.'on'('peer_warning', (peer_id) !~>
+				@'fire'('peer_warning', peer_id)
 			)
 			.'on'('connect_to', (peer_peer_id, peer_id) !~>
+				@'fire'('connect_to', peer_peer_id, peer_id)
 			)
 			.'on'('send', (peer_id, command, payload) !~>
+				@'fire'('send', peer_id, command, payload)
 			)
 
 	DHT:: =
+		/**
+		 * @param {!Uint8Array}	peer_id
+		 * @param {number}		command
+		 * @param {!Uint8Array}	payload
+		 */
+		'receive' : (peer_id, command, payload) !->
+			@_dht['receive'](peer_id, command, payload)
 		/**
 		 * @param {!Uint8Array} node_id
 		 *

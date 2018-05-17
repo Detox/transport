@@ -201,14 +201,30 @@
         return new DHT(dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer);
       }
       asyncEventer.call(this);
-      this._dht = detoxDht['DHT'](dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer)['on']('peer_error', function(peer_id){})['on']('peer_warning', function(peer_id){})['on']('connect_to', function(peer_peer_id, peer_id){})['on']('send', function(peer_id, command, payload){});
+      this._dht = detoxDht['DHT'](dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer)['on']('peer_error', function(peer_id){
+        this$['fire']('peer_error', peer_id);
+      })['on']('peer_warning', function(peer_id){
+        this$['fire']('peer_warning', peer_id);
+      })['on']('connect_to', function(peer_peer_id, peer_id){
+        this$['fire']('connect_to', peer_peer_id, peer_id);
+      })['on']('send', function(peer_id, command, payload){
+        this$['fire']('send', peer_id, command, payload);
+      });
     }
     DHT.prototype = {
+      /**
+       * @param {!Uint8Array}	peer_id
+       * @param {number}		command
+       * @param {!Uint8Array}	payload
+       */
+      'receive': function(peer_id, command, payload){
+        this._dht['receive'](peer_id, command, payload);
+      }
       /**
        * @param {!Uint8Array} node_id
        *
        * @return {!Promise} Resolves with `!Array<!Uint8Array>`
-       */
+       */,
       'lookup': function(node_id){
         if (this._destroyed) {
           return Promise.reject();
