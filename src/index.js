@@ -211,7 +211,7 @@
        */
       'lookup': function(node_id){
         if (this._destroyed) {
-          return;
+          return Promise.reject();
         }
         return this._dht['lookup'](node_id);
       }
@@ -268,7 +268,7 @@
        */,
       'find_introduction_nodes': function(target_public_key){
         if (this._destroyed) {
-          return;
+          return Promise.reject();
         }
         return this._dht['get_value'](target_public_key).then(function(introduction_nodes_bulk){
           var introduction_nodes, i$, to$, i;

@@ -209,7 +209,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		 */
 		'lookup' : (node_id) ->
 			if @_destroyed
-				return
+				return Promise.reject()
 			@_dht['lookup'](node_id)
 		/**
 		 * Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity)
@@ -257,7 +257,7 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		 */
 		'find_introduction_nodes' : (target_public_key) ->
 			if @_destroyed
-				return
+				return Promise.reject()
 			@_dht['get_value'](target_public_key).then (introduction_nodes_bulk) ->
 				if introduction_nodes_bulk.length % PUBLIC_KEY_LENGTH != 0
 					throw ''
