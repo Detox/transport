@@ -3,7 +3,7 @@
  * @author  Nazar Mokrynskyi <nazar@mokrynskyi.com>
  * @license 0BSD
  */
-const ROUTING_COMMANDS_OFFSET	= 10 # 0..9 are reserved as DHT commands
+const UNCOMPRESSED_COMMANDS_OFFSET	= 10 # 0..9 are reserved as DHT commands
 
 # 65 KiB is what is enough for DHT messages and will also be enough for routing data, bigger data will be multiplexed on higher levels when necessary
 const MAX_DATA_SIZE				= 2 ** 16 - 2
@@ -92,7 +92,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 						demultiplexed_data	= @_demultiplexer['get_data']()
 						command				= demultiplexed_data[0]
 						command_data		= demultiplexed_data.subarray(1)
-						if command < ROUTING_COMMANDS_OFFSET
+						if command < UNCOMPRESSED_COMMANDS_OFFSET
 							command_data	= @_zlib_decompress(command_data)
 						@'fire'('data', command, command_data)
 					@_sending	= true
@@ -121,7 +121,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 			if data.length > MAX_DATA_SIZE
 				return
 			# We only compress DHT commands data
-			if command < ROUTING_COMMANDS_OFFSET
+			if command < UNCOMPRESSED_COMMANDS_OFFSET
 				if data.length > MAX_DHT_DATA_SIZE
 					return
 				data	= @_zlib_compress(data)

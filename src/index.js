@@ -5,8 +5,8 @@
  * @license 0BSD
  */
 (function(){
-  var ROUTING_COMMANDS_OFFSET, MAX_DATA_SIZE, MAX_DHT_DATA_SIZE, PACKET_SIZE, PEER_CONNECTION_TIMEOUT;
-  ROUTING_COMMANDS_OFFSET = 10;
+  var UNCOMPRESSED_COMMANDS_OFFSET, MAX_DATA_SIZE, MAX_DHT_DATA_SIZE, PACKET_SIZE, PEER_CONNECTION_TIMEOUT;
+  UNCOMPRESSED_COMMANDS_OFFSET = 10;
   MAX_DATA_SIZE = Math.pow(2, 16) - 2;
   MAX_DHT_DATA_SIZE = MAX_DATA_SIZE - 1;
   PACKET_SIZE = 512;
@@ -91,7 +91,7 @@
             demultiplexed_data = this$._demultiplexer['get_data']();
             command = demultiplexed_data[0];
             command_data = demultiplexed_data.subarray(1);
-            if (command < ROUTING_COMMANDS_OFFSET) {
+            if (command < UNCOMPRESSED_COMMANDS_OFFSET) {
               command_data = this$._zlib_decompress(command_data);
             }
             this$['fire']('data', command, command_data);
@@ -126,7 +126,7 @@
         if (data.length > MAX_DATA_SIZE) {
           return;
         }
-        if (command < ROUTING_COMMANDS_OFFSET) {
+        if (command < UNCOMPRESSED_COMMANDS_OFFSET) {
           if (data.length > MAX_DHT_DATA_SIZE) {
             return;
           }
