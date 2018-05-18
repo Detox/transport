@@ -5,14 +5,10 @@
  * @license 0BSD
  */
 (function(){
-  var ROUTING_COMMANDS_OFFSET, PUBLIC_KEY_LENGTH, MAC_LENGTH, ROUTING_PATH_SEGMENT_TIMEOUT, MAX_DATA_SIZE, PACKET_SIZE, ROUTER_PACKET_SIZE, PEER_CONNECTION_TIMEOUT;
+  var ROUTING_COMMANDS_OFFSET, MAX_DATA_SIZE, PACKET_SIZE, PEER_CONNECTION_TIMEOUT;
   ROUTING_COMMANDS_OFFSET = 10;
-  PUBLIC_KEY_LENGTH = 32;
-  MAC_LENGTH = 16;
-  ROUTING_PATH_SEGMENT_TIMEOUT = 10;
   MAX_DATA_SIZE = Math.pow(2, 16) - 1;
   PACKET_SIZE = 512;
-  ROUTER_PACKET_SIZE = PACKET_SIZE - 3;
   PEER_CONNECTION_TIMEOUT = 30;
   /**
    * @param {!Array<!Uint8Array>}	buffer
@@ -25,7 +21,7 @@
     buffer[3] = buffer[4];
     buffer[4] = new_array;
   }
-  function Wrapper(detoxDht, detoxUtils, fixedSizeMultiplexer, asyncEventer, pako, simplePeer, wrtc){
+  function Wrapper(detoxUtils, fixedSizeMultiplexer, asyncEventer, pako, simplePeer, wrtc){
     var array2string, string2array, concat_arrays, null_array;
     array2string = detoxUtils['array2string'];
     string2array = detoxUtils['string2array'];
@@ -180,177 +176,16 @@
     Object.defineProperty(P2P_transport.prototype, 'constructor', {
       value: P2P_transport
     });
-    /**
-     * @constructor
-     *
-     * @param {!Uint8Array}	dht_public_key						Own ID (Ed25519 public key)
-     * @param {number}		bucket_size							Size of a bucket from Kademlia design
-     * @param {number}		state_history_size					How many versions of local history will be kept
-     * @param {number}		values_cache_size					How many values will be kept in cache
-     * @param {number}		fraction_of_nodes_from_same_peer	Max fraction of nodes originated from single peer allowed on lookup start
-     *
-     * @return {!DHT}
-     */
-    function DHT(dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer){
-      var this$ = this;
-      fraction_of_nodes_from_same_peer == null && (fraction_of_nodes_from_same_peer = 0.2);
-      if (!(this instanceof DHT)) {
-        return new DHT(dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer);
-      }
-      asyncEventer.call(this);
-      this._dht = detoxDht['DHT'](dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer)['on']('peer_error', function(peer_id){
-        this$['fire']('peer_error', peer_id);
-      })['on']('peer_warning', function(peer_id){
-        this$['fire']('peer_warning', peer_id);
-      })['on']('connect_to', function(peer_peer_id, peer_id){
-        this$['fire']('connect_to', peer_peer_id, peer_id);
-      })['on']('send', function(peer_id, command, payload){
-        this$['fire']('send', peer_id, command, payload);
-      });
-    }
-    DHT.prototype = {
-      /**
-       * @param {!Uint8Array}	peer_id
-       * @param {number}		command
-       * @param {!Uint8Array}	payload
-       */
-      'receive': function(peer_id, command, payload){
-        this._dht['receive'](peer_id, command, payload);
-      }
-      /**
-       * Only used during initial connection, afterwards state updates happen automatically
-       *
-       * @return {!Uint8Array}
-       */,
-      'get_state': function(){
-        return this._dht['get_state']();
-      }
-      /**
-       * Add new peer upon connection
-       *
-       * @param {!Uint8Array}	peer_id	Id of a peer
-       * @param {!Uint8Array}	state	Peer's state generated with `get_state()` method
-       *
-       * @return {boolean}
-       */,
-      'add_peer': function(peer_id, state){
-        if (this._dht['has_peer'](peer_id)) {
-          true;
-        } else {
-          this._dht['set_peer'](peer_id, state);
-        }
-      }
-      /**
-       * Delete peer when disconnected
-       *
-       * @param {!Uint8Array} peer_id Id of a peer
-       */,
-      'del_peer': function(peer_id){
-        this._dht['del_peer'](peer_id);
-      }
-      /**
-       * @param {!Uint8Array} node_id
-       *
-       * @return {!Promise} Resolves with `!Array<!Uint8Array>`
-       */,
-      'lookup': function(node_id){
-        if (this._destroyed) {
-          return Promise.reject();
-        }
-        return this._dht['lookup'](node_id);
-      }
-      /**
-       * Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity)
-       *
-       * @param {!Uint8Array}			real_public_key		Ed25519 public key (real one, different from supplied in DHT constructor)
-       * @param {!Uint8Array}			real_private_key	Corresponding Ed25519 private key
-       * @param {!Array<!Uint8Array>}	introduction_nodes	Array of public keys of introduction points
-       *
-       * @return {!Uint8Array}
-       */,
-      'generate_announcement_message': function(real_public_key, real_private_key, introduction_nodes){
-        var time;
-        time = parseInt(+new Date / 1000);
-        return concat_arrays(this._dht['make_mutable_value'](real_public_key, real_private_key, time, concat_arrays(introduction_nodes)));
-      }
-      /**
-       * @param {!Uint8Array} message
-       *
-       * @return {Uint8Array} Public key if signature is correct, `null` otherwise
-       */,
-      'verify_announcement_message': function(message){
-        var real_public_key, data, payload;
-        real_public_key = message.subarray(0, PUBLIC_KEY_LENGTH);
-        data = message.subarray(PUBLIC_KEY_LENGTH);
-        payload = this._dht['verify_value'](real_public_key, data);
-        if (!payload || payload[1].length % PUBLIC_KEY_LENGTH) {
-          return null;
-        } else {
-          return real_public_key;
-        }
-      }
-      /**
-       * Publish message with introduction nodes (typically happens on different node than `generate_announcement_message()`)
-       *
-       * @param {!Uint8Array} message
-       */,
-      'publish_announcement_message': function(message){
-        var real_public_key, data;
-        if (this._destroyed) {
-          return;
-        }
-        real_public_key = message.subarray(0, PUBLIC_KEY_LENGTH);
-        data = message.subarray(PUBLIC_KEY_LENGTH);
-        this._dht['put_value'](real_public_key, data);
-      }
-      /**
-       * Find nodes in DHT that are acting as introduction points for specified public key
-       *
-       * @param {!Uint8Array}	target_public_key
-       *
-       * @return {!Promise} Resolves with `!Array<!Uint8Array>`
-       */,
-      'find_introduction_nodes': function(target_public_key){
-        if (this._destroyed) {
-          return Promise.reject();
-        }
-        return this._dht['get_value'](target_public_key).then(function(introduction_nodes_bulk){
-          var introduction_nodes, i$, to$, i;
-          if (introduction_nodes_bulk.length % PUBLIC_KEY_LENGTH !== 0) {
-            throw '';
-          }
-          introduction_nodes = [];
-          for (i$ = 0, to$ = introduction_nodes_bulk.length / PUBLIC_KEY_LENGTH; i$ < to$; ++i$) {
-            i = i$;
-            introduction_nodes.push(introduction_nodes_bulk.subarray(i * PUBLIC_KEY_LENGTH, (i + 1) * PUBLIC_KEY_LENGTH));
-          }
-          return introduction_nodes;
-        });
-      },
-      'destroy': function(){
-        if (this._destroyed) {
-          return;
-        }
-        this._destroyed = true;
-        this._dht['destroy']();
-      }
-    };
-    DHT.prototype = Object.assign(Object.create(asyncEventer.prototype), DHT.prototype);
-    Object.defineProperty(DHT.prototype, 'constructor', {
-      value: DHT
-    });
     return {
-      'ready': detoxDht['ready'],
-      'DHT': DHT,
       'P2P_transport': P2P_transport,
       'MAX_DATA_SIZE': MAX_DATA_SIZE
     };
   }
   if (typeof define === 'function' && define['amd']) {
-    define(['@detox/dht', '@detox/utils', 'fixed-size-multiplexer', 'async-eventer', 'pako', '@detox/simple-peer'], Wrapper);
+    define(['@detox/utils', 'fixed-size-multiplexer', 'async-eventer', 'pako', '@detox/simple-peer'], Wrapper);
   } else if (typeof exports === 'object') {
-    module.exports = Wrapper(require('@detox/dht'), require('@detox/utils'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'), require('@detox/simple-peer'), require('wrtc'));
+    module.exports = Wrapper(require('@detox/utils'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'), require('@detox/simple-peer'), require('wrtc'));
   } else {
-    this['detox_transport'] = Wrapper(this['detox_dht'], this['detox_utils'], this['fixed_size_multiplexer'], this['async_eventer'], this['pako'], this['SimplePeer']);
+    this['detox_transport'] = Wrapper(this['detox_utils'], this['fixed_size_multiplexer'], this['async_eventer'], this['pako'], this['SimplePeer']);
   }
 }).call(this);

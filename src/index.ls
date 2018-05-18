@@ -5,20 +5,12 @@
  */
 const ROUTING_COMMANDS_OFFSET	= 10 # 0..9 are reserved as DHT commands
 
-# Length of Ed25519 public key in bytes
-const PUBLIC_KEY_LENGTH				= 32
-# ChaChaPoly+BLAKE2b
-const MAC_LENGTH					= 16
-# Max time in seconds allowed for routing path segment creation after which creation is considered failed
-const ROUTING_PATH_SEGMENT_TIMEOUT	= 10
 # 65 KiB is what is enough for DHT messages and will also be enough for routing data, bigger data will be multiplexed on higher levels when necessary
-const MAX_DATA_SIZE					= 2 ** 16 - 1
+const MAX_DATA_SIZE				= 2 ** 16 - 1
 # Fixed packet size for all communications on peer connection
-const PACKET_SIZE					= 512
-# 3 bytes (2 for multiplexer and 1 for command) smaller than packet size in DHT in order to avoid fragmentation when sending over peer connection
-const ROUTER_PACKET_SIZE			= PACKET_SIZE - 3
+const PACKET_SIZE				= 512
 # If connection was not established during this time (seconds) then assume connection failure
-const PEER_CONNECTION_TIMEOUT		= 30
+const PEER_CONNECTION_TIMEOUT	= 30
 
 /**
  * @param {!Array<!Uint8Array>}	buffer
@@ -31,7 +23,7 @@ const PEER_CONNECTION_TIMEOUT		= 30
 	buffer[3]	= buffer[4]
 	buffer[4]	= new_array
 
-function Wrapper (detox-dht, detox-utils, fixed-size-multiplexer, async-eventer, pako, simple-peer, wrtc)
+function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simple-peer, wrtc)
 	array2string	= detox-utils['array2string']
 	string2array	= detox-utils['string2array']
 	concat_arrays	= detox-utils['concat_arrays']
@@ -172,155 +164,18 @@ function Wrapper (detox-dht, detox-utils, fixed-size-multiplexer, async-eventer,
 			result
 	P2P_transport:: = Object.assign(Object.create(async-eventer::), P2P_transport::)
 	Object.defineProperty(P2P_transport::, 'constructor', {value: P2P_transport})
-	/**
-	 * @constructor
-	 *
-	 * @param {!Uint8Array}	dht_public_key						Own ID (Ed25519 public key)
-	 * @param {number}		bucket_size							Size of a bucket from Kademlia design
-	 * @param {number}		state_history_size					How many versions of local history will be kept
-	 * @param {number}		values_cache_size					How many values will be kept in cache
-	 * @param {number}		fraction_of_nodes_from_same_peer	Max fraction of nodes originated from single peer allowed on lookup start
-	 *
-	 * @return {!DHT}
-	 */
-	!function DHT (dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer = 0.2)
-		if !(@ instanceof DHT)
-			return new DHT(dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer)
-		async-eventer.call(@)
-
-		@_dht	= detox-dht['DHT'](dht_public_key, bucket_size, state_history_size, values_cache_size, fraction_of_nodes_from_same_peer)
-			.'on'('peer_error', (peer_id) !~>
-				@'fire'('peer_error', peer_id)
-			)
-			.'on'('peer_warning', (peer_id) !~>
-				@'fire'('peer_warning', peer_id)
-			)
-			.'on'('connect_to', (peer_peer_id, peer_id) !~>
-				@'fire'('connect_to', peer_peer_id, peer_id)
-			)
-			.'on'('send', (peer_id, command, payload) !~>
-				@'fire'('send', peer_id, command, payload)
-			)
-
-	DHT:: =
-		/**
-		 * @param {!Uint8Array}	peer_id
-		 * @param {number}		command
-		 * @param {!Uint8Array}	payload
-		 */
-		'receive' : (peer_id, command, payload) !->
-			@_dht['receive'](peer_id, command, payload)
-		/**
-		 * Only used during initial connection, afterwards state updates happen automatically
-		 *
-		 * @return {!Uint8Array}
-		 */
-		'get_state' : ->
-			@_dht['get_state']()
-		/**
-		 * Add new peer upon connection
-		 *
-		 * @param {!Uint8Array}	peer_id	Id of a peer
-		 * @param {!Uint8Array}	state	Peer's state generated with `get_state()` method
-		 *
-		 * @return {boolean}
-		 */
-		'add_peer' : (peer_id, state) !->
-			if @_dht['has_peer'](peer_id)
-				true
-			else
-				@_dht['set_peer'](peer_id, state)
-		/**
-		 * Delete peer when disconnected
-		 *
-		 * @param {!Uint8Array} peer_id Id of a peer
-		 */
-		'del_peer' : (peer_id) !->
-			@_dht['del_peer'](peer_id)
-		/**
-		 * @param {!Uint8Array} node_id
-		 *
-		 * @return {!Promise} Resolves with `!Array<!Uint8Array>`
-		 */
-		'lookup' : (node_id) ->
-			if @_destroyed
-				return Promise.reject()
-			@_dht['lookup'](node_id)
-		/**
-		 * Generate message with introduction nodes that can later be published by any node connected to DHT (typically other node than this for anonymity)
-		 *
-		 * @param {!Uint8Array}			real_public_key		Ed25519 public key (real one, different from supplied in DHT constructor)
-		 * @param {!Uint8Array}			real_private_key	Corresponding Ed25519 private key
-		 * @param {!Array<!Uint8Array>}	introduction_nodes	Array of public keys of introduction points
-		 *
-		 * @return {!Uint8Array}
-		 */
-		'generate_announcement_message' : (real_public_key, real_private_key, introduction_nodes) ->
-			time	= parseInt(+(new Date) / 1000) # In seconds, should be enough if kept as unsigned 32-bit integer which we actually do
-			concat_arrays(@_dht['make_mutable_value'](real_public_key, real_private_key, time, concat_arrays(introduction_nodes)))
-		/**
-		 * @param {!Uint8Array} message
-		 *
-		 * @return {Uint8Array} Public key if signature is correct, `null` otherwise
-		 */
-		'verify_announcement_message' : (message) ->
-			real_public_key	= message.subarray(0, PUBLIC_KEY_LENGTH)
-			data			= message.subarray(PUBLIC_KEY_LENGTH)
-			payload			= @_dht['verify_value'](real_public_key, data)
-			# If value is not valid or length doesn't fit certain number of introduction nodes exactly
-			if !payload || (payload[1].length % PUBLIC_KEY_LENGTH)
-				null
-			else
-				real_public_key
-		/**
-		 * Publish message with introduction nodes (typically happens on different node than `generate_announcement_message()`)
-		 *
-		 * @param {!Uint8Array} message
-		 */
-		'publish_announcement_message' : (message) !->
-			if @_destroyed
-				return
-			real_public_key	= message.subarray(0, PUBLIC_KEY_LENGTH)
-			data			= message.subarray(PUBLIC_KEY_LENGTH)
-			@_dht['put_value'](real_public_key, data)
-		/**
-		 * Find nodes in DHT that are acting as introduction points for specified public key
-		 *
-		 * @param {!Uint8Array}	target_public_key
-		 *
-		 * @return {!Promise} Resolves with `!Array<!Uint8Array>`
-		 */
-		'find_introduction_nodes' : (target_public_key) ->
-			if @_destroyed
-				return Promise.reject()
-			@_dht['get_value'](target_public_key).then (introduction_nodes_bulk) ->
-				if introduction_nodes_bulk.length % PUBLIC_KEY_LENGTH != 0
-					throw ''
-				introduction_nodes	= []
-				for i from 0 til introduction_nodes_bulk.length / PUBLIC_KEY_LENGTH
-					introduction_nodes.push(introduction_nodes_bulk.subarray(i * PUBLIC_KEY_LENGTH, (i + 1) * PUBLIC_KEY_LENGTH))
-				introduction_nodes
-		'destroy' : !->
-			if @_destroyed
-				return
-			@_destroyed	= true
-			@_dht['destroy']()
-	DHT:: = Object.assign(Object.create(async-eventer::), DHT::)
-	Object.defineProperty(DHT::, 'constructor', {value: DHT})
 	{
-		'ready'			: detox-dht['ready']
-		'DHT'			: DHT
 		'P2P_transport'	: P2P_transport
 		'MAX_DATA_SIZE'	: MAX_DATA_SIZE
 	}
 
-# NOTE: wrtc dependency is the last one and only specified for CommonJS, make sure to insert new dependencies before it
+# NOTE: `wrtc` dependency is the last one and only specified for CommonJS, make sure to insert new dependencies before it
 if typeof define == 'function' && define['amd']
 	# AMD
-	define(['@detox/dht', '@detox/utils', 'fixed-size-multiplexer', 'async-eventer', 'pako', '@detox/simple-peer'], Wrapper)
+	define(['@detox/utils', 'fixed-size-multiplexer', 'async-eventer', 'pako', '@detox/simple-peer'], Wrapper)
 else if typeof exports == 'object'
 	# CommonJS
-	module.exports = Wrapper(require('@detox/dht'), require('@detox/utils'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'), require('@detox/simple-peer'), require('wrtc'))
+	module.exports = Wrapper(require('@detox/utils'), require('fixed-size-multiplexer'), require('async-eventer'), require('pako'), require('@detox/simple-peer'), require('wrtc'))
 else
 	# Browser globals
-	@'detox_transport' = Wrapper(@'detox_dht', @'detox_utils', @'fixed_size_multiplexer', @'async_eventer', @'pako', @'SimplePeer')
+	@'detox_transport' = Wrapper(@'detox_utils', @'fixed_size_multiplexer', @'async_eventer', @'pako', @'SimplePeer')

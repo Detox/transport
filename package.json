@@ -1,12 +1,12 @@
 {
 	"name"            : "@detox/transport",
-	"description"     : "High-level utilities that combine under simple interfaces complexity of the transport layer used in Detox project",
+	"description"     : "Transport layer implementation for Detox project",
 	"keywords"        : [
 		"detox",
 		"transport",
-		"dht",
-		"routing",
-		"anonymous"
+		"p2p",
+		"webrtc",
+		"rtcdatachannel"
 	],
 	"version"         : "0.34.1",
 	"homepage"        : "https://github.com/Detox/transport",
@@ -24,14 +24,11 @@
 		"test" : "tape tests/**/*.js"
 	},
 	"dependencies"    : {
-		"@detox/crypto"          : "^0.7.0",
-		"@detox/dht"             : "github:Detox/dht#next",
 		"@detox/simple-peer"     : "^9.0.0",
 		"@detox/utils"           : "^1.6.0",
 		"async-eventer"          : "^1.1.5",
 		"fixed-size-multiplexer" : "^1.0.2",
 		"pako"                   : "^1.0.6",
-		"ronion"                 : "^0.7.0",
 		"wrtc"                   : "^0.1.4"
 	},
 	"devDependencies" : {
