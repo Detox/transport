@@ -15,15 +15,3 @@ var require = function (module) {};
 var exports = {};
 var module = {};
 module.exports	= {};
-/**
- * @constructor
- *
- * @extends {Uint8Array}
- */
-function Buffer () {}
-/**
- * @param {!Uint8Array|string} input
- *
- * @return {!Buffer}
- */
-Buffer.from = function (input) {};
