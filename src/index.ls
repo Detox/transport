@@ -24,6 +24,9 @@ const PEER_CONNECTION_TIMEOUT	= 30
 	buffer[3]	= buffer[4]
 	buffer[4]	= new_array
 
+/**
+ * @param {!Object=} wrtc
+ */
 function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simple-peer, wrtc)
 	array2string	= detox-utils['array2string']
 	string2array	= detox-utils['string2array']
@@ -36,7 +39,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 	 * @param {!Array<!Object>}	ice_servers
 	 * @param {number}			packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
 	 *
-	 * @return {!DHT}
+	 * @return {!P2P_transport}
 	 */
 	!function P2P_transport (initiator, ice_servers, packets_per_second)
 		if !(@ instanceof P2P_transport)
