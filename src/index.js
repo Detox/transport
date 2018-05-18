@@ -26,10 +26,11 @@
     buffer[4] = new_array;
   }
   function Wrapper(detoxDht, detoxUtils, fixedSizeMultiplexer, asyncEventer, pako, simplePeer, wrtc){
-    var array2string, string2array, concat_arrays;
+    var array2string, string2array, concat_arrays, null_array;
     array2string = detoxUtils['array2string'];
     string2array = detoxUtils['string2array'];
     concat_arrays = detoxUtils['concat_arrays'];
+    null_array = new Uint8Array(0);
     /**
      * @constructor
      *
@@ -64,8 +65,8 @@
       this._sending = initiator;
       this._multiplexer = fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, PACKET_SIZE);
       this._demultiplexer = fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, PACKET_SIZE);
-      this._send_zlib_buffer = [new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0)];
-      this._receive_zlib_buffer = [new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0)];
+      this._send_zlib_buffer = [null_array, null_array, null_array, null_array, null_array];
+      this._receive_zlib_buffer = [null_array, null_array, null_array, null_array, null_array];
       this._peer['once']('connect', function(){
         this$['fire']('connected');
         this$._last_sent = +new Date;
@@ -115,13 +116,11 @@
        * @param {!Uint8Array}	data
        */,
       'send': function(command, data){
-        var x$, data_with_header;
+        var data_with_header;
         if (command < ROUTING_COMMANDS_OFFSET) {
           data = this._zlib_compress(data);
         }
-        x$ = data_with_header = new Uint8Array(data.length + 1);
-        x$.set([command]);
-        x$.set(data, 1);
+        data_with_header = concat_arrays([[command], data]);
         this._multiplexer['feed'](data_with_header);
       },
       'destroy': function(){

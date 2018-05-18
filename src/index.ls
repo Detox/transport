@@ -35,6 +35,7 @@ function Wrapper (detox-dht, detox-utils, fixed-size-multiplexer, async-eventer,
 	array2string	= detox-utils['array2string']
 	string2array	= detox-utils['string2array']
 	concat_arrays	= detox-utils['concat_arrays']
+	null_array		= new Uint8Array(0)
 	/**
 	 * @constructor
 	 *
@@ -72,8 +73,8 @@ function Wrapper (detox-dht, detox-utils, fixed-size-multiplexer, async-eventer,
 		@_sending				= initiator
 		@_multiplexer			= fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, PACKET_SIZE)
 		@_demultiplexer			= fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, PACKET_SIZE)
-		@_send_zlib_buffer		= [new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0)]
-		@_receive_zlib_buffer	= [new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0)]
+		@_send_zlib_buffer		= [null_array, null_array, null_array, null_array, null_array]
+		@_receive_zlib_buffer	= [null_array, null_array, null_array, null_array, null_array]
 		@_peer
 			.'once'('connect', !~>
 				@'fire'('connected')
@@ -124,9 +125,7 @@ function Wrapper (detox-dht, detox-utils, fixed-size-multiplexer, async-eventer,
 			# We only compress DHT commands data
 			if command < ROUTING_COMMANDS_OFFSET
 				data	= @_zlib_compress(data)
-			data_with_header	= new Uint8Array(data.length + 1)
-				..set([command])
-				..set(data, 1)
+			data_with_header	= concat_arrays([[command], data])
 			@_multiplexer['feed'](data_with_header)
 		'destroy' : !->
 			@_destroyed	= true
