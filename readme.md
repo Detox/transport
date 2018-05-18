@@ -47,7 +47,7 @@ Resolves with `Uint8Array` signaling data that should be sent to remote node.
 Send command with some payload to the remote node.
 
 * `command` - command from range `[0, 255]`; commands `[0..9]` are considered to be DHT commands and payload sent with these commands are compressed using zlib
-* `data` - command payload
+* `data` - command payload, for DHT commands (`command <= 9`) up to `detox_transport.MAX_DATA_SIZE - 1` bytes and for other commands up to `detox_transport.MAX_DATA_SIZE` bytes
 
 ### detox_transport.P2P_transport.destroy()
 Destroy instance, disconnect from the remote node.
@@ -72,7 +72,10 @@ Payload consists of two arguments: `command` (`number`) and `data` (`Uint8Array`
 Event is fired when new remote node have sent data using `send()` method.
 
 ### detox_transport.MAX_DATA_SIZE : number
-Constant that defines max data size supported for sending.
+Constant that defines max data size supported for sending for non-DHT commands.
+
+### detox_transport.MAX_DHT_DATA_SIZE : number
+Constant that defines max data size supported for sending for DHT commands.
 
 ## Contribution
 Feel free to create issues and send pull requests (for big changes create an issue first and link it from the PR), they are highly appreciated!

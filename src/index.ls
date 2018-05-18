@@ -6,7 +6,8 @@
 const ROUTING_COMMANDS_OFFSET	= 10 # 0..9 are reserved as DHT commands
 
 # 65 KiB is what is enough for DHT messages and will also be enough for routing data, bigger data will be multiplexed on higher levels when necessary
-const MAX_DATA_SIZE				= 2 ** 16 - 1
+const MAX_DATA_SIZE				= 2 ** 16 - 2
+const MAX_DHT_DATA_SIZE			= MAX_DATA_SIZE - 1
 # Fixed packet size for all communications on peer connection
 const PACKET_SIZE				= 512
 # If connection was not established during this time (seconds) then assume connection failure
@@ -114,8 +115,12 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 		 * @param {!Uint8Array}	data
 		 */
 		'send' : (command, data) !->
+			if data.length > MAX_DATA_SIZE
+				return
 			# We only compress DHT commands data
 			if command < ROUTING_COMMANDS_OFFSET
+				if data.length > MAX_DHT_DATA_SIZE
+					return
 				data	= @_zlib_compress(data)
 			data_with_header	= concat_arrays([[command], data])
 			@_multiplexer['feed'](data_with_header)
@@ -149,23 +154,32 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 				'level'			: 1
 			})
 			update_dictionary_buffer(@_send_zlib_buffer, data)
-			result
+			if result.length > MAX_DHT_DATA_SIZE
+				concat_arrays([[0], data])
+			else
+				concat_arrays([[1], result])
 		/**
 		 * @param {!Uint8Array} data
 		 *
 		 * @return {!Uint8Array}
 		 */
 		_zlib_decompress : (data) ->
-			result	= pako['inflate'](data, {
-				'dictionary'	: concat_arrays(@_receive_zlib_buffer)
-			})
+			compressed	= data[0]
+			data		= data.subarray(1)
+			if compressed
+				result	= pako['inflate'](data, {
+					'dictionary'	: concat_arrays(@_receive_zlib_buffer)
+				})
+			else
+				result	= data
 			update_dictionary_buffer(@_receive_zlib_buffer, result)
 			result
 	P2P_transport:: = Object.assign(Object.create(async-eventer::), P2P_transport::)
 	Object.defineProperty(P2P_transport::, 'constructor', {value: P2P_transport})
 	{
-		'P2P_transport'	: P2P_transport
-		'MAX_DATA_SIZE'	: MAX_DATA_SIZE
+		'P2P_transport'		: P2P_transport
+		'MAX_DATA_SIZE'		: MAX_DATA_SIZE
+		'MAX_DHT_DATA_SIZE'	: MAX_DHT_DATA_SIZE
 	}
 
 # NOTE: `wrtc` dependency is the last one and only specified for CommonJS, make sure to insert new dependencies before it

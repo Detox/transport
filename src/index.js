@@ -5,9 +5,10 @@
  * @license 0BSD
  */
 (function(){
-  var ROUTING_COMMANDS_OFFSET, MAX_DATA_SIZE, PACKET_SIZE, PEER_CONNECTION_TIMEOUT;
+  var ROUTING_COMMANDS_OFFSET, MAX_DATA_SIZE, MAX_DHT_DATA_SIZE, PACKET_SIZE, PEER_CONNECTION_TIMEOUT;
   ROUTING_COMMANDS_OFFSET = 10;
-  MAX_DATA_SIZE = Math.pow(2, 16) - 1;
+  MAX_DATA_SIZE = Math.pow(2, 16) - 2;
+  MAX_DHT_DATA_SIZE = MAX_DATA_SIZE - 1;
   PACKET_SIZE = 512;
   PEER_CONNECTION_TIMEOUT = 30;
   /**
@@ -119,7 +120,13 @@
        */,
       'send': function(command, data){
         var data_with_header;
+        if (data.length > MAX_DATA_SIZE) {
+          return;
+        }
         if (command < ROUTING_COMMANDS_OFFSET) {
+          if (data.length > MAX_DHT_DATA_SIZE) {
+            return;
+          }
           data = this._zlib_compress(data);
         }
         data_with_header = concat_arrays([[command], data]);
@@ -159,7 +166,11 @@
           'level': 1
         });
         update_dictionary_buffer(this._send_zlib_buffer, data);
-        return result;
+        if (result.length > MAX_DHT_DATA_SIZE) {
+          return concat_arrays([[0], data]);
+        } else {
+          return concat_arrays([[1], result]);
+        }
       }
       /**
        * @param {!Uint8Array} data
@@ -167,10 +178,16 @@
        * @return {!Uint8Array}
        */,
       _zlib_decompress: function(data){
-        var result;
-        result = pako['inflate'](data, {
-          'dictionary': concat_arrays(this._receive_zlib_buffer)
-        });
+        var compressed, result;
+        compressed = data[0];
+        data = data.subarray(1);
+        if (compressed) {
+          result = pako['inflate'](data, {
+            'dictionary': concat_arrays(this._receive_zlib_buffer)
+          });
+        } else {
+          result = data;
+        }
         update_dictionary_buffer(this._receive_zlib_buffer, result);
         return result;
       }
@@ -181,7 +198,8 @@
     });
     return {
       'P2P_transport': P2P_transport,
-      'MAX_DATA_SIZE': MAX_DATA_SIZE
+      'MAX_DATA_SIZE': MAX_DATA_SIZE,
+      'MAX_DHT_DATA_SIZE': MAX_DHT_DATA_SIZE
     };
   }
   if (typeof define === 'function' && define['amd']) {
