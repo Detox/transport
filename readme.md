@@ -120,66 +120,6 @@ Event is fired when DHT instance is ready to be used.
 Payload is single argument `error`.
 Event is fired when errors occur in underlying DHT implementation.
 
-### detox_transport.Router(dht_private_key : Uint8Array, max_pending_segments = 10 : number) : detox_transport.Router
-Constructor for Router object, offers anonymous routing functionality based on [Ronion](https://github.com/nazar-pc/ronion) spec and reference implementation with just a few high-level APIs available for the user.
-
-* `dht_private_key` - X25519 private key that corresponds to Ed25519 key used in `DHT` constructor
-* `max_pending_segments` - How much segments can be in pending state per one address
-
-### detox_transport.Router.process_packet(node_id : Uint8Array, packet : Uint8Array)
-Process routing packet coming from node with specified ID.
-
-### detox_transport.Router.construct_routing_path(nodes : Uint8Array[]) : Promise
-Construct routing path through specified nodes.
-
-* `nodes` - IDs of the nodes through which routing path must be constructed, last node in the list is responder
-
-Returned promise will resolve with ID of the route or will be rejected if path construction fails.
-
-### detox_transport.Router.destroy_routing_path(node_id : Uint8Array, route_id : Uint8Array)
-Destroy routing path constructed earlier.
-
-* `node_id` - first node in routing path
-* `route_id` - identifier returned during routing path construction
-
-### detox_transport.Router.get_max_packet_data_size() : number
-Max data size that will fit into single packet without fragmentation
-
-### detox_transport.Router.send_data(node_id : Uint8Array, route_id : Uint8Array, command : number, data : Uint8Array)
-Send data to the responder on specified routing path.
-
-* `node_id` - first node in routing path
-* `route_id` - identifier returned during routing path construction
-* `command` - command for data, can be any number from the range `0..245`
-* `data` - data being sent
-
-### detox_transport.Router.destroy()
-Destroy all of the routing path constructed earlier.
-
-### detox_transport.Router.on(event: string, callback: Function) : detox_transport.Router
-Register event handler.
-
-### detox_transport.Router.once(event: string, callback: Function) : detox_transport.Router
-Register one-time event handler (just `on()` + `off()` under the hood).
-
-### detox_transport.Router.off(event: string[, callback: Function]) : detox_transport.Router
-Unregister event handler.
-
-### Event: activity
-Payload consists of two `Uint8Array` arguments: `node_id` and `route_id`.
-Event is fired when packet is sent/received from/to `address` with segment ID `segment_id`.
-
-This event can be used to track when packets are flowing on certain `address` and `segment_id` and decide when to consider routing path as inactive and destroy it.
-
-### Event: send
-Payload consists of two `Uint8Array` arguments: `node_id` and `packet`.
-Event is fired when `packet` needs to be sent to `node_id` node.
-
-### Event: data
-Payload consists of four arguments, all of which except `command` are `Uint8Array`: `node_id`, `route_id`, `command` and `data`.
-
-Event is fired when `data` were received from the responder with specified `command` on routing path with started at `node_id` with `route_id`.
-
 ### detox_transport.MAX_DATA_SIZE : number
 Constant that defines max data size supported for sending by DHT and Router.
 
