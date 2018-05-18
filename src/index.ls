@@ -214,6 +214,33 @@ function Wrapper (detox-crypto, detox-dht, detox-utils, ronion, fixed-size-multi
 		'receive' : (peer_id, command, payload) !->
 			@_dht['receive'](peer_id, command, payload)
 		/**
+		 * Only used during initial connection, afterwards state updates happen automatically
+		 *
+		 * @return {!Uint8Array}
+		 */
+		'get_state' : ->
+			@_dht['get_state']()
+		/**
+		 * Add new peer upon connection
+		 *
+		 * @param {!Uint8Array}	peer_id	Id of a peer
+		 * @param {!Uint8Array}	state	Peer's state generated with `get_state()` method
+		 *
+		 * @return {boolean}
+		 */
+		'add_peer' : (peer_id, state) !->
+			if @_dht['has_peer'](peer_id)
+				true
+			else
+				@_dht['set_peer'](peer_id, state)
+		/**
+		 * Delete peer when disconnected
+		 *
+		 * @param {!Uint8Array} peer_id Id of a peer
+		 */
+		'del_peer' : (peer_id) !->
+			@_dht['del_peer'](peer_id)
+		/**
 		 * @param {!Uint8Array} node_id
 		 *
 		 * @return {!Promise} Resolves with `!Array<!Uint8Array>`
