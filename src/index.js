@@ -37,9 +37,9 @@
      * @return {!DHT}
      */
     function P2P_transport(initiator, ice_servers, packets_per_second){
-      var this$ = this;
+      var x$, this$ = this;
       if (!(this instanceof P2P_transport)) {
-        return new P2P_transport(ice_servers, packets_per_second);
+        return new P2P_transport(initiator, ice_servers, packets_per_second);
       }
       asyncEventer.call(this);
       this._initiator = initiator;
@@ -52,9 +52,12 @@
         'wrtc': wrtc
       });
       this._signal = new Promise(function(resolve, reject){
-        this$._peer['once']('signal', function(signal){
+        var x$;
+        x$ = this$._peer;
+        x$['once']('signal', function(signal){
           resolve(string2array(signal['sdp']));
-        })['once']('close', reject);
+        });
+        x$['once']('close', reject);
       });
       this._signal['catch'](function(){});
       this._send_delay = 1000 / packets_per_second;
@@ -63,15 +66,18 @@
       this._demultiplexer = fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, PACKET_SIZE);
       this._send_zlib_buffer = [null_array, null_array, null_array, null_array, null_array];
       this._receive_zlib_buffer = [null_array, null_array, null_array, null_array, null_array];
-      this._peer['once']('connect', function(){
+      x$ = this._peer;
+      x$['once']('connect', function(){
         this$['fire']('connected');
         this$._last_sent = +new Date;
         if (this$._sending) {
           this$._real_send();
         }
-      })['once']('close', function(){
+      });
+      x$['once']('close', function(){
         this$['fire']('disconnected');
-      })['on']('data', function(data){
+      });
+      x$['on']('data', function(data){
         var demultiplexed_data, command, command_data;
         if (this$._sending || data.length !== PACKET_SIZE) {
           this$['destroy']();
@@ -121,6 +127,7 @@
       },
       'destroy': function(){
         this._destroyed = true;
+        clearTimeout(this._timeout);
         this._peer['destroy']();
       }
       /**
@@ -129,19 +136,15 @@
       _real_send: function(){
         var delay, this$ = this;
         delay = Math.max(0, this._send_delay - (new Date - this._last_sent));
-        setTimeout(function(){
-          var e;
+        this._timeout = setTimeout(function(){
           if (this$._destroyed) {
             return;
           }
           try {
-            simplePeer.prototype['send'].call(this$, this$._multiplexer['get_block']());
+            this$._peer['send'](this$._multiplexer['get_block']());
             this$._sending = false;
             this$._last_sent = +new Date;
-          } catch (e$) {
-            e = e$;
-            this$['emit']('error', e);
-          }
+          } catch (e$) {}
         }, delay);
       }
       /**

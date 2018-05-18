@@ -39,7 +39,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 	 */
 	!function P2P_transport (initiator, ice_servers, packets_per_second)
 		if !(@ instanceof P2P_transport)
-			return new P2P_transport(ice_servers, packets_per_second)
+			return new P2P_transport(initiator, ice_servers, packets_per_second)
 		async-eventer.call(@)
 
 		@_initiator	= initiator
@@ -55,10 +55,10 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 
 		@_signal	= new Promise (resolve, reject) !~>
 			@_peer
-				.'once'('signal', (signal) !~>
+				..'once'('signal', (signal) !~>
 					resolve(string2array(signal['sdp']))
 				)
-				.'once'('close', reject)
+				..'once'('close', reject)
 		@_signal.catch(->)
 
 		@_send_delay			= 1000 / packets_per_second
@@ -68,16 +68,16 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 		@_send_zlib_buffer		= [null_array, null_array, null_array, null_array, null_array]
 		@_receive_zlib_buffer	= [null_array, null_array, null_array, null_array, null_array]
 		@_peer
-			.'once'('connect', !~>
+			..'once'('connect', !~>
 				@'fire'('connected')
 				@_last_sent	= +(new Date)
 				if @_sending
 					@_real_send()
 			)
-			.'once'('close', !~>
+			..'once'('close', !~>
 				@'fire'('disconnected')
 			)
-			.'on'('data', (data) !~>
+			..'on'('data', (data) !~>
 				# Data are sent in alternating order, sending data when receiving is expected violates the protocol
 				# Data size must be exactly one packet size
 				if @_sending || data.length != PACKET_SIZE
@@ -121,23 +121,22 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 			@_multiplexer['feed'](data_with_header)
 		'destroy' : !->
 			@_destroyed	= true
+			clearTimeout(@_timeout)
 			@_peer['destroy']()
 		/**
 		 * Send a block of multiplexed data to the other side
 		 */
 		_real_send : !->
 			# Subtract from necessary delay actual amount of time already passed and make sure it is not negative
-			delay	= Math.max(0, @_send_delay - (new Date - @_last_sent))
-			setTimeout (!~>
+			delay		= Math.max(0, @_send_delay - (new Date - @_last_sent))
+			@_timeout	= setTimeout (!~>
 				if @_destroyed
 					return
 				# In rare cases we might get exceptions like `InvalidStateError`, don't let the whole thing crash because of this
 				try
-					simple-peer::['send'].call(@, @_multiplexer['get_block']())
+					@_peer['send'](@_multiplexer['get_block']())
 					@_sending	= false
 					@_last_sent	= +(new Date)
-				catch e
-					@'emit'('error', e)
 			), delay
 		/**
 		 * @param {!Uint8Array} data
