@@ -5,10 +5,9 @@
  * @license 0BSD
  */
 (function(){
-  var UNCOMPRESSED_COMMANDS_OFFSET, MAX_DATA_SIZE, MAX_DHT_DATA_SIZE, PACKET_SIZE, PEER_CONNECTION_TIMEOUT;
-  UNCOMPRESSED_COMMANDS_OFFSET = 10;
+  var MAX_DATA_SIZE, MAX_COMPRESSED_DATA_SIZE, PACKET_SIZE, PEER_CONNECTION_TIMEOUT;
   MAX_DATA_SIZE = Math.pow(2, 16) - 2;
-  MAX_DHT_DATA_SIZE = MAX_DATA_SIZE - 1;
+  MAX_COMPRESSED_DATA_SIZE = MAX_DATA_SIZE - 1;
   PACKET_SIZE = 512;
   PEER_CONNECTION_TIMEOUT = 30;
   /**
@@ -36,17 +35,19 @@
      *
      * @param {boolean}			initiator
      * @param {!Array<!Object>}	ice_servers
-     * @param {number}			packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
+     * @param {number}			packets_per_second				Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
+     * @param {number}			uncompressed_commands_offset	Commands with number less than this will be compressed/decompressed with zlib
      *
      * @return {!P2P_transport}
      */
-    function P2P_transport(initiator, ice_servers, packets_per_second){
+    function P2P_transport(initiator, ice_servers, packets_per_second, uncompressed_commands_offset){
       var x$, this$ = this;
       if (!(this instanceof P2P_transport)) {
-        return new P2P_transport(initiator, ice_servers, packets_per_second);
+        return new P2P_transport(initiator, ice_servers, packets_per_second, uncompressed_commands_offset);
       }
       asyncEventer.call(this);
       this._initiator = initiator;
+      this._uncompressed_commands_offset = uncompressed_commands_offset;
       this._peer = simplePeer({
         'config': {
           'iceServers': ice_servers
@@ -91,7 +92,7 @@
             demultiplexed_data = this$._demultiplexer['get_data']();
             command = demultiplexed_data[0];
             command_data = demultiplexed_data.subarray(1);
-            if (command < UNCOMPRESSED_COMMANDS_OFFSET) {
+            if (command < this$._uncompressed_commands_offset) {
               command_data = this$._zlib_decompress(command_data);
             }
             this$['fire']('data', command, command_data);
@@ -126,8 +127,8 @@
         if (data.length > MAX_DATA_SIZE) {
           return;
         }
-        if (command < UNCOMPRESSED_COMMANDS_OFFSET) {
-          if (data.length > MAX_DHT_DATA_SIZE) {
+        if (command < this._uncompressed_commands_offset) {
+          if (data.length > MAX_COMPRESSED_DATA_SIZE) {
             return;
           }
           data = this._zlib_compress(data);
@@ -169,7 +170,7 @@
           'level': 1
         });
         update_dictionary_buffer(this._send_zlib_buffer, data);
-        if (result.length > MAX_DHT_DATA_SIZE) {
+        if (result.length > MAX_COMPRESSED_DATA_SIZE) {
           return concat_arrays([[0], data]);
         } else {
           return concat_arrays([[1], result]);
@@ -202,7 +203,7 @@
     return {
       'P2P_transport': P2P_transport,
       'MAX_DATA_SIZE': MAX_DATA_SIZE,
-      'MAX_DHT_DATA_SIZE': MAX_DHT_DATA_SIZE
+      'MAX_COMPRESSED_DATA_SIZE': MAX_COMPRESSED_DATA_SIZE
     };
   }
   if (typeof define === 'function' && define['amd']) {

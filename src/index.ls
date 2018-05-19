@@ -3,11 +3,9 @@
  * @author  Nazar Mokrynskyi <nazar@mokrynskyi.com>
  * @license 0BSD
  */
-const UNCOMPRESSED_COMMANDS_OFFSET	= 10 # 0..9 are reserved as DHT commands
-
 # 65 KiB is what is enough for DHT messages and will also be enough for routing data, bigger data will be multiplexed on higher levels when necessary
 const MAX_DATA_SIZE				= 2 ** 16 - 2
-const MAX_DHT_DATA_SIZE			= MAX_DATA_SIZE - 1
+const MAX_COMPRESSED_DATA_SIZE	= MAX_DATA_SIZE - 1
 # Fixed packet size for all communications on peer connection
 const PACKET_SIZE				= 512
 # If connection was not established during this time (seconds) then assume connection failure
@@ -37,19 +35,21 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 	 *
 	 * @param {boolean}			initiator
 	 * @param {!Array<!Object>}	ice_servers
-	 * @param {number}			packets_per_second	Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
+	 * @param {number}			packets_per_second				Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
+	 * @param {number}			uncompressed_commands_offset	Commands with number less than this will be compressed/decompressed with zlib
 	 *
 	 * @return {!P2P_transport}
 	 */
-	!function P2P_transport (initiator, ice_servers, packets_per_second)
+	!function P2P_transport (initiator, ice_servers, packets_per_second, uncompressed_commands_offset)
 		if !(@ instanceof P2P_transport)
-			return new P2P_transport(initiator, ice_servers, packets_per_second)
+			return new P2P_transport(initiator, ice_servers, packets_per_second, uncompressed_commands_offset)
 		async-eventer.call(@)
 
-		@_initiator	= initiator
+		@_initiator						= initiator
+		@_uncompressed_commands_offset	= uncompressed_commands_offset
 		# TODO: Timeouts (PEER_CONNECTION_TIMEOUT)?
 		# TODO: Signatures here?
-		@_peer		= simple-peer(
+		@_peer							= simple-peer(
 			'config'	:
 				'iceServers'	: ice_servers
 			'initiator'	: initiator
@@ -57,7 +57,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 			'wrtc'		: wrtc
 		)
 
-		@_signal	= new Promise (resolve, reject) !~>
+		@_signal						= new Promise (resolve, reject) !~>
 			@_peer
 				..'once'('signal', (signal) !~>
 					resolve(string2array(signal['sdp']))
@@ -92,7 +92,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 						demultiplexed_data	= @_demultiplexer['get_data']()
 						command				= demultiplexed_data[0]
 						command_data		= demultiplexed_data.subarray(1)
-						if command < UNCOMPRESSED_COMMANDS_OFFSET
+						if command < @_uncompressed_commands_offset
 							command_data	= @_zlib_decompress(command_data)
 						@'fire'('data', command, command_data)
 					@_sending	= true
@@ -121,8 +121,8 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 			if data.length > MAX_DATA_SIZE
 				return
 			# We only compress DHT commands data
-			if command < UNCOMPRESSED_COMMANDS_OFFSET
-				if data.length > MAX_DHT_DATA_SIZE
+			if command < @_uncompressed_commands_offset
+				if data.length > MAX_COMPRESSED_DATA_SIZE
 					return
 				data	= @_zlib_compress(data)
 			data_with_header	= concat_arrays([[command], data])
@@ -157,7 +157,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 				'level'			: 1
 			})
 			update_dictionary_buffer(@_send_zlib_buffer, data)
-			if result.length > MAX_DHT_DATA_SIZE
+			if result.length > MAX_COMPRESSED_DATA_SIZE
 				concat_arrays([[0], data])
 			else
 				concat_arrays([[1], result])
@@ -180,9 +180,9 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 	P2P_transport:: = Object.assign(Object.create(async-eventer::), P2P_transport::)
 	Object.defineProperty(P2P_transport::, 'constructor', {value: P2P_transport})
 	{
-		'P2P_transport'		: P2P_transport
-		'MAX_DATA_SIZE'		: MAX_DATA_SIZE
-		'MAX_DHT_DATA_SIZE'	: MAX_DHT_DATA_SIZE
+		'P2P_transport'				: P2P_transport
+		'MAX_DATA_SIZE'				: MAX_DATA_SIZE
+		'MAX_COMPRESSED_DATA_SIZE'	: MAX_COMPRESSED_DATA_SIZE
 	}
 
 # NOTE: `wrtc` dependency is the last one and only specified for CommonJS, make sure to insert new dependencies before it

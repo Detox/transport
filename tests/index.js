@@ -17,7 +17,7 @@
       var generated_command, generated_data;
       t.pass('Initiator connected successfully');
       generated_command = 5;
-      generated_data = crypto.randomBytes(lib.MAX_DHT_DATA_SIZE);
+      generated_data = crypto.randomBytes(lib.MAX_COMPRESSED_DATA_SIZE);
       responder.once('data', function(command, data){
         t.equal(command, generated_command, 'Got correct command from initiator');
         t.equal(data.length, generated_data.length, 'Got correct data length from initiator');

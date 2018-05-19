@@ -34,7 +34,7 @@ requirejs(['@detox/transport'], function (detox_transport) {
 Constructor for peer-to-peer transport between 2 nodes in Detox network.
 
 * `initiator` - whether current node initiates connection
-* `ice_servers` - array of objects as `config.iceServers` in [simple-peer constructor](https://github.com/feross/simple-peer#peer--new-simplepeeropts)
+* `ice_servers` - array of objects as in [RTCPeerConnection constructor](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection)
 * `packets_per_second` - packets are sent at constant rate (which together with fixed packet size of 512 bytes can be used to identify bandwidth requirements for specific connection), `1` is minimal supported rate, actual rate is negotiated between 2 nodes on connection
 
 ### detox_transport.P2P_transport.get_signaling() : Promise
