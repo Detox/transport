@@ -42,17 +42,17 @@
     }).on('disconnected', function(){
       t.ok(done, 'Responder disconnected after done');
     });
-    initiator.get_signaling().then(function(signaling){
-      t.pass('Getting signaling succeeded on initiator');
-      responder.set_signaling(signaling);
+    initiator.get_signal().then(function(signal){
+      t.pass('Getting signal succeeded on initiator');
+      responder.set_signal(signal);
     })['catch'](function(){
-      t.fail('Getting signaling failed on initiator');
+      t.fail('Getting signal failed on initiator');
     });
-    responder.get_signaling().then(function(signaling){
-      t.pass('Getting signaling succeeded on responder');
-      initiator.set_signaling(signaling);
+    responder.get_signal().then(function(signal){
+      t.pass('Getting signal succeeded on responder');
+      initiator.set_signal(signal);
     })['catch'](function(){
-      t.fail('Getting signaling failed on responder');
+      t.fail('Getting signal failed on responder');
     });
   });
 }).call(this);

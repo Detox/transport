@@ -46,16 +46,16 @@ test('Transport', (t) !->
 		.on('disconnected', !->
 			t.ok(done, 'Responder disconnected after done')
 		)
-	initiator.get_signaling()
-		.then (signaling) !->
-			t.pass('Getting signaling succeeded on initiator')
-			responder.set_signaling(signaling)
+	initiator.get_signal()
+		.then (signal) !->
+			t.pass('Getting signal succeeded on initiator')
+			responder.set_signal(signal)
 		.catch !->
-			t.fail('Getting signaling failed on initiator')
-	responder.get_signaling()
-		.then (signaling) !->
-			t.pass('Getting signaling succeeded on responder')
-			initiator.set_signaling(signaling)
+			t.fail('Getting signal failed on initiator')
+	responder.get_signal()
+		.then (signal) !->
+			t.pass('Getting signal succeeded on responder')
+			initiator.set_signal(signal)
 		.catch !->
-			t.fail('Getting signaling failed on responder')
+			t.fail('Getting signal failed on responder')
 )
