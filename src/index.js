@@ -81,9 +81,6 @@
         }
       });
       x$['once']('close', function(){
-        if (this$._destroyed) {
-          return;
-        }
         this$['fire']('disconnected');
       });
       x$['on']('data', function(data){
