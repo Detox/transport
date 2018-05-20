@@ -30,6 +30,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 	string2array	= detox-utils['string2array']
 	concat_arrays	= detox-utils['concat_arrays']
 	ArrayMap		= detox-utils['ArrayMap']
+	timeoutSet		= detox-utils['timeoutSet']
 	null_array		= new Uint8Array(0)
 	/**
 	 * @constructor
@@ -184,19 +185,22 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 	 * @param {!Array<!Object>}	ice_servers
 	 * @param {number}			packets_per_second				Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
 	 * @param {number}			uncompressed_commands_offset	Commands with number less than this will be compressed/decompressed with zlib
+	 * @param {number}			connect_timeout					How many seconds since `signal` generation to wait for connection before failing
 	 *
 	 * @return {!Transport}
 	 */
-	!function Transport (ice_servers, packets_per_second, uncompressed_commands_offset)
+	!function Transport (ice_servers, packets_per_second, uncompressed_commands_offset, connect_timeout)
 		if !(@ instanceof Transport)
-			return new Transport(ice_servers, packets_per_second, uncompressed_commands_offset)
+			return new Transport(ice_servers, packets_per_second, uncompressed_commands_offset, connect_timeout)
 		async-eventer.call(@)
 
 		@_pending_connections			= ArrayMap()
 		@_connections					= ArrayMap()
+		@_timeouts						= ArraySet()
 		@_ice_servers					= ice_servers
 		@_packets_per_second			= packets_per_second
 		@_uncompressed_commands_offset	= uncompressed_commands_offset
+		@_connect_timeout				= connect_timeout
 
 	Transport:: =
 		/**
@@ -206,7 +210,6 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 		'create_connection' : (initiator, peer_id) !->
 			if @_destroyed || @_pending_connections.has(peer_id) || @_connections.has(peer_id)
 				return
-			# TODO: Timeouts (PEER_CONNECTION_TIMEOUT)?
 			connection	= P2P_transport(initiator, @_ice_servers, @_packets_per_second, @_uncompressed_commands_offset)
 				.'on'('data', (command, command_data) !~>
 					if @_destroyed
@@ -217,6 +220,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 					if @_destroyed
 						return
 					@'fire'('signal', peer_id, signal)
+					@_connection_timeout(connection)
 				)
 				.'once'('connected', !~>
 					if @_destroyed || !@_pending_connections.has(peer_id)
@@ -232,7 +236,22 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 					@_connections.delete(peer_id)
 					@'fire'('disconnected', peer_id)
 				)
+			if !initiator
+				# Responder might never fire `signal` event, so create timeout here
+				@_connection_timeout(connection)
 			@_pending_connections.set(peer_id, connection)
+		/**
+		 * @param {!P2P_transport} connection
+		 */
+		_connection_timeout : (connection) !->
+			timeout	= timeoutSet(@_connect_timeout, !->
+				connection['destroy']()
+			)
+			@_timeouts.add(timeout)
+			connection['once']('connected', !~>
+				@_timeouts.delete(timeout)
+				clearTimeout(timeout)
+			)
 		/**
 		 * @param {!Uint8Array} peer_id
 		 */
@@ -269,6 +288,8 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 				connection['destroy']()
 			@_connections.forEach (connection) !->
 				connection['destroy']()
+			@_timeouts.forEach (timeout) !->
+				clearTimeout(timeout)
 	Transport:: = Object.assign(Object.create(async-eventer::), Transport::)
 	Object.defineProperty(Transport::, 'constructor', {value: Transport})
 	{

@@ -25,11 +25,12 @@
    * @param {!Object=} wrtc
    */
   function Wrapper(detoxUtils, fixedSizeMultiplexer, asyncEventer, pako, simplePeer, wrtc){
-    var array2string, string2array, concat_arrays, ArrayMap, null_array;
+    var array2string, string2array, concat_arrays, ArrayMap, timeoutSet, null_array;
     array2string = detoxUtils['array2string'];
     string2array = detoxUtils['string2array'];
     concat_arrays = detoxUtils['concat_arrays'];
     ArrayMap = detoxUtils['ArrayMap'];
+    timeoutSet = detoxUtils['timeoutSet'];
     null_array = new Uint8Array(0);
     /**
      * @constructor
@@ -210,19 +211,22 @@
      * @param {!Array<!Object>}	ice_servers
      * @param {number}			packets_per_second				Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
      * @param {number}			uncompressed_commands_offset	Commands with number less than this will be compressed/decompressed with zlib
+     * @param {number}			connect_timeout					How many seconds since `signal` generation to wait for connection before failing
      *
      * @return {!Transport}
      */
-    function Transport(ice_servers, packets_per_second, uncompressed_commands_offset){
+    function Transport(ice_servers, packets_per_second, uncompressed_commands_offset, connect_timeout){
       if (!(this instanceof Transport)) {
-        return new Transport(ice_servers, packets_per_second, uncompressed_commands_offset);
+        return new Transport(ice_servers, packets_per_second, uncompressed_commands_offset, connect_timeout);
       }
       asyncEventer.call(this);
       this._pending_connections = ArrayMap();
       this._connections = ArrayMap();
+      this._timeouts = ArraySet();
       this._ice_servers = ice_servers;
       this._packets_per_second = packets_per_second;
       this._uncompressed_commands_offset = uncompressed_commands_offset;
+      this._connect_timeout = connect_timeout;
     }
     Transport.prototype = {
       /**
@@ -244,6 +248,7 @@
             return;
           }
           this$['fire']('signal', peer_id, signal);
+          this$._connection_timeout(connection);
         })['once']('connected', function(){
           if (this$._destroyed || !this$._pending_connections.has(peer_id)) {
             return;
@@ -259,7 +264,24 @@
           this$._connections['delete'](peer_id);
           this$['fire']('disconnected', peer_id);
         });
+        if (!initiator) {
+          this._connection_timeout(connection);
+        }
         this._pending_connections.set(peer_id, connection);
+      }
+      /**
+       * @param {!P2P_transport} connection
+       */,
+      _connection_timeout: function(connection){
+        var timeout, this$ = this;
+        timeout = timeoutSet(this._connect_timeout, function(){
+          connection['destroy']();
+        });
+        this._timeouts.add(timeout);
+        connection['once']('connected', function(){
+          this$._timeouts['delete'](timeout);
+          clearTimeout(timeout);
+        });
       }
       /**
        * @param {!Uint8Array} peer_id
@@ -310,6 +332,9 @@
         });
         this._connections.forEach(function(connection){
           connection['destroy']();
+        });
+        this._timeouts.forEach(function(timeout){
+          clearTimeout(timeout);
         });
       }
     };
