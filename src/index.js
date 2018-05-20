@@ -222,7 +222,7 @@
       asyncEventer.call(this);
       this._pending_connections = ArrayMap();
       this._connections = ArrayMap();
-      this._timeouts = ArraySet();
+      this._timeouts = new Set;
       this._ice_servers = ice_servers;
       this._packets_per_second = packets_per_second;
       this._uncompressed_commands_offset = uncompressed_commands_offset;

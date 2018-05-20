@@ -7,7 +7,7 @@ crypto	= require('crypto')
 lib		= require('..')
 test	= require('tape')
 
-test('Transport', (t) !->
+test('P2P_transport', (t) !->
 	t.plan(12)
 
 	done		= false

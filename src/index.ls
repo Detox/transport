@@ -196,7 +196,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 
 		@_pending_connections			= ArrayMap()
 		@_connections					= ArrayMap()
-		@_timeouts						= ArraySet()
+		@_timeouts						= new Set
 		@_ice_servers					= ice_servers
 		@_packets_per_second			= packets_per_second
 		@_uncompressed_commands_offset	= uncompressed_commands_offset

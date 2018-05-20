@@ -9,7 +9,7 @@
   crypto = require('crypto');
   lib = require('..');
   test = require('tape');
-  test('Transport', function(t){
+  test('P2P_transport', function(t){
     var done, initiator, responder;
     t.plan(12);
     done = false;
