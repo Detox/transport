@@ -5,11 +5,10 @@
  * @license 0BSD
  */
 (function(){
-  var MAX_DATA_SIZE, MAX_COMPRESSED_DATA_SIZE, PACKET_SIZE, PEER_CONNECTION_TIMEOUT;
+  var MAX_DATA_SIZE, MAX_COMPRESSED_DATA_SIZE, PACKET_SIZE;
   MAX_DATA_SIZE = Math.pow(2, 16) - 2;
   MAX_COMPRESSED_DATA_SIZE = MAX_DATA_SIZE - 1;
   PACKET_SIZE = 512;
-  PEER_CONNECTION_TIMEOUT = 30;
   /**
    * @param {!Array<!Uint8Array>}	buffer
    * @param {!Uint8Array}			new_array

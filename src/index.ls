@@ -8,8 +8,6 @@ const MAX_DATA_SIZE				= 2 ** 16 - 2
 const MAX_COMPRESSED_DATA_SIZE	= MAX_DATA_SIZE - 1
 # Fixed packet size for all communications on peer connection
 const PACKET_SIZE				= 512
-# If connection was not established during this time (seconds) then assume connection failure
-const PEER_CONNECTION_TIMEOUT	= 30
 
 /**
  * @param {!Array<!Uint8Array>}	buffer
