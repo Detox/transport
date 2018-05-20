@@ -36,23 +36,17 @@
       initiator.send(generated_command, generated_data);
     }).on('disconnected', function(){
       t.ok(done, 'Initiator disconnected after done');
+    }).on('signal', function(signal){
+      t.pass('Getting signal succeeded on initiator');
+      responder.signal(signal);
     });
     responder = lib.P2P_transport(false, [], 1000).on('connected', function(){
       t.pass('Responder connected successfully');
     }).on('disconnected', function(){
       t.ok(done, 'Responder disconnected after done');
-    });
-    initiator.get_signal().then(function(signal){
-      t.pass('Getting signal succeeded on initiator');
-      responder.set_signal(signal);
-    })['catch'](function(){
-      t.fail('Getting signal failed on initiator');
-    });
-    responder.get_signal().then(function(signal){
+    }).on('signal', function(signal){
       t.pass('Getting signal succeeded on responder');
-      initiator.set_signal(signal);
-    })['catch'](function(){
-      t.fail('Getting signal failed on responder');
+      initiator.signal(signal);
     });
   });
 }).call(this);
