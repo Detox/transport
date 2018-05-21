@@ -204,10 +204,15 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 		/**
 		 * @param {boolean}		initiator
 		 * @param {!Uint8Array}	peer_id
+		 *
+		 * @return {P2P_transport}
 		 */
-		'create_connection' : (initiator, peer_id) !->
-			if @_destroyed || @_pending_connections.has(peer_id) || @_connections.has(peer_id)
-				return
+		'create_connection' : (initiator, peer_id) ->
+			if @_destroyed
+				return null
+			connection	= @_pending_connections.get(peer_id) || @_connections.get(peer_id)
+			if connection
+				return connection
 			connection	= P2P_transport(initiator, @_ice_servers, @_packets_per_second, @_uncompressed_commands_offset)
 				.'on'('data', (command, command_data) !~>
 					if @_destroyed
@@ -238,6 +243,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 			# `signal` event might not be fired ever, so create timeout here
 			@_timeout(connection, 'signal')
 			@_pending_connections.set(peer_id, connection)
+			connection
 		/**
 		 * @param {!P2P_transport} connection
 		 */

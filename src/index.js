@@ -231,11 +231,17 @@
       /**
        * @param {boolean}		initiator
        * @param {!Uint8Array}	peer_id
+       *
+       * @return {P2P_transport}
        */
       'create_connection': function(initiator, peer_id){
         var connection, this$ = this;
-        if (this._destroyed || this._pending_connections.has(peer_id) || this._connections.has(peer_id)) {
-          return;
+        if (this._destroyed) {
+          return null;
+        }
+        connection = this._pending_connections.get(peer_id) || this._connections.get(peer_id);
+        if (connection) {
+          return connection;
         }
         connection = P2P_transport(initiator, this._ice_servers, this._packets_per_second, this._uncompressed_commands_offset)['on']('data', function(command, command_data){
           if (this$._destroyed) {
@@ -265,6 +271,7 @@
         });
         this._timeout(connection, 'signal');
         this._pending_connections.set(peer_id, connection);
+        return connection;
       }
       /**
        * @param {!P2P_transport} connection

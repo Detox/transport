@@ -82,8 +82,10 @@ Constructor for transport object that encapsulates multiple P2P connections and 
 * `uncompressed_commands_offset` - commands with number less than this will be compressed/decompressed with zlib
 * `connect_timeout` - how many seconds since `signal` generation to wait for connection before failing
 
-### detox_transport.Transport.create_connection(initiator : boolean, peer_id : Uint8Array)
+### detox_transport.Transport.create_connection(initiator : boolean, peer_id : Uint8Array) : P2P_transport
 Create new connection for `peer_id` as initiator or responder.
+
+Returns instance of `P2P_transport` on success.
 
 ### detox_transport.Transport.destroy_connection(peer_id : Uint8Array)
 Destroy connection for `peer_id`.
