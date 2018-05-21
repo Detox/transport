@@ -247,7 +247,7 @@
             return;
           }
           this$['fire']('signal', peer_id, signal);
-          this$._connection_timeout(connection);
+          this$._timeout(connection, 'connected');
         })['once']('connected', function(){
           if (this$._destroyed || !this$._pending_connections.has(peer_id)) {
             return;
@@ -263,21 +263,19 @@
           this$._connections['delete'](peer_id);
           this$['fire']('disconnected', peer_id);
         });
-        if (!initiator) {
-          this._connection_timeout(connection);
-        }
+        this._timeout(connection, 'signal');
         this._pending_connections.set(peer_id, connection);
       }
       /**
        * @param {!P2P_transport} connection
        */,
-      _connection_timeout: function(connection){
+      _timeout: function(connection, event){
         var timeout, this$ = this;
         timeout = timeoutSet(this._connect_timeout, function(){
           connection['destroy']();
         });
         this._timeouts.add(timeout);
-        connection['once']('connected', function(){
+        connection['once'](event, function(){
           this$._timeouts['delete'](timeout);
           clearTimeout(timeout);
         });

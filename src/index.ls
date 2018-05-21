@@ -218,7 +218,8 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 					if @_destroyed
 						return
 					@'fire'('signal', peer_id, signal)
-					@_connection_timeout(connection)
+					# Make sure connection takes no longer than needed
+					@_timeout(connection, 'connected')
 				)
 				.'once'('connected', !~>
 					if @_destroyed || !@_pending_connections.has(peer_id)
@@ -234,19 +235,18 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 					@_connections.delete(peer_id)
 					@'fire'('disconnected', peer_id)
 				)
-			if !initiator
-				# Responder might never fire `signal` event, so create timeout here
-				@_connection_timeout(connection)
+			# `signal` event might not be fired ever, so create timeout here
+			@_timeout(connection, 'signal')
 			@_pending_connections.set(peer_id, connection)
 		/**
 		 * @param {!P2P_transport} connection
 		 */
-		_connection_timeout : (connection) !->
+		_timeout : (connection, event) !->
 			timeout	= timeoutSet(@_connect_timeout, !->
 				connection['destroy']()
 			)
 			@_timeouts.add(timeout)
-			connection['once']('connected', !~>
+			connection['once'](event, !~>
 				@_timeouts.delete(timeout)
 				clearTimeout(timeout)
 			)
