@@ -77,6 +77,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 			)
 			..'once'('close', !~>
 				@'fire'('disconnected')
+				@'destroy'()
 			)
 			..'on'('data', (data) !~>
 				if @_destroyed

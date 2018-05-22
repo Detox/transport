@@ -82,6 +82,7 @@
       });
       x$['once']('close', function(){
         this$['fire']('disconnected');
+        this$['destroy']();
       });
       x$['on']('data', function(data){
         var demultiplexed_data, command, command_data;
