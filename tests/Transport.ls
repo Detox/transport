@@ -8,19 +8,21 @@ lib		= require('..')
 test	= require('tape')
 
 test('Transport', (t) !->
-	t.plan(10)
+	t.plan(11)
 
-	initiator_id	= Buffer.from('foo')
-	responder_id	= Buffer.from('bar')
-	transport		= lib.Transport([], 5, 10, 30)
+	initiator_id		= Buffer.from('foo')
+	responder_unknown	= Buffer.from('unknown')
+	responder_id		= Buffer.from('bar')
+	transport			= lib.Transport([], 5, 10, 30)
 		.once('signal', (peer_id, signal) !->
-			t.same(peer_id, responder_id, 'Got signal for responder')
+			t.same(peer_id, responder_unknown, 'Got signal for unknown responder')
 
 			transport.create_connection(false, initiator_id)
 			transport.signal(initiator_id, signal)
 			transport.once('signal', (peer_id, signal) !->
 				t.same(peer_id, initiator_id, 'Got signal for initiator')
 
+				t.ok(transport.update_peer_id(responder_unknown, responder_id), 'Responder ID update succeeded')
 				transport.signal(responder_id, signal)
 				connections	= 0
 				done		= false
@@ -56,5 +58,5 @@ test('Transport', (t) !->
 					)
 			)
 		)
-	transport.create_connection(true, responder_id)
+	transport.create_connection(true, responder_unknown)
 )

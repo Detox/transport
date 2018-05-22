@@ -87,6 +87,11 @@ Create new connection for `peer_id` as initiator or responder.
 
 Returns instance of `P2P_transport` on success.
 
+### detox_transport.Transport.update_peer_id(old_peer_id : Uint8Array, new_peer_id : Uint8Array) : boolean
+Allows to change old peer ID to new one, is useful when connection needs to be initialized, but peer's ID is not yet known, so that random ID can be used and then updated to correct one.
+
+Returns `true` if update succeeded (will fail when connection to peer with `new_peer_id` already exists).
+
 ### detox_transport.Transport.destroy_connection(peer_id : Uint8Array)
 Destroy connection for `peer_id`.
 

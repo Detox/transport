@@ -29,7 +29,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 	concat_arrays	= detox-utils['concat_arrays']
 	ArrayMap		= detox-utils['ArrayMap']
 	timeoutSet		= detox-utils['timeoutSet']
-	null_array		= new Uint8Array(0)
+	empty_array		= new Uint8Array(0)
 	/**
 	 * @constructor
 	 *
@@ -59,8 +59,8 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 		@_sending				= initiator
 		@_multiplexer			= fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, PACKET_SIZE)
 		@_demultiplexer			= fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, PACKET_SIZE)
-		@_send_zlib_buffer		= [null_array, null_array, null_array, null_array, null_array]
-		@_receive_zlib_buffer	= [null_array, null_array, null_array, null_array, null_array]
+		@_send_zlib_buffer		= [empty_array, empty_array, empty_array, empty_array, empty_array]
+		@_receive_zlib_buffer	= [empty_array, empty_array, empty_array, empty_array, empty_array]
 		@_peer
 			..once('signal', (signal) !~>
 				if @_destroyed
@@ -199,6 +199,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 		@_packets_per_second			= packets_per_second
 		@_uncompressed_commands_offset	= uncompressed_commands_offset
 		@_connect_timeout				= connect_timeout
+		@_connection_to_id_map			= new WeakMap
 
 	Transport:: =
 		/**
@@ -217,16 +218,19 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 				.'on'('data', (command, command_data) !~>
 					if @_destroyed
 						return
+					peer_id	= @_connection_to_id_map.get(connection)
 					@'fire'('data', peer_id, command, command_data)
 				)
 				.'once'('signal', (signal) !~>
 					if @_destroyed
 						return
+					peer_id	= @_connection_to_id_map.get(connection)
 					@'fire'('signal', peer_id, signal)
 					# Make sure connection takes no longer than needed
 					@_timeout(connection, 'connected')
 				)
 				.'once'('connected', !~>
+					peer_id	= @_connection_to_id_map.get(connection)
 					if @_destroyed || !@_pending_connections.has(peer_id)
 						return
 					@_pending_connections.delete(peer_id)
@@ -236,14 +240,38 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 				.'once'('disconnected', !~>
 					if @_destroyed
 						return
+					peer_id	= @_connection_to_id_map.get(connection)
 					@_pending_connections.delete(peer_id)
 					@_connections.delete(peer_id)
 					@'fire'('disconnected', peer_id)
 				)
+			@_connection_to_id_map.set(connection, peer_id)
 			# `signal` event might not be fired ever, so create timeout here
 			@_timeout(connection, 'signal')
 			@_pending_connections.set(peer_id, connection)
 			connection
+		/**
+		 * @param {!Uint8Array}	old_peer_id
+		 * @param {!Uint8Array}	new_peer_id
+		 *
+		 * @return {boolean}
+		 */
+		'update_peer_id' : (old_peer_id, new_peer_id) ->
+			if @_pending_connections.has(new_peer_id) || @_connections.has(new_peer_id)
+				return false
+			connection	= @_pending_connections.get(old_peer_id)
+			if connection
+				@_connection_to_id_map.set(connection, new_peer_id)
+				@_pending_connections.delete(old_peer_id)
+				@_pending_connections.set(new_peer_id, connection)
+				return true
+			connection	= @_connections.get(old_peer_id)
+			if connection
+				@_connection_to_id_map.set(connection, new_peer_id)
+				@_connections.delete(old_peer_id)
+				@_connections.set(new_peer_id, connection)
+				return true
+			false
 		/**
 		 * @param {!P2P_transport} connection
 		 */

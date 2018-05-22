@@ -24,13 +24,13 @@
    * @param {!Object=} wrtc
    */
   function Wrapper(detoxUtils, fixedSizeMultiplexer, asyncEventer, pako, simplePeer, wrtc){
-    var array2string, string2array, concat_arrays, ArrayMap, timeoutSet, null_array;
+    var array2string, string2array, concat_arrays, ArrayMap, timeoutSet, empty_array;
     array2string = detoxUtils['array2string'];
     string2array = detoxUtils['string2array'];
     concat_arrays = detoxUtils['concat_arrays'];
     ArrayMap = detoxUtils['ArrayMap'];
     timeoutSet = detoxUtils['timeoutSet'];
-    null_array = new Uint8Array(0);
+    empty_array = new Uint8Array(0);
     /**
      * @constructor
      *
@@ -61,8 +61,8 @@
       this._sending = initiator;
       this._multiplexer = fixedSizeMultiplexer['Multiplexer'](MAX_DATA_SIZE, PACKET_SIZE);
       this._demultiplexer = fixedSizeMultiplexer['Demultiplexer'](MAX_DATA_SIZE, PACKET_SIZE);
-      this._send_zlib_buffer = [null_array, null_array, null_array, null_array, null_array];
-      this._receive_zlib_buffer = [null_array, null_array, null_array, null_array, null_array];
+      this._send_zlib_buffer = [empty_array, empty_array, empty_array, empty_array, empty_array];
+      this._receive_zlib_buffer = [empty_array, empty_array, empty_array, empty_array, empty_array];
       x$ = this._peer;
       x$.once('signal', function(signal){
         if (this$._destroyed) {
@@ -226,6 +226,7 @@
       this._packets_per_second = packets_per_second;
       this._uncompressed_commands_offset = uncompressed_commands_offset;
       this._connect_timeout = connect_timeout;
+      this._connection_to_id_map = new WeakMap;
     }
     Transport.prototype = {
       /**
@@ -244,17 +245,23 @@
           return connection;
         }
         connection = P2P_transport(initiator, this._ice_servers, this._packets_per_second, this._uncompressed_commands_offset)['on']('data', function(command, command_data){
+          var peer_id;
           if (this$._destroyed) {
             return;
           }
+          peer_id = this$._connection_to_id_map.get(connection);
           this$['fire']('data', peer_id, command, command_data);
         })['once']('signal', function(signal){
+          var peer_id;
           if (this$._destroyed) {
             return;
           }
+          peer_id = this$._connection_to_id_map.get(connection);
           this$['fire']('signal', peer_id, signal);
           this$._timeout(connection, 'connected');
         })['once']('connected', function(){
+          var peer_id;
+          peer_id = this$._connection_to_id_map.get(connection);
           if (this$._destroyed || !this$._pending_connections.has(peer_id)) {
             return;
           }
@@ -262,16 +269,46 @@
           this$._connections.set(peer_id, connection);
           this$['fire']('connected', peer_id);
         })['once']('disconnected', function(){
+          var peer_id;
           if (this$._destroyed) {
             return;
           }
+          peer_id = this$._connection_to_id_map.get(connection);
           this$._pending_connections['delete'](peer_id);
           this$._connections['delete'](peer_id);
           this$['fire']('disconnected', peer_id);
         });
+        this._connection_to_id_map.set(connection, peer_id);
         this._timeout(connection, 'signal');
         this._pending_connections.set(peer_id, connection);
         return connection;
+      }
+      /**
+       * @param {!Uint8Array}	old_peer_id
+       * @param {!Uint8Array}	new_peer_id
+       *
+       * @return {boolean}
+       */,
+      'update_peer_id': function(old_peer_id, new_peer_id){
+        var connection;
+        if (this._pending_connections.has(new_peer_id) || this._connections.has(new_peer_id)) {
+          return false;
+        }
+        connection = this._pending_connections.get(old_peer_id);
+        if (connection) {
+          this._connection_to_id_map.set(connection, new_peer_id);
+          this._pending_connections['delete'](old_peer_id);
+          this._pending_connections.set(new_peer_id, connection);
+          return true;
+        }
+        connection = this._connections.get(old_peer_id);
+        if (connection) {
+          this._connection_to_id_map.set(connection, new_peer_id);
+          this._connections['delete'](old_peer_id);
+          this._connections.set(new_peer_id, connection);
+          return true;
+        }
+        return false;
       }
       /**
        * @param {!P2P_transport} connection
