@@ -65,14 +65,15 @@
        * @param {boolean} initiator
        */
       _init_peer: function(initiator){
-        var old_instance, x$, instance, this$ = this;
+        var old_instance, instance, x$, this$ = this;
         if (this._connected) {
           return;
         }
         this._initiator = initiator;
         this._sending = initiator;
+        this._signal_received = false;
         old_instance = this._peer;
-        x$ = instance = simplePeer({
+        instance = simplePeer({
           'config': {
             'iceServers': this._ice_servers
           },
@@ -80,6 +81,8 @@
           'trickle': false,
           'wrtc': wrtc
         });
+        this._peer = instance;
+        x$ = instance;
         x$['once']('signal', function(signal){
           if (this$._destroyed || this$._peer !== instance) {
             return;
@@ -128,7 +131,6 @@
           }
         });
         x$['on']('error', error_handler);
-        this._peer = instance;
         if (old_instance) {
           old_instance['destroy']();
         }
@@ -138,9 +140,10 @@
        */,
       'signal': function(signal){
         var offer, i$, ref$, len$, key, item;
-        if (this._destroyed) {
+        if (this._destroyed || this._signal_received) {
           return;
         }
+        this._signal_received = true;
         offer = Boolean(signal[0]);
         if (offer === this._initiator) {
           for (i$ = 0, len$ = (ref$ = this._id).length; i$ < len$; ++i$) {
