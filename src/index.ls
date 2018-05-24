@@ -34,6 +34,8 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 	/**
 	 * @constructor
 	 *
+	 * @param {!Uint8Array}		id								Own ID
+	 * @param {!Uint8Array}		peer_id							ID of a peer
 	 * @param {boolean}			initiator
 	 * @param {!Array<!Object>}	ice_servers
 	 * @param {number}			packets_per_second				Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
@@ -41,77 +43,95 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 	 *
 	 * @return {!P2P_transport}
 	 */
-	!function P2P_transport (initiator, ice_servers, packets_per_second, uncompressed_commands_offset)
+	!function P2P_transport (id, peer_id, initiator, ice_servers, packets_per_second, uncompressed_commands_offset)
 		if !(@ instanceof P2P_transport)
-			return new P2P_transport(initiator, ice_servers, packets_per_second, uncompressed_commands_offset)
+			return new P2P_transport(id, peer_id, initiator, ice_servers, packets_per_second, uncompressed_commands_offset)
 		async-eventer.call(@)
 
+		@_id							= id
+		@_peer_id						= peer_id
 		@_initiator						= initiator
+		@_ice_servers					= ice_servers
 		@_uncompressed_commands_offset	= uncompressed_commands_offset
-		@_peer							= simple-peer(
-			'config'	:
-				'iceServers'	: ice_servers
-			'initiator'	: initiator
-			'trickle'	: false
-			'wrtc'		: wrtc
-		)
-
-		@_send_delay			= 1000 / packets_per_second
-		@_sending				= initiator
-		@_multiplexer			= fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, PACKET_SIZE)
-		@_demultiplexer			= fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, PACKET_SIZE)
-		@_send_zlib_buffer		= [empty_array, empty_array, empty_array, empty_array, empty_array]
-		@_receive_zlib_buffer	= [empty_array, empty_array, empty_array, empty_array, empty_array]
-		@_peer
-			..'once'('signal', (signal) !~>
-				if @_destroyed
-					return
-				@'fire'('signal', string2array(signal['sdp']))
-			)
-			..'once'('connect', !~>
-				if @_destroyed
-					return
-				@'fire'('connected')
-				@_last_sent	= +(new Date)
-				if @_sending
-					@_real_send()
-			)
-			..'once'('close', !~>
-				@'fire'('disconnected')
-				@'destroy'()
-			)
-			..'on'('data', (data) !~>
-				if @_destroyed
-					return
-				# Data are sent in alternating order, sending data when receiving is expected violates the protocol
-				# Data size must be exactly one packet size
-				if @_sending || data.length != PACKET_SIZE
-					@'destroy'()
-				else
-					@_demultiplexer['feed'](data)
-					while @_demultiplexer['have_more_data']()
-						demultiplexed_data	= @_demultiplexer['get_data']()
-						command				= demultiplexed_data[0]
-						command_data		= demultiplexed_data.subarray(1)
-						if command < @_uncompressed_commands_offset
-							command_data	= @_zlib_decompress(command_data)
-						@'fire'('data', command, command_data)
-					@_sending	= true
-					@_real_send()
-			)
-			.'on'('error', error_handler)
+		@_send_delay					= 1000 / packets_per_second
+		@_sending						= initiator
+		@_multiplexer					= fixed-size-multiplexer['Multiplexer'](MAX_DATA_SIZE, PACKET_SIZE)
+		@_demultiplexer					= fixed-size-multiplexer['Demultiplexer'](MAX_DATA_SIZE, PACKET_SIZE)
+		@_send_zlib_buffer				= [empty_array, empty_array, empty_array, empty_array, empty_array]
+		@_receive_zlib_buffer			= [empty_array, empty_array, empty_array, empty_array, empty_array]
+		@_init_peer(initiator)
 
 	P2P_transport:: =
+		/**
+		 * @param {boolean} initiator
+		 */
+		_init_peer	: (initiator) !->
+			instance	= simple-peer(
+				'config'	:
+					'iceServers'	: @_ice_servers
+				'initiator'	: initiator
+				'trickle'	: false
+				'wrtc'		: wrtc
+			)
+				..'once'('signal', (signal) !~>
+					if @_destroyed || @_peer != instance
+						return
+					@'fire'('signal', concat_arrays([
+						[if initiator then 1 else 0]
+						string2array(signal['sdp'])
+					]))
+				)
+				..'once'('connect', !~>
+					if @_destroyed || @_peer != instance
+						return
+					@'fire'('connected')
+					@_last_sent	= +(new Date)
+					if @_sending
+						@_real_send()
+				)
+				..'once'('close', !~>
+					if @_peer != instance
+						return
+					@'fire'('disconnected')
+					@'destroy'()
+				)
+				..'on'('data', (data) !~>
+					if @_destroyed || @_peer != instance
+						return
+					# Data are sent in alternating order, sending data when receiving is expected violates the protocol
+					# Data size must be exactly one packet size
+					if @_sending || data.length != PACKET_SIZE
+						@'destroy'()
+					else
+						@_demultiplexer['feed'](data)
+						while @_demultiplexer['have_more_data']()
+							demultiplexed_data	= @_demultiplexer['get_data']()
+							command				= demultiplexed_data[0]
+							command_data		= demultiplexed_data.subarray(1)
+							if command < @_uncompressed_commands_offset
+								command_data	= @_zlib_decompress(command_data)
+							@'fire'('data', command, command_data)
+						@_sending	= true
+						@_real_send()
+				)
+				..'on'('error', error_handler)
+			@_peer	= instance
 		/**
 		 * @param {!Uint8Array} signal As generated by `signal` event
 		 */
 		'signal' : (signal) !->
 			if @_destroyed
 				return
+			offer	= Boolean(signal[0])
+			if offer == @_initiator
+				# TODO: Implement race condition resolution
+				void
 			@_peer['signal'](
 				'type'	: if @_initiator then 'answer' else 'offer'
-				'sdp'	: array2string(signal)
+				'sdp'	: array2string(signal.subarray(1))
 			)
+		'update_peer_id' : (peer_id) !->
+			@_peer_id	= peer_id
 		/**
 		 * @param {number}		command
 		 * @param {!Uint8Array}	data
@@ -183,6 +203,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 	/**
 	 * @constructor
 	 *
+	 * @param {!Uint8Array}		id								Own ID
 	 * @param {!Array<!Object>}	ice_servers
 	 * @param {number}			packets_per_second				Each packet send in each direction has exactly the same size and packets are sent at fixed rate (>= 1)
 	 * @param {number}			uncompressed_commands_offset	Commands with number less than this will be compressed/decompressed with zlib
@@ -190,11 +211,12 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 	 *
 	 * @return {!Transport}
 	 */
-	!function Transport (ice_servers, packets_per_second, uncompressed_commands_offset, connect_timeout)
+	!function Transport (id, ice_servers, packets_per_second, uncompressed_commands_offset, connect_timeout)
 		if !(@ instanceof Transport)
-			return new Transport(ice_servers, packets_per_second, uncompressed_commands_offset, connect_timeout)
+			return new Transport(id, ice_servers, packets_per_second, uncompressed_commands_offset, connect_timeout)
 		async-eventer.call(@)
 
+		@_id							= id
 		@_pending_connections			= ArrayMap()
 		@_connections					= ArrayMap()
 		@_timeouts						= new Set
@@ -217,7 +239,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 			connection	= @_pending_connections.get(peer_id) || @_connections.get(peer_id)
 			if connection
 				return connection
-			connection	= P2P_transport(initiator, @_ice_servers, @_packets_per_second, @_uncompressed_commands_offset)
+			connection	= P2P_transport(@_id, peer_id, initiator, @_ice_servers, @_packets_per_second, @_uncompressed_commands_offset)
 				.'on'('data', (command, command_data) !~>
 					if @_destroyed
 						return
@@ -267,12 +289,14 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 				@_connection_to_id_map.set(connection, new_peer_id)
 				@_pending_connections.delete(old_peer_id)
 				@_pending_connections.set(new_peer_id, connection)
+				connection['update_peer_id'](new_peer_id)
 				return true
 			connection	= @_connections.get(old_peer_id)
 			if connection
 				@_connection_to_id_map.set(connection, new_peer_id)
 				@_connections.delete(old_peer_id)
 				@_connections.set(new_peer_id, connection)
+				connection['update_peer_id'](new_peer_id)
 				return true
 			false
 		/**

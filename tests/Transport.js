@@ -10,51 +10,57 @@
   lib = require('..');
   test = require('tape');
   test('Transport', function(t){
-    var initiator_id, responder_unknown, responder_id, transport;
+    var initiator_id, responder_unknown, responder_id, initiator_transport, responder_transport;
     t.plan(11);
     initiator_id = Buffer.from('foo');
     responder_unknown = Buffer.from('unknown');
     responder_id = Buffer.from('bar');
-    transport = lib.Transport([], 5, 10, 30).once('signal', function(peer_id, signal){
+    initiator_transport = lib.Transport(initiator_id, [], 5, 10, 30);
+    responder_transport = lib.Transport(responder_id, [], 5, 10, 30);
+    initiator_transport.once('signal', function(peer_id, signal){
       t.same(peer_id, responder_unknown, 'Got signal for unknown responder');
-      transport.create_connection(false, initiator_id);
-      transport.signal(initiator_id, signal);
-      transport.once('signal', function(peer_id, signal){
+      responder_transport.create_connection(false, initiator_id);
+      responder_transport.signal(initiator_id, signal);
+      responder_transport.once('signal', function(peer_id, signal){
         var connections, done;
         t.same(peer_id, initiator_id, 'Got signal for initiator');
-        t.ok(transport.update_peer_id(responder_unknown, responder_id), 'Responder ID update succeeded');
-        transport.signal(responder_id, signal);
+        t.ok(initiator_transport.update_peer_id(responder_unknown, responder_id), 'Responder ID update succeeded');
+        initiator_transport.signal(responder_id, signal);
         connections = 0;
         done = false;
-        transport.on('connected', function(){
+        function connected(){
           var generated_command, generated_data;
           ++connections;
           t.pass('Connected #' + connections);
           if (connections === 2) {
             generated_command = 5;
             generated_data = crypto.randomBytes(20);
-            transport.send(responder_id, generated_command, generated_data);
-            transport.once('data', function(arg$, command, data){
+            initiator_transport.send(responder_id, generated_command, generated_data);
+            responder_transport.once('data', function(arg$, command, data){
               t.equal(command, generated_command, 'Got correct command from initiator');
               t.equal(data.length, generated_data.length, 'Got correct data length from initiator');
               t.same(Buffer.from(data), generated_data, 'Got correct data from initiator');
               generated_command = 25;
               generated_data = crypto.randomBytes(20);
-              transport.send(initiator_id, generated_command, generated_data);
-              transport.once('data', function(arg$, command, data){
+              responder_transport.send(initiator_id, generated_command, generated_data);
+              initiator_transport.once('data', function(arg$, command, data){
                 t.equal(command, generated_command, 'Got correct command from responder');
                 t.equal(data.length, generated_data.length, 'Got correct data length from responder');
                 t.same(Buffer.from(data), generated_data, 'Got correct data from responder');
                 done = true;
-                transport.destroy();
+                initiator_transport.destroy();
+                responder_transport.destroy();
               });
             });
           }
-        }).on('disconnected', function(){
+        }
+        initiator_transport.on('connected', connected).on('disconnected', function(){
+          t.fail('Disconnected');
+        });
+        responder_transport.on('connected', connected).on('disconnected', function(){
           t.fail('Disconnected');
         });
       });
-    });
-    transport.create_connection(true, responder_unknown);
+    }).create_connection(true, responder_unknown);
   });
 }).call(this);

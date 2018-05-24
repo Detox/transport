@@ -10,8 +10,10 @@ test	= require('tape')
 test('P2P_transport', (t) !->
 	t.plan(12)
 
-	done		= false
-	initiator	= lib.P2P_transport(true, [], 1000)
+	done			= false
+	initiator_id	= Buffer.from('foo')
+	responder_id	= Buffer.from('bar')
+	initiator		= lib.P2P_transport(initiator_id, responder_id, true, [], 1000)
 		.on('connected', !->
 			t.pass('Initiator connected successfully')
 
@@ -43,7 +45,7 @@ test('P2P_transport', (t) !->
 			t.pass('Getting signal succeeded on initiator')
 			responder.signal(signal)
 		)
-	responder	= lib.P2P_transport(false, [], 1000)
+	responder	= lib.P2P_transport(responder_id, initiator_id, false, [], 1000)
 		.on('connected', !->
 			t.pass('Responder connected successfully')
 		)

@@ -10,10 +10,12 @@
   lib = require('..');
   test = require('tape');
   test('P2P_transport', function(t){
-    var done, initiator, responder;
+    var done, initiator_id, responder_id, initiator, responder;
     t.plan(12);
     done = false;
-    initiator = lib.P2P_transport(true, [], 1000).on('connected', function(){
+    initiator_id = Buffer.from('foo');
+    responder_id = Buffer.from('bar');
+    initiator = lib.P2P_transport(initiator_id, responder_id, true, [], 1000).on('connected', function(){
       var generated_command, generated_data;
       t.pass('Initiator connected successfully');
       generated_command = 5;
@@ -40,7 +42,7 @@
       t.pass('Getting signal succeeded on initiator');
       responder.signal(signal);
     });
-    responder = lib.P2P_transport(false, [], 1000).on('connected', function(){
+    responder = lib.P2P_transport(responder_id, initiator_id, false, [], 1000).on('connected', function(){
       t.pass('Responder connected successfully');
     }).on('disconnected', function(){
       t.ok(done, 'Responder disconnected after done');
