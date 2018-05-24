@@ -88,6 +88,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 					if @_destroyed || @_peer != instance
 						return
 					@'fire'('connected')
+					@'off'('signal')
 					@_connected	= true
 					@_last_sent	= +(new Date)
 					if @_sending

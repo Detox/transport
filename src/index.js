@@ -91,6 +91,7 @@
             return;
           }
           this$['fire']('connected');
+          this$['off']('signal');
           this$._connected = true;
           this$._last_sent = +new Date;
           if (this$._sending) {
