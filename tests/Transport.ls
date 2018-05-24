@@ -69,3 +69,39 @@ test('Transport', (t) !->
 		)
 		.create_connection(true, responder_unknown)
 )
+test('Transport: concurrent connections initialization', (t) !->
+	t.plan(4)
+
+	initiator_id		= Buffer.from('foo')
+	responder_id		= Buffer.from('bar')
+	initiator_transport	= lib.Transport(initiator_id, [], 5, 10, 30)
+	responder_transport	= lib.Transport(responder_id, [], 5, 10, 30)
+	connections			= 0
+	!function connected
+		++connections
+		t.pass('Connected #' + connections)
+
+		if connections == 2
+			initiator_transport.destroy()
+			responder_transport.destroy()
+	initiator_transport
+		.on('signal', (peer_id, signal) !->
+			t.same(peer_id, responder_id, 'Got signal for responder')
+			responder_transport.signal(initiator_id, signal)
+		)
+		.on('connected', connected)
+		.on('disconnected', !->
+			t.fail('Disconnected')
+		)
+		.create_connection(true, responder_id)
+	responder_transport
+		.on('signal', (peer_id, signal) !->
+			t.same(peer_id, initiator_id, 'Got signal for initiator')
+			initiator_transport.signal(responder_id, signal)
+		)
+		.on('connected', connected)
+		.on('disconnected', !->
+			t.fail('Disconnected')
+		)
+		.create_connection(true, initiator_id)
+)
