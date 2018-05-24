@@ -106,7 +106,7 @@
         });
         x$['on']('data', function(data){
           var demultiplexed_data, command, command_data;
-          if (this$._destroyed || this$._peer !== instance) {
+          if (this$._destroyed) {
             return;
           }
           if (this$._sending || data.length !== PACKET_SIZE) {

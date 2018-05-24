@@ -100,7 +100,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 					@'destroy'()
 				)
 				..'on'('data', (data) !~>
-					if @_destroyed || @_peer != instance
+					if @_destroyed
 						return
 					# Data are sent in alternating order, sending data when receiving is expected violates the protocol
 					# Data size must be exactly one packet size
