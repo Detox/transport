@@ -8,7 +8,7 @@
 		"webrtc",
 		"rtcdatachannel"
 	],
-	"version"         : "0.36.4",
+	"version"         : "0.36.5",
 	"homepage"        : "https://github.com/Detox/transport",
 	"author"          : "Nazar Mokrynskyi <nazar@mokrynskyi.com>",
 	"repository"      : {

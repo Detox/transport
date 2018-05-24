@@ -24,10 +24,11 @@
    * @param {!Object=} wrtc
    */
   function Wrapper(detoxUtils, fixedSizeMultiplexer, asyncEventer, pako, simplePeer, wrtc){
-    var array2string, string2array, concat_arrays, ArrayMap, timeoutSet, empty_array;
+    var array2string, string2array, concat_arrays, error_handler, ArrayMap, timeoutSet, empty_array;
     array2string = detoxUtils['array2string'];
     string2array = detoxUtils['string2array'];
     concat_arrays = detoxUtils['concat_arrays'];
+    error_handler = detoxUtils['error_handler'];
     ArrayMap = detoxUtils['ArrayMap'];
     timeoutSet = detoxUtils['timeoutSet'];
     empty_array = new Uint8Array(0);
@@ -64,7 +65,7 @@
       this._send_zlib_buffer = [empty_array, empty_array, empty_array, empty_array, empty_array];
       this._receive_zlib_buffer = [empty_array, empty_array, empty_array, empty_array, empty_array];
       x$ = this._peer;
-      x$.once('signal', function(signal){
+      x$['once']('signal', function(signal){
         if (this$._destroyed) {
           return;
         }
@@ -105,7 +106,7 @@
           this$._sending = true;
           this$._real_send();
         }
-      });
+      })['on']('error', error_handler);
     }
     P2P_transport.prototype = {
       /**

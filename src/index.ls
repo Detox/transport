@@ -27,6 +27,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 	array2string	= detox-utils['array2string']
 	string2array	= detox-utils['string2array']
 	concat_arrays	= detox-utils['concat_arrays']
+	error_handler	= detox-utils['error_handler']
 	ArrayMap		= detox-utils['ArrayMap']
 	timeoutSet		= detox-utils['timeoutSet']
 	empty_array		= new Uint8Array(0)
@@ -62,7 +63,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 		@_send_zlib_buffer		= [empty_array, empty_array, empty_array, empty_array, empty_array]
 		@_receive_zlib_buffer	= [empty_array, empty_array, empty_array, empty_array, empty_array]
 		@_peer
-			..once('signal', (signal) !~>
+			..'once'('signal', (signal) !~>
 				if @_destroyed
 					return
 				@'fire'('signal', string2array(signal['sdp']))
@@ -98,6 +99,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 					@_sending	= true
 					@_real_send()
 			)
+			.'on'('error', error_handler)
 
 	P2P_transport:: =
 		/**
