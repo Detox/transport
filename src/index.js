@@ -335,6 +335,14 @@
         return connection;
       }
       /**
+       * @param {!Uint8Array} peer_id
+       *
+       * @return {P2P_transport}
+       */,
+      'has_connection': function(peer_id){
+        return this._pending_connections.get(peer_id) || this._connections.get(peer_id) || null;
+      }
+      /**
        * @param {!Uint8Array}	old_peer_id
        * @param {!Uint8Array}	new_peer_id
        *
