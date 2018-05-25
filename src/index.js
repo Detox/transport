@@ -339,7 +339,7 @@
        *
        * @return {P2P_transport}
        */,
-      'has_connection': function(peer_id){
+      'get_connection': function(peer_id){
         return this._pending_connections.get(peer_id) || this._connections.get(peer_id) || null;
       }
       /**

@@ -93,10 +93,10 @@ Create new connection for `peer_id` as initiator or responder.
 
 Returns instance of `P2P_transport` on success.
 
-### detox_transport.Transport.has_connection(peer_id : Uint8Array) : detox_transport.P2P_transport
-Check whether connection for `peer_id` was already created.
+### detox_transport.Transport.get_connection(peer_id : Uint8Array) : detox_transport.P2P_transport
+Get connection for `peer_id` that was already created.
 
-Returns instance of `P2P_transport` was already created or `null` otherwise.
+Returns instance of `P2P_transport` if it was already created or `null` otherwise.
 
 ### detox_transport.Transport.update_peer_id(old_peer_id : Uint8Array, new_peer_id : Uint8Array) : boolean
 Allows to change old peer ID to new one, is useful when connection needs to be initialized, but peer's ID is not yet known, so that random ID can be used and then updated to correct one.

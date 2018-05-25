@@ -299,7 +299,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 		 *
 		 * @return {P2P_transport}
 		 */
-		'has_connection' : (peer_id) ->
+		'get_connection' : (peer_id) ->
 			@_pending_connections.get(peer_id) || @_connections.get(peer_id) || null
 		/**
 		 * @param {!Uint8Array}	old_peer_id
