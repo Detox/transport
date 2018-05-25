@@ -132,8 +132,8 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 			if @_destroyed || @_signal_received
 				return
 			@_signal_received	= true
-			offer				= Boolean(signal[0])
-			if offer == @_initiator
+			received_offer		= Boolean(signal[0])
+			if received_offer && @_initiator
 				for item, key in @_id
 					if item == @_peer_id[key]
 						continue
@@ -145,6 +145,10 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 						# Otherwise our connection is discarded and we proceed with connection initiated by the other side
 						@_init_peer(false)
 						break
+			else if !received_offer && !@_initiator
+				# Looks like previous connection was killed after timeout and new connection was created as responder, destroy this connection too
+				@'destroy'()
+				return
 			@_peer['signal'](
 				'type'	: if @_initiator then 'answer' else 'offer'
 				'sdp'	: array2string(signal.subarray(1))
