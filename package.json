@@ -25,8 +25,8 @@
 	},
 	"dependencies"    : {
 		"@detox/simple-peer"     : "^9.0.0",
-		"@detox/utils"           : "^1.6.0",
-		"async-eventer"          : "^1.1.5",
+		"@detox/utils"           : "^1.10.0",
+		"async-eventer"          : "^1.1.7",
 		"fixed-size-multiplexer" : "^1.0.2",
 		"pako"                   : "^1.0.6",
 		"wrtc"                   : "^0.1.4"

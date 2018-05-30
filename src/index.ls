@@ -82,10 +82,10 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 				..'once'('signal', (signal) !~>
 					if @_destroyed || @_peer != instance
 						return
-					@'fire'('signal', concat_arrays([
+					@'fire'('signal', concat_arrays(
 						[if initiator then 1 else 0]
 						string2array(signal['sdp'])
-					]))
+					))
 				)
 				..'once'('connect', !~>
 					if @_destroyed || @_peer != instance
@@ -167,7 +167,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 				if data.length > MAX_COMPRESSED_DATA_SIZE
 					return
 				data	= @_zlib_compress(data)
-			data_with_header	= concat_arrays([[command], data])
+			data_with_header	= concat_arrays([command], data)
 			@_multiplexer['feed'](data_with_header)
 		'destroy' : !->
 			if @_destroyed
@@ -202,9 +202,9 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 			})
 			update_dictionary_buffer(@_send_zlib_buffer, data)
 			if result.length > MAX_COMPRESSED_DATA_SIZE
-				concat_arrays([[0], data])
+				concat_arrays([0], data)
 			else
-				concat_arrays([[1], result])
+				concat_arrays([1], result)
 		/**
 		 * @param {!Uint8Array} data
 		 *

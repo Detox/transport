@@ -87,7 +87,7 @@
           if (this$._destroyed || this$._peer !== instance) {
             return;
           }
-          this$['fire']('signal', concat_arrays([[initiator ? 1 : 0], string2array(signal['sdp'])]));
+          this$['fire']('signal', concat_arrays([initiator ? 1 : 0], string2array(signal['sdp'])));
         });
         x$['once']('connect', function(){
           if (this$._destroyed || this$._peer !== instance) {
@@ -186,7 +186,7 @@
           }
           data = this._zlib_compress(data);
         }
-        data_with_header = concat_arrays([[command], data]);
+        data_with_header = concat_arrays([command], data);
         this._multiplexer['feed'](data_with_header);
       },
       'destroy': function(){
@@ -227,9 +227,9 @@
         });
         update_dictionary_buffer(this._send_zlib_buffer, data);
         if (result.length > MAX_COMPRESSED_DATA_SIZE) {
-          return concat_arrays([[0], data]);
+          return concat_arrays([0], data);
         } else {
-          return concat_arrays([[1], result]);
+          return concat_arrays([1], result);
         }
       }
       /**
