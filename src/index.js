@@ -130,7 +130,12 @@
             this$._real_send();
           }
         });
-        x$['on']('error', error_handler);
+        x$['on']('error', function(error){
+          if (error['code'] === 'ERR_ICE_CONNECTION_FAILURE') {
+            return;
+          }
+          error_handler(error);
+        });
         if (old_instance) {
           old_instance['destroy']();
         }

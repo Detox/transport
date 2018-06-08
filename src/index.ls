@@ -122,7 +122,12 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 						@_sending	= true
 						@_real_send()
 				)
-				..'on'('error', error_handler)
+				..'on'('error', (error) !->
+					# Ignore Ice errors, since they can happen quite often and are not too useful
+					if error['code'] == 'ERR_ICE_CONNECTION_FAILURE'
+						return
+					error_handler(error)
+				)
 			if old_instance
 				old_instance['destroy']()
 		/**
