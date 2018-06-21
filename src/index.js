@@ -65,7 +65,7 @@
        * @param {boolean} initiator
        */
       _init_peer: function(initiator){
-        var old_instance, instance, x$, this$ = this;
+        var old_instance, instance, this$ = this;
         if (this._connected) {
           return;
         }
@@ -80,16 +80,12 @@
           'initiator': initiator,
           'trickle': false,
           'wrtc': wrtc
-        });
-        this._peer = instance;
-        x$ = instance;
-        x$['once']('signal', function(signal){
+        })['once']('signal', function(signal){
           if (this$._destroyed || this$._peer !== instance) {
             return;
           }
           this$['fire']('signal', concat_arrays([initiator ? 1 : 0], string2array(signal['sdp'])));
-        });
-        x$['once']('connect', function(){
+        })['once']('connect', function(){
           if (this$._destroyed || this$._peer !== instance) {
             return;
           }
@@ -100,15 +96,13 @@
           if (this$._sending) {
             this$._real_send();
           }
-        });
-        x$['once']('close', function(){
+        })['once']('close', function(){
           if (this$._peer !== instance) {
             return;
           }
           this$['fire']('disconnected');
           this$['destroy']();
-        });
-        x$['on']('data', function(data){
+        })['on']('data', function(data){
           var demultiplexed_data, command, command_data;
           if (this$._destroyed) {
             return;
@@ -129,13 +123,13 @@
             this$._sending = true;
             this$._real_send();
           }
-        });
-        x$['on']('error', function(error){
+        })['on']('error', function(error){
           if (error['code'] === 'ERR_ICE_CONNECTION_FAILURE') {
             return;
           }
           error_handler(error);
         });
+        this._peer = instance;
         if (old_instance) {
           old_instance['destroy']();
         }

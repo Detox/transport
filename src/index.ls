@@ -77,9 +77,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 				'trickle'	: false
 				'wrtc'		: wrtc
 			)
-			@_peer				= instance
-			instance
-				..'once'('signal', (signal) !~>
+				.'once'('signal', (signal) !~>
 					if @_destroyed || @_peer != instance
 						return
 					@'fire'('signal', concat_arrays(
@@ -87,7 +85,7 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 						string2array(signal['sdp'])
 					))
 				)
-				..'once'('connect', !~>
+				.'once'('connect', !~>
 					if @_destroyed || @_peer != instance
 						return
 					@'fire'('connected')
@@ -97,13 +95,13 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 					if @_sending
 						@_real_send()
 				)
-				..'once'('close', !~>
+				.'once'('close', !~>
 					if @_peer != instance
 						return
 					@'fire'('disconnected')
 					@'destroy'()
 				)
-				..'on'('data', (data) !~>
+				.'on'('data', (data) !~>
 					if @_destroyed
 						return
 					# Data are sent in alternating order, sending data when receiving is expected violates the protocol
@@ -122,12 +120,13 @@ function Wrapper (detox-utils, fixed-size-multiplexer, async-eventer, pako, simp
 						@_sending	= true
 						@_real_send()
 				)
-				..'on'('error', (error) !->
+				.'on'('error', (error) !->
 					# Ignore Ice errors, since they can happen quite often and are not too useful
 					if error['code'] == 'ERR_ICE_CONNECTION_FAILURE'
 						return
 					error_handler(error)
 				)
+			@_peer				= instance
 			if old_instance
 				old_instance['destroy']()
 		/**

@@ -8,7 +8,7 @@
 		"webrtc",
 		"rtcdatachannel"
 	],
-	"version"         : "0.38.2",
+	"version"         : "0.38.3",
 	"homepage"        : "https://github.com/Detox/transport",
 	"author"          : "Nazar Mokrynskyi <nazar@mokrynskyi.com>",
 	"repository"      : {
@@ -24,7 +24,7 @@
 		"test" : "tape tests/**/*.js"
 	},
 	"dependencies"    : {
-		"@detox/simple-peer"     : "^9.0.0",
+		"@detox/simple-peer"     : "^9.1.2",
 		"@detox/utils"           : "^1.10.0",
 		"async-eventer"          : "^1.1.7",
 		"fixed-size-multiplexer" : "^1.0.2",
